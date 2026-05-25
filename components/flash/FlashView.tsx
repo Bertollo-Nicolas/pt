@@ -320,7 +320,7 @@ export function FlashView() {
         </div>
       )}
 
-      {answered && !autoNext && (
+      {answered && (!autoNext || feedback?.type === 'wrong') && (
         <button onClick={drawNext}
           className="w-full max-w-[380px] px-4 py-3 rounded text-xs font-semibold border border-border2 text-muted bg-transparent hover:bg-bg3 hover:text-text transition-all active:scale-95">
           Main suivante →
