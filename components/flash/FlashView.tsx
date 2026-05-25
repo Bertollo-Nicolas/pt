@@ -107,7 +107,6 @@ export function FlashView() {
   const [sessionEnded, setSessionEnded] = useState(false);
   const [totalStats,   setTotalStats]   = useState<FlashStats>({ correct: 0, wrong: 0, streak: 0, bestStreak: 0 });
   const [retryCount,   setRetryCount]   = useState(0);
-  const [rangeHand,    setRangeHand]    = useState<string | null>(null);
 
   const totalStatsRef    = useRef<FlashStats>({ correct: 0, wrong: 0, streak: 0, bestStreak: 0 });
   const sessionErrorsRef = useRef<Map<string, number>>(new Map());
@@ -143,7 +142,6 @@ export function FlashView() {
     setRetryCount(0);
     setPaused(false);
     setSessionEnded(false);
-    setRangeHand(null);
   }, []);
 
   useEffect(() => { handleNewSession(); }, [selectedTabKey]); // eslint-disable-line
@@ -226,7 +224,6 @@ export function FlashView() {
             timerMs={timerMs} autoNext={autoNext} paused={paused || sessionEnded}
             compact={false} sessionErrorsRef={sessionErrorsRef} retryQueueRef={retryQueueRef}
             onAnswer={onAnswer} onRetryCountChange={onRetryCountChange}
-            onShowRange={setRangeHand}
           />
         </div>
       ) : (
@@ -240,23 +237,8 @@ export function FlashView() {
               timerMs={timerMs} autoNext={autoNext} paused={paused || sessionEnded}
               compact sessionErrorsRef={sessionErrorsRef} retryQueueRef={retryQueueRef}
               onAnswer={onAnswer} onRetryCountChange={onRetryCountChange}
-              onShowRange={setRangeHand}
             />
           ))}
-        </div>
-      )}
-
-      {/* ── Range overlay (fixed, covers full viewport) ────────── */}
-      {rangeHand !== null && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
-          onClick={() => setRangeHand(null)}>
-          <div className="relative" onClick={e => e.stopPropagation()}>
-            <button onClick={() => setRangeHand(null)}
-              className="absolute -top-8 right-0 text-[11px] bg-bg2 text-muted hover:text-text rounded px-2 py-0.5 border border-border">
-              ✕ Fermer
-            </button>
-            <MiniRange selectedTab={selectedTab} actionButtons={actionButtons} currentHand={rangeHand} />
-          </div>
         </div>
       )}
 
@@ -303,20 +285,20 @@ interface FlashPanelProps {
   retryQueueRef: MutableRefObject<string[]>;
   onAnswer: (correct: boolean, partial: boolean) => void;
   onRetryCountChange: () => void;
-  onShowRange: (hand: string) => void;
 }
 
 function FlashPanel({
-  selectedTab, allButtons, timerMs, autoNext, paused, compact,
-  sessionErrorsRef, retryQueueRef, onAnswer, onRetryCountChange, onShowRange,
+  selectedTab, allButtons, actionButtons, timerMs, autoNext, paused, compact,
+  sessionErrorsRef, retryQueueRef, onAnswer, onRetryCountChange,
 }: FlashPanelProps) {
   const { recordError } = useAppStore();
 
-  const [hand,     setHand]     = useState<HandItem | null>(null);
-  const [suits,    setSuits]    = useState<[Suit, Suit]>(['♠', '♥']);
-  const [answered, setAnswered] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: 'correct' | 'wrong' | 'partial'; text: string } | null>(null);
-  const [timerPct, setTimerPct] = useState(100);
+  const [hand,             setHand]             = useState<HandItem | null>(null);
+  const [suits,            setSuits]            = useState<[Suit, Suit]>(['♠', '♥']);
+  const [answered,         setAnswered]         = useState(false);
+  const [feedback,         setFeedback]         = useState<{ type: 'correct' | 'wrong' | 'partial'; text: string } | null>(null);
+  const [timerPct,         setTimerPct]         = useState(100);
+  const [showRangeOverlay, setShowRangeOverlay] = useState(false);
 
   const answeredRef      = useRef(false);
   const timerRef         = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -505,12 +487,24 @@ function FlashPanel({
         </button>
       )}
 
-      <button onClick={() => onShowRange(hand.hand)}
+      <button onClick={() => setShowRangeOverlay(v => !v)}
         className={clsx('text-muted hover:text-text transition-colors flex-shrink-0',
           compact ? 'text-[9px]' : 'text-[11px]'
         )}>
         👁 Range
       </button>
+
+      {showRangeOverlay && (
+        <div className="absolute inset-0 z-10 bg-black/85 rounded-lg flex flex-col items-center justify-center p-2">
+          <button onClick={() => setShowRangeOverlay(false)}
+            className="absolute top-2 right-2 text-[10px] bg-bg2 text-muted hover:text-text rounded px-2 py-0.5 border border-border">
+            ✕
+          </button>
+          <div className="overflow-auto no-scrollbar w-full mt-4">
+            <MiniRange selectedTab={selectedTab} actionButtons={actionButtons} currentHand={hand.hand} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
