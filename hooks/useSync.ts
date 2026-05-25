@@ -20,16 +20,33 @@ export function useSync() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Load user data (srs, config, sessions…)
       const res = await fetch('/api/sync');
-      if (!res.ok) return;
-      const data = await res.json();
+      if (res.ok) {
+        const data = await res.json();
+        if (data.srs)      useAppStore.setState({ srs: data.srs });
+        if (data.config)   useAppStore.setState({ config: data.config });
+        if (data.sessions) useAppStore.setState({ sessions: data.sessions });
+        if (data.errors)   useAppStore.setState({ errors: data.errors });
+        if (data.heatmap)  useAppStore.setState({ heatmap: data.heatmap });
+      }
 
-      // Hydrate store with DB data (DB wins over localStorage)
-      if (data.srs)      useAppStore.setState({ srs: data.srs });
-      if (data.config)   useAppStore.setState({ config: data.config });
-      if (data.sessions) useAppStore.setState({ sessions: data.sessions });
-      if (data.errors)   useAppStore.setState({ errors: data.errors });
-      if (data.heatmap)  useAppStore.setState({ heatmap: data.heatmap });
+      // Load latest .rm file from DB if localStorage doesn't have one
+      const { rmFileContent } = useAppStore.getState();
+      if (!rmFileContent) {
+        const rmRes = await fetch('/api/rm-files');
+        if (rmRes.ok) {
+          const files: { id: string; name: string }[] = await rmRes.json();
+          if (files.length > 0) {
+            // Fetch the most recent file's content
+            const fileRes = await fetch(`/api/rm-files/${files[0].id}`);
+            if (fileRes.ok) {
+              const { content } = await fileRes.json();
+              useAppStore.getState().loadRmFile(content);
+            }
+          }
+        }
+      }
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
