@@ -146,7 +146,14 @@ export const useAppStore = create<AppStore>()(
 
       addSession: (session) =>
         set((s) => {
-          const sessions = [...s.sessions, session];
+          const idx = s.sessions.findIndex(x => x.key === session.key && x.date === session.date);
+          let sessions: Session[];
+          if (idx !== -1) {
+            sessions = [...s.sessions];
+            sessions[idx] = session;
+          } else {
+            sessions = [...s.sessions, session];
+          }
           return { sessions: sessions.length > MAX_SESSIONS ? sessions.slice(-MAX_SESSIONS) : sessions };
         }),
 
