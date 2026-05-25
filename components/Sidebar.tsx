@@ -6,7 +6,7 @@ import { countCombos, tabKey } from '@/lib/poker';
 import { todayStr, diffDays } from '@/lib/utils';
 import type { Category } from '@/lib/types';
 
-export function Sidebar({ onOpenSettings, onClose }: { onOpenSettings: () => void; onClose?: () => void }) {
+export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings: () => void; onClose?: () => void; onLogout?: () => void }) {
   const { rmData, srs, loadRmFile, selectTab, setMode, selectedTabKey } = useAppStore();
   const [search, setSearch] = useState('');
   const [openCats, setOpenCats] = useState<Set<string>>(new Set());
@@ -15,7 +15,19 @@ export function Sidebar({ onOpenSettings, onClose }: { onOpenSettings: () => voi
   const handleFile = useCallback(
     (f: File) => {
       const r = new FileReader();
-      r.onload = (e) => { if (e.target?.result) loadRmFile(e.target.result as string); };
+      r.onload = async (e) => {
+        const content = e.target?.result as string;
+        if (!content) return;
+        loadRmFile(content);
+        // Also persist to DB
+        try {
+          await fetch('/api/rm-files', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: f.name, content }),
+          });
+        } catch { /* offline — localStorage fallback */ }
+      };
       r.readAsText(f);
     },
     [loadRmFile],
@@ -105,7 +117,7 @@ export function Sidebar({ onOpenSettings, onClose }: { onOpenSettings: () => voi
       )}
 
       {/* Tree */}
-      <div className="flex-1 overflow-y-auto p-1.5 min-h-0">
+      <div className="flex-1 overflow-y-auto p-1.5 min-h-0 pb-0">
         {!rmData ? (
           <p className="p-3 text-[11px] text-muted text-center">Importe un fichier .rm</p>
         ) : (
@@ -125,6 +137,18 @@ export function Sidebar({ onOpenSettings, onClose }: { onOpenSettings: () => voi
           ))
         )}
       </div>
+
+      {/* Footer — logout */}
+      {onLogout && (
+        <div className="flex-shrink-0 border-t border-border px-3 py-2">
+          <button
+            onClick={onLogout}
+            className="w-full text-left text-[10px] text-muted hover:text-red transition-colors cursor-pointer py-1"
+          >
+            ⎋ Déconnexion
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

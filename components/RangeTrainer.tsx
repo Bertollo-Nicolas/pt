@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useAppStore } from '@/store/appStore';
+import { useSync } from '@/hooks/useSync';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { FlashView } from './flash/FlashView';
@@ -11,6 +12,7 @@ import { SettingsModal } from './modals/SettingsModal';
 
 export default function RangeTrainer() {
   const { rehydrateRmData, selectedTab, currentMode, lastSpot, selectTab } = useAppStore();
+  const { logout } = useSync();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -47,13 +49,14 @@ export default function RangeTrainer() {
           <Sidebar
             onOpenSettings={() => { setSettingsOpen(true); setSidebarOpen(false); }}
             onClose={() => setSidebarOpen(false)}
+            onLogout={logout}
           />
         </div>
       </div>
 
       {/* ── Desktop sidebar (always visible) ── */}
       <div className="hidden md:block w-[272px] flex-shrink-0 h-full">
-        <Sidebar onOpenSettings={() => setSettingsOpen(true)} />
+        <Sidebar onOpenSettings={() => setSettingsOpen(true)} onLogout={logout} />
       </div>
 
       {/* ── Main content ── */}
