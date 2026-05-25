@@ -12,7 +12,7 @@ const ALL_SUITS: Suit[] = ['♠', '♥', '♦', '♣'];
 type TableCount = 1 | 2 | 4;
 type TimerMs = 0 | 5000 | 8000 | 12000 | 15000 | 20000;
 
-interface ButtonDef { label: string; color: string; actions: string[] }
+interface ButtonDef { label: string; color: string; color2?: string; actions: string[] }
 interface FlashStats { correct: number; wrong: number; streak: number; bestStreak: number }
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -33,6 +33,7 @@ function buildAllButtons(actionButtons: [string, string][]): ButtonDef[] {
       result.push({
         label: `${actionButtons[i][0]} / ${actionButtons[j][0]}`,
         color: actionButtons[i][1],
+        color2: actionButtons[j][1],
         actions: [actionButtons[i][0], actionButtons[j][0]],
       });
     }
@@ -81,10 +82,7 @@ function evaluateAnswer(
   return { correct: false, partial: false, expected, text: `✗ Erreur — ${detail}` };
 }
 
-function pickNextHand(
-  rangeMap: Record<string, HandAction[]>,
-  retryQueue: string[],
-): HandItem {
+function pickNextHand(rangeMap: Record<string, HandAction[]>, retryQueue: string[]): HandItem {
   const all = allHands();
   if (retryQueue.length > 0 && Math.random() < 0.35) {
     const idx = Math.floor(Math.random() * retryQueue.length);
@@ -105,11 +103,11 @@ export function FlashView() {
   const [tableCount,   setTableCount]   = useState<TableCount>(1);
   const [timerMs,      setTimerMs]      = useState<TimerMs>(0);
   const [autoNext,     setAutoNext]     = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [paused,       setPaused]       = useState(false);
   const [sessionEnded, setSessionEnded] = useState(false);
   const [totalStats,   setTotalStats]   = useState<FlashStats>({ correct: 0, wrong: 0, streak: 0, bestStreak: 0 });
   const [retryCount,   setRetryCount]   = useState(0);
+  const [rangeHand,    setRangeHand]    = useState<string | null>(null);
 
   const totalStatsRef    = useRef<FlashStats>({ correct: 0, wrong: 0, streak: 0, bestStreak: 0 });
   const sessionErrorsRef = useRef<Map<string, number>>(new Map());
@@ -122,27 +120,18 @@ export function FlashView() {
   const onAnswer = useCallback((correct: boolean, partial: boolean) => {
     const prev = totalStatsRef.current;
     const next = { ...prev };
-    if (correct || partial) {
-      next.correct++;
-      next.streak++;
-      next.bestStreak = Math.max(next.bestStreak, next.streak);
-    } else {
-      next.wrong++;
-      next.streak = 0;
-    }
+    if (correct || partial) { next.correct++; next.streak++; next.bestStreak = Math.max(next.bestStreak, next.streak); }
+    else { next.wrong++; next.streak = 0; }
     totalStatsRef.current = next;
     setTotalStats(next);
 
     if (!selectedTab || !selectedTabKey) return;
     const tot = next.correct + next.wrong;
-    addSession({
-      key: `flash_${selectedTabKey}`, date: todayStr(),
+    addSession({ key: `flash_${selectedTabKey}`, date: todayStr(),
       name: selectedTab.name, catName: selectedTab.catName,
-      mode: 'flash', correct: next.correct, wrong: next.wrong, bestStreak: next.bestStreak,
-    });
+      mode: 'flash', correct: next.correct, wrong: next.wrong, bestStreak: next.bestStreak });
     if (!srs[selectedTabKey] && pendingSrsKey !== selectedTabKey && tot >= cfg.minHands) {
-      const acc = Math.round(next.correct / tot * 100);
-      if (acc >= cfg.threshold) setPendingSrsKey(selectedTabKey);
+      if (Math.round(next.correct / tot * 100) >= cfg.threshold) setPendingSrsKey(selectedTabKey);
     }
   }, [selectedTab, selectedTabKey, addSession, srs, pendingSrsKey, cfg, setPendingSrsKey]);
 
@@ -154,21 +143,17 @@ export function FlashView() {
     setRetryCount(0);
     setPaused(false);
     setSessionEnded(false);
+    setRangeHand(null);
   }, []);
 
-  // Reset on tab change
   useEffect(() => { handleNewSession(); }, [selectedTabKey]); // eslint-disable-line
 
   if (!selectedTab) return null;
 
-  // Compute action buttons (always include Fold)
   const rawButtons: [string, string][] = [...new Map(
     selectedTab.rangeList
       .filter(rl => rl.hands.length > 0)
-      .map(rl => {
-        const r = store.rangeColors[rl.id];
-        return r ? [r.name, r.color] as [string, string] : null;
-      })
+      .map(rl => { const r = store.rangeColors[rl.id]; return r ? [r.name, r.color] as [string, string] : null; })
       .filter(Boolean) as [string, string][]
   )];
   const hasExplicitFold = rawButtons.some(([n]) => n.toUpperCase().includes('FOLD'));
@@ -182,104 +167,111 @@ export function FlashView() {
   return (
     <div className="flex-1 flex flex-col relative overflow-hidden">
 
-      {/* ── Top Bar ────────────────────────────────────────────── */}
-      <div className="flex items-center gap-1.5 px-3 py-2 bg-bg2 border-b border-border flex-shrink-0 overflow-x-auto no-scrollbar">
+      {/* ── Row 1: Stats + Session Controls ──────────────────── */}
+      <div className="flex items-center gap-2 px-3 py-2 bg-bg2 border-b border-border flex-shrink-0 overflow-x-auto no-scrollbar">
         <span className="text-xs font-bold text-green flex-shrink-0">✓{totalStats.correct}</span>
         <span className="text-xs font-bold text-red flex-shrink-0">✗{totalStats.wrong}</span>
         {acc !== null && <span className="text-xs font-bold text-blue flex-shrink-0">{acc}%</span>}
         {totalStats.streak >= 3 && <span className="text-xs font-bold text-orange flex-shrink-0">🔥{totalStats.streak}</span>}
-        {retryCount > 0 && <span className="text-xs font-bold text-yellow flex-shrink-0">🔁{retryCount}</span>}
+        {retryCount > 0 && <span className="text-[10px] font-bold text-yellow flex-shrink-0">🔁{retryCount}</span>}
         <div className="flex-1" />
-        <button onClick={() => setAutoNext(v => !v)}
-          className={clsx('text-[10px] px-2 py-1 rounded border transition-all flex-shrink-0',
-            autoNext ? 'bg-accent/20 border-accent text-accent' : 'border-border text-muted hover:text-text'
-          )}>
-          Auto▶
-        </button>
-        <button onClick={() => { if (!sessionEnded) setPaused(v => !v); }}
-          className={clsx('text-[10px] px-2 py-1 rounded border transition-all flex-shrink-0',
-            paused ? 'bg-green/10 border-green text-green' : 'border-border text-muted hover:text-text'
-          )}>
-          {paused ? '▶' : '⏸'}
-        </button>
-        <button onClick={() => { setPaused(true); setSessionEnded(true); }}
-          className="text-[10px] px-2 py-1 rounded border border-border text-muted hover:border-red hover:text-red transition-all flex-shrink-0">
-          ⏹
-        </button>
-        <button onClick={() => setShowSettings(v => !v)}
-          className={clsx('text-[10px] px-2 py-1 rounded border transition-all flex-shrink-0',
-            showSettings ? 'bg-bg3 border-border2 text-text' : 'border-border text-muted hover:text-text'
-          )}>
-          ⚙
-        </button>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button onClick={() => setAutoNext(v => !v)}
+            className={clsx('text-[10px] px-2 py-1 rounded border transition-all',
+              autoNext ? 'bg-accent/20 border-accent text-accent' : 'border-border text-muted hover:text-text'
+            )}>
+            Auto▶
+          </button>
+          <button onClick={() => { if (!sessionEnded) setPaused(v => !v); }}
+            className={clsx('text-[10px] px-2 py-1 rounded border transition-all',
+              paused ? 'bg-green/10 border-green text-green' : 'border-border text-muted hover:text-text'
+            )}>
+            {paused ? '▶' : '⏸'}
+          </button>
+          <button onClick={() => { setPaused(true); setSessionEnded(true); }}
+            className="text-[10px] px-2 py-1 rounded border border-border text-muted hover:border-red hover:text-red transition-all">
+            ⏹
+          </button>
+        </div>
       </div>
 
-      {/* ── Settings Panel ─────────────────────────────────────── */}
-      {showSettings && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-bg3 border-b border-border flex-shrink-0 flex-wrap">
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <span className="text-[9px] text-muted uppercase tracking-wider mr-1">Timer</span>
-            {([0, 5000, 8000, 12000, 15000, 20000] as TimerMs[]).map(ms => (
-              <button key={ms} onClick={() => setTimerMs(ms)}
-                className={clsx('text-[10px] px-1.5 py-0.5 rounded border transition-all',
-                  timerMs === ms ? 'bg-accent border-accent text-white' : 'border-border text-muted hover:text-text'
-                )}>
-                {ms === 0 ? 'Off' : `${ms / 1000}s`}
-              </button>
-            ))}
-          </div>
-          <div className="w-px h-3 bg-border flex-shrink-0" />
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <span className="text-[9px] text-muted uppercase tracking-wider mr-1">Tables</span>
-            {([1, 2, 4] as TableCount[]).map(n => (
-              <button key={n} onClick={() => setTableCount(n)}
-                className={clsx('text-[10px] px-1.5 py-0.5 rounded border transition-all',
-                  tableCount === n ? 'bg-accent border-accent text-white' : 'border-border text-muted hover:text-text'
-                )}>
-                {n}
-              </button>
-            ))}
+      {/* ── Row 2: Timer + Tables (always visible) ────────────── */}
+      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-bg3 border-b border-border flex-shrink-0 overflow-x-auto no-scrollbar">
+        <span className="text-[9px] text-muted uppercase tracking-wider flex-shrink-0">Timer</span>
+        {([0, 5000, 8000, 12000, 15000, 20000] as TimerMs[]).map(ms => (
+          <button key={ms} onClick={() => setTimerMs(ms)}
+            className={clsx('text-[10px] px-1.5 py-0.5 rounded border transition-all flex-shrink-0',
+              timerMs === ms ? 'bg-accent border-accent text-white' : 'border-border text-muted hover:text-text'
+            )}>
+            {ms === 0 ? 'Off' : `${ms / 1000}s`}
+          </button>
+        ))}
+        <div className="w-px h-3 bg-border mx-1 flex-shrink-0" />
+        <span className="text-[9px] text-muted uppercase tracking-wider flex-shrink-0">Tables</span>
+        {([1, 2, 4] as TableCount[]).map(n => (
+          <button key={n} onClick={() => setTableCount(n)}
+            className={clsx('text-[10px] px-1.5 py-0.5 rounded border transition-all flex-shrink-0',
+              tableCount === n ? 'bg-accent border-accent text-white' : 'border-border text-muted hover:text-text'
+            )}>
+            {n}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Panels ─────────────────────────────────────────────── */}
+      {tableCount === 1 ? (
+        <div className="flex-1 min-h-0 overflow-y-auto p-2 md:p-3 flex items-start md:items-center justify-center">
+          <FlashPanel key={resetKey}
+            selectedTab={selectedTab} allButtons={allButtons} actionButtons={actionButtons}
+            timerMs={timerMs} autoNext={autoNext} paused={paused || sessionEnded}
+            compact={false} sessionErrorsRef={sessionErrorsRef} retryQueueRef={retryQueueRef}
+            onAnswer={onAnswer} onRetryCountChange={onRetryCountChange}
+            onShowRange={setRangeHand}
+          />
+        </div>
+      ) : (
+        <div className={clsx(
+          'flex-1 min-h-0 overflow-hidden p-2 md:p-3 grid grid-cols-2 gap-2',
+          tableCount === 4 && 'grid-rows-2',
+        )}>
+          {Array.from({ length: tableCount }, (_, i) => (
+            <FlashPanel key={`${resetKey}-${i}`}
+              selectedTab={selectedTab} allButtons={allButtons} actionButtons={actionButtons}
+              timerMs={timerMs} autoNext={autoNext} paused={paused || sessionEnded}
+              compact sessionErrorsRef={sessionErrorsRef} retryQueueRef={retryQueueRef}
+              onAnswer={onAnswer} onRetryCountChange={onRetryCountChange}
+              onShowRange={setRangeHand}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* ── Range overlay (fixed, covers full viewport) ────────── */}
+      {rangeHand !== null && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setRangeHand(null)}>
+          <div className="relative" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setRangeHand(null)}
+              className="absolute -top-8 right-0 text-[11px] bg-bg2 text-muted hover:text-text rounded px-2 py-0.5 border border-border">
+              ✕ Fermer
+            </button>
+            <MiniRange selectedTab={selectedTab} actionButtons={actionButtons} currentHand={rangeHand} />
           </div>
         </div>
       )}
 
-      {/* ── Panels ─────────────────────────────────────────────── */}
-      <div className={clsx(
-        'flex-1 overflow-y-auto p-2 md:p-3',
-        tableCount === 1
-          ? 'flex items-start md:items-center justify-center'
-          : 'grid grid-cols-2 gap-2 content-start',
-      )}>
-        {Array.from({ length: tableCount }, (_, i) => (
-          <FlashPanel
-            key={`${resetKey}-${i}`}
-            selectedTab={selectedTab}
-            allButtons={allButtons}
-            actionButtons={actionButtons}
-            timerMs={timerMs}
-            autoNext={autoNext}
-            paused={paused || sessionEnded}
-            compact={tableCount > 1}
-            sessionErrorsRef={sessionErrorsRef}
-            retryQueueRef={retryQueueRef}
-            onAnswer={onAnswer}
-            onRetryCountChange={onRetryCountChange}
-          />
-        ))}
-      </div>
-
       {/* ── Session ended overlay ──────────────────────────────── */}
       {sessionEnded && (
-        <div className="absolute inset-0 z-50 bg-bg/90 flex items-center justify-center p-4">
+        <div className="absolute inset-0 z-40 bg-bg/90 flex items-center justify-center p-4">
           <div className="bg-bg2 border border-border rounded-xl p-6 max-w-[340px] w-full text-center">
             <div className="text-base font-bold mb-0.5">Session terminée</div>
             <div className="text-[11px] text-muted mb-4">{selectedTab.catName} — {selectedTab.name}</div>
             <div className="grid grid-cols-2 gap-2 mb-5">
               {[
-                { val: totalStats.correct,                          label: 'Corrects',   color: 'text-green' },
-                { val: totalStats.wrong,                            label: 'Erreurs',    color: 'text-red' },
-                { val: acc !== null ? `${acc}%` : '—',             label: 'Précision',  color: 'text-blue' },
-                { val: totalStats.bestStreak,                       label: 'Best streak', color: 'text-orange' },
+                { val: totalStats.correct,                label: 'Corrects',    color: 'text-green'  },
+                { val: totalStats.wrong,                  label: 'Erreurs',     color: 'text-red'    },
+                { val: acc !== null ? `${acc}%` : '—',   label: 'Précision',   color: 'text-blue'   },
+                { val: totalStats.bestStreak,             label: 'Best streak', color: 'text-orange' },
               ].map(({ val, label, color }) => (
                 <div key={label} className="bg-bg3 rounded-lg py-2 px-3">
                   <div className={clsx('text-2xl font-bold', color)}>{val}</div>
@@ -311,29 +303,29 @@ interface FlashPanelProps {
   retryQueueRef: MutableRefObject<string[]>;
   onAnswer: (correct: boolean, partial: boolean) => void;
   onRetryCountChange: () => void;
+  onShowRange: (hand: string) => void;
 }
 
 function FlashPanel({
-  selectedTab, allButtons, actionButtons, timerMs, autoNext, paused, compact,
-  sessionErrorsRef, retryQueueRef, onAnswer, onRetryCountChange,
+  selectedTab, allButtons, timerMs, autoNext, paused, compact,
+  sessionErrorsRef, retryQueueRef, onAnswer, onRetryCountChange, onShowRange,
 }: FlashPanelProps) {
   const { recordError } = useAppStore();
 
-  const [hand,             setHand]             = useState<HandItem | null>(null);
-  const [suits,            setSuits]            = useState<[Suit, Suit]>(['♠', '♥']);
-  const [answered,         setAnswered]         = useState(false);
-  const [feedback,         setFeedback]         = useState<{ type: 'correct' | 'wrong' | 'partial'; text: string } | null>(null);
-  const [timerPct,         setTimerPct]         = useState(100);
-  const [showRangeOverlay, setShowRangeOverlay] = useState(false);
+  const [hand,     setHand]     = useState<HandItem | null>(null);
+  const [suits,    setSuits]    = useState<[Suit, Suit]>(['♠', '♥']);
+  const [answered, setAnswered] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: 'correct' | 'wrong' | 'partial'; text: string } | null>(null);
+  const [timerPct, setTimerPct] = useState(100);
 
-  const answeredRef       = useRef(false);
-  const timerRef          = useRef<ReturnType<typeof setInterval> | null>(null);
-  const intervalStartRef  = useRef(0);
-  const pausedAtRef       = useRef<number | null>(null);
-  const timerMsRef        = useRef(timerMs);
-  const pausedRef         = useRef(paused);
-  const autoNextRef       = useRef(autoNext);
-  const handleTimeoutRef  = useRef<(() => void) | null>(null);
+  const answeredRef      = useRef(false);
+  const timerRef         = useRef<ReturnType<typeof setInterval> | null>(null);
+  const intervalStartRef = useRef(0);
+  const pausedAtRef      = useRef<number | null>(null);
+  const timerMsRef       = useRef(timerMs);
+  const pausedRef        = useRef(paused);
+  const autoNextRef      = useRef(autoNext);
+  const handleTimeoutRef = useRef<(() => void) | null>(null);
 
   useEffect(() => { autoNextRef.current = autoNext; }, [autoNext]);
 
@@ -341,7 +333,6 @@ function FlashPanel({
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
   }, []);
 
-  // Stable interval — reads everything from refs
   const startTimer = useCallback(() => {
     clearTimer();
     timerRef.current = setInterval(() => {
@@ -351,45 +342,31 @@ function FlashPanel({
       const elapsed = Date.now() - intervalStartRef.current;
       const pct = Math.max(0, 100 - (elapsed / duration) * 100);
       setTimerPct(pct);
-      if (elapsed >= duration) {
-        clearTimer();
-        handleTimeoutRef.current?.();
-      }
+      if (elapsed >= duration) { clearTimer(); handleTimeoutRef.current?.(); }
     }, 50);
   }, [clearTimer]);
 
-  // Sync paused state + compensate start time on unpause
   useEffect(() => {
     pausedRef.current = paused;
     if (paused) {
       pausedAtRef.current = Date.now();
     } else if (pausedAtRef.current !== null) {
-      // Shift the interval start forward so elapsed is unchanged
       intervalStartRef.current += Date.now() - pausedAtRef.current;
       pausedAtRef.current = null;
     }
   }, [paused]);
 
-  // Handle timerMs change
   useEffect(() => {
     timerMsRef.current = timerMs;
     if (answeredRef.current || !hand) return;
-    if (timerMs === 0) {
-      clearTimer();
-      setTimerPct(100);
-    } else if (!pausedRef.current) {
-      intervalStartRef.current = Date.now();
-      setTimerPct(100);
-      startTimer();
-    }
+    if (timerMs === 0) { clearTimer(); setTimerPct(100); }
+    else if (!pausedRef.current) { intervalStartRef.current = Date.now(); setTimerPct(100); startTimer(); }
   }, [timerMs]); // eslint-disable-line
 
-  // Timeout handler — updated whenever hand changes
   useEffect(() => {
     handleTimeoutRef.current = () => {
       if (answeredRef.current || !hand) return;
-      answeredRef.current = true;
-      setAnswered(true);
+      answeredRef.current = true; setAnswered(true);
       const acts = getHandActions(hand.hand, selectedTab.rangeMap);
       const detail = acts
         ? acts.map(a => `${a.action}${a.freq < 1 ? ' (' + Math.round(a.freq * 100) + '%)' : ''}`).join(' / ')
@@ -401,28 +378,22 @@ function FlashPanel({
 
   const draw = useCallback(() => {
     clearTimer();
-    setAnswered(false);
-    answeredRef.current = false;
+    setAnswered(false); answeredRef.current = false;
     setFeedback(null);
-    setShowRangeOverlay(false);
     setTimerPct(100);
     const h = pickNextHand(selectedTab.rangeMap, retryQueueRef.current);
-    setHand(h);
-    setSuits(pickSuits(h.type));
+    setHand(h); setSuits(pickSuits(h.type));
     intervalStartRef.current = Date.now();
     pausedAtRef.current = pausedRef.current ? Date.now() : null;
     if (timerMsRef.current > 0 && !pausedRef.current) startTimer();
   }, [selectedTab.rangeMap, retryQueueRef, clearTimer, startTimer]);
 
-  // Initial draw
   useEffect(() => { draw(); }, []); // eslint-disable-line
 
-  // Auto-next on correct
   useEffect(() => {
     if (!answered || !feedback) return;
     if ((feedback.type === 'correct' || feedback.type === 'partial') && autoNextRef.current && !pausedRef.current) {
-      const t = setTimeout(draw, 700);
-      return () => clearTimeout(t);
+      const t = setTimeout(draw, 700); return () => clearTimeout(t);
     }
   }, [answered, feedback, draw]);
 
@@ -430,42 +401,48 @@ function FlashPanel({
 
   const handleAnswer = useCallback((btn: ButtonDef) => {
     if (answeredRef.current || !hand || pausedRef.current) return;
-    answeredRef.current = true;
-    setAnswered(true);
-    clearTimer();
+    answeredRef.current = true; setAnswered(true); clearTimer();
 
     const result = evaluateAnswer(btn, hand.hand, selectedTab.rangeMap);
-    const fbType = result.correct ? 'correct' : result.partial ? 'partial' : 'wrong';
-    setFeedback({ type: fbType, text: result.text });
+    setFeedback({ type: result.correct ? 'correct' : result.partial ? 'partial' : 'wrong', text: result.text });
 
-    // Global error tracking for heatmap
-    if (!result.correct && !result.partial) {
-      recordError(hand.hand, btn.label, result.expected);
-    }
+    if (!result.correct && !result.partial) recordError(hand.hand, btn.label, result.expected);
 
-    // Session retry queue (≥2 errors → queue for retry)
     if (!result.correct) {
       const prev = sessionErrorsRef.current.get(hand.hand) ?? 0;
       const next = prev + 1;
       sessionErrorsRef.current.set(hand.hand, next);
       if (next >= 2 && !retryQueueRef.current.includes(hand.hand)) {
-        retryQueueRef.current.push(hand.hand);
-        onRetryCountChange();
+        retryQueueRef.current.push(hand.hand); onRetryCountChange();
       }
     } else {
       const idx = retryQueueRef.current.indexOf(hand.hand);
       if (idx !== -1) { retryQueueRef.current.splice(idx, 1); onRetryCountChange(); }
     }
-
     onAnswer(result.correct, result.partial);
   }, [hand, clearTimer, selectedTab.rangeMap, sessionErrorsRef, retryQueueRef, onAnswer, onRetryCountChange, recordError]);
 
   if (!hand) return null;
 
+  const singleButtons = allButtons.filter(b => b.actions.length === 1);
+  const mixedButtons  = allButtons.filter(b => b.actions.length > 1);
+
+  const btnStyle = (btn: ButtonDef) => btn.actions.length === 1
+    ? { background: hexRgba(btn.color, 0.22), borderColor: hexRgba(btn.color, 0.5), color: '#fff' }
+    : { background: `linear-gradient(135deg, ${hexRgba(btn.color, 0.32)} 50%, ${hexRgba(btn.color2 ?? btn.color, 0.32)} 50%)`,
+        borderColor: hexRgba(btn.color, 0.5), color: '#fff' };
+
+  const btnClass = clsx(
+    'rounded border font-semibold transition-all hover:-translate-y-px active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed',
+    compact ? 'px-2 py-1 text-[9px]' : 'px-3 py-2 text-[11px]',
+  );
+
   return (
     <div className={clsx(
-      'relative flex flex-col items-center bg-bg2 border border-border rounded-lg overflow-hidden',
-      compact ? 'p-2 gap-1.5' : 'p-3 md:p-5 gap-2 md:gap-3 w-full max-w-[400px]',
+      'flex flex-col items-center bg-bg2 border border-border rounded-lg overflow-hidden',
+      compact
+        ? 'h-full gap-1.5 p-2 justify-center'
+        : 'gap-2 md:gap-3 p-3 md:p-5 w-full max-w-[400px]',
     )}>
       {!compact && (
         <div className="text-[10px] text-muted uppercase tracking-widest text-center">
@@ -476,35 +453,40 @@ function FlashPanel({
       <HandCards hand={hand} suits={suits} compact={compact} />
 
       {timerMs > 0 && (
-        <div className="w-full h-0.5 bg-bg3 rounded-full overflow-hidden">
+        <div className="w-full h-0.5 bg-bg3 rounded-full overflow-hidden flex-shrink-0">
           <div className="h-full rounded-full transition-none"
-            style={{
-              width: `${timerPct}%`,
-              background: timerPct > 40 ? '#6c63ff' : timerPct > 20 ? '#e09540' : '#e05555',
-            }} />
+            style={{ width: `${timerPct}%`,
+              background: timerPct > 40 ? '#6c63ff' : timerPct > 20 ? '#e09540' : '#e05555' }} />
         </div>
       )}
 
       {!answered && (
-        <div className="flex gap-1.5 flex-wrap justify-center">
-          {allButtons.map(btn => (
-            <button key={btn.label} onClick={() => handleAnswer(btn)}
-              disabled={paused}
-              className={clsx(
-                'rounded border bg-transparent transition-all hover:-translate-y-px active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed',
-                compact ? 'px-2 py-1 text-[10px]' : 'px-3 py-2 text-xs font-semibold',
-              )}
-              style={{ borderColor: btn.color, color: btn.color }}>
-              {btn.label}
-            </button>
-          ))}
+        <div className="flex flex-col gap-1.5 w-full flex-shrink-0">
+          <div className="flex gap-1.5 flex-wrap justify-center">
+            {singleButtons.map(btn => (
+              <button key={btn.label} onClick={() => handleAnswer(btn)} disabled={paused}
+                className={btnClass} style={btnStyle(btn)}>
+                {btn.label}
+              </button>
+            ))}
+          </div>
+          {mixedButtons.length > 0 && (
+            <div className="flex gap-1.5 flex-wrap justify-center">
+              {mixedButtons.map(btn => (
+                <button key={btn.label} onClick={() => handleAnswer(btn)} disabled={paused}
+                  className={btnClass} style={btnStyle(btn)}>
+                  {btn.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {feedback && (
         <div className={clsx(
-          'rounded text-center w-full',
-          compact ? 'px-2 py-1 text-[10px]' : 'px-3 py-2 text-xs font-medium',
+          'rounded text-center w-full flex-shrink-0',
+          compact ? 'px-2 py-1 text-[9px]' : 'px-3 py-2 text-xs font-medium',
           feedback.type === 'correct' ? 'bg-green/10 border border-green/30 text-green' :
           feedback.type === 'partial'  ? 'bg-orange/10 border border-orange/30 text-orange' :
           'bg-red/10 border border-red/30 text-red',
@@ -516,32 +498,19 @@ function FlashPanel({
       {answered && (!autoNext || feedback?.type === 'wrong') && (
         <button onClick={draw}
           className={clsx(
-            'w-full rounded border border-border2 text-muted bg-transparent hover:bg-bg3 hover:text-text transition-all active:scale-95 cursor-pointer',
-            compact ? 'px-2 py-1 text-[10px]' : 'px-4 py-2 text-xs font-semibold',
+            'w-full rounded border border-border2 text-muted bg-transparent hover:bg-bg3 hover:text-text transition-all active:scale-95 cursor-pointer flex-shrink-0',
+            compact ? 'px-2 py-1 text-[9px]' : 'px-4 py-2 text-xs font-semibold',
           )}>
           Main suivante →
         </button>
       )}
 
-      <button onClick={() => setShowRangeOverlay(v => !v)}
-        className={clsx('text-muted hover:text-text transition-colors',
-          compact ? 'text-[10px]' : 'text-[11px]'
+      <button onClick={() => onShowRange(hand.hand)}
+        className={clsx('text-muted hover:text-text transition-colors flex-shrink-0',
+          compact ? 'text-[9px]' : 'text-[11px]'
         )}>
-        {showRangeOverlay ? '🙈 Fermer' : '👁 Range'}
+        👁 Range
       </button>
-
-      {/* Per-panel range overlay */}
-      {showRangeOverlay && (
-        <div className="absolute inset-0 z-10 bg-black/85 rounded-lg flex flex-col items-center justify-center p-2">
-          <button onClick={() => setShowRangeOverlay(false)}
-            className="absolute top-2 right-2 text-[10px] bg-bg2 text-muted hover:text-text rounded px-2 py-0.5 border border-border">
-            ✕
-          </button>
-          <div className="overflow-auto no-scrollbar w-full mt-4">
-            <MiniRange selectedTab={selectedTab} actionButtons={actionButtons} currentHand={hand.hand} />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -553,33 +522,29 @@ function MiniRange({ selectedTab, actionButtons, currentHand }: {
   currentHand?: string;
 }) {
   const hands = allHands();
-  const CELL = 22;
+  const CELL = 24;
   return (
-    <div className="bg-bg2 border border-border rounded-lg p-2">
+    <div className="bg-bg2 border border-border rounded-lg p-2.5 shadow-2xl">
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(13, ${CELL}px)`, gridAutoRows: `${CELL}px`, gap: '1px' }}>
         {hands.map(({ hand }) => {
           const acts = getNonFoldActions(hand, selectedTab.rangeMap);
           const isCurrent = hand === currentHand;
           if (acts.length === 0) {
-            return (
-              <div key={hand} className="rounded-sm bg-bg3 flex items-center justify-center"
-                style={isCurrent ? { boxShadow: 'inset 0 0 0 2px #f0b429' } : undefined}
-                title={hand} />
-            );
+            return <div key={hand} className="rounded-sm bg-bg3"
+              style={isCurrent ? { boxShadow: 'inset 0 0 0 2px #f0b429' } : undefined} title={hand} />;
           }
           const color = actionButtons.find(([n]) => n === acts[0].action)?.[1] ?? '#888';
           let bg: string;
           if (acts.length === 1 || acts[0].freq > 0.95) {
-            bg = hexRgba(color, 0.82);
+            bg = hexRgba(color, 0.85);
           } else {
-            let pos = 0;
-            const stops: string[] = [];
+            let pos = 0; const stops: string[] = [];
             const total = acts.reduce((s, a) => s + a.freq, 0);
             for (const a of acts) {
               const c = actionButtons.find(([n]) => n === a.action)?.[1] ?? '#888';
               const pct = (a.freq / total) * 100;
-              stops.push(`${hexRgba(c, 0.82)} ${pos.toFixed(0)}%`);
-              stops.push(`${hexRgba(c, 0.82)} ${(pos + pct).toFixed(0)}%`);
+              stops.push(`${hexRgba(c, 0.85)} ${pos.toFixed(0)}%`);
+              stops.push(`${hexRgba(c, 0.85)} ${(pos + pct).toFixed(0)}%`);
               pos += pct;
             }
             bg = `linear-gradient(90deg, ${stops.join(', ')})`;
@@ -587,7 +552,7 @@ function MiniRange({ selectedTab, actionButtons, currentHand }: {
           return (
             <div key={hand} className="rounded-sm flex items-center justify-center"
               style={{ background: bg, boxShadow: isCurrent ? 'inset 0 0 0 2px #f0b429' : undefined,
-                fontSize: '6px', fontWeight: 700, color: '#fff', letterSpacing: '-0.3px' }}
+                fontSize: '6.5px', fontWeight: 700, color: '#fff', letterSpacing: '-0.3px' }}
               title={hand}>
               {hand}
             </div>
@@ -608,13 +573,10 @@ function PlayingCard({ rank, suit, compact }: { rank: string; suit: Suit; compac
   const w = compact ? 52 : 72;
   const h = compact ? 72 : 100;
   return (
-    <div style={{
-      width: w, height: h,
-      background: '#ffffff', border: '1.5px solid #d1d5db', borderRadius: 8,
-      padding: compact ? '4px 6px' : '6px 8px',
+    <div style={{ width: w, height: h, background: '#ffffff', border: '1.5px solid #d1d5db',
+      borderRadius: 8, padding: compact ? '4px 6px' : '6px 8px',
       display: 'flex', flexDirection: 'column', position: 'relative',
-      boxShadow: '0 3px 12px rgba(0,0,0,0.35)', color,
-    }}>
+      boxShadow: '0 3px 12px rgba(0,0,0,0.35)', color }}>
       <span style={{ fontSize: compact ? 20 : 28, fontWeight: 900, lineHeight: 1 }}>{rank}</span>
       <span style={{ fontSize: compact ? 17 : 24, lineHeight: 1.1 }}>{suit}</span>
       <span style={{ position: 'absolute', bottom: compact ? 4 : 6, right: compact ? 6 : 8,
@@ -629,7 +591,7 @@ function HandCards({ hand, suits, compact }: { hand: HandItem; suits: [Suit, Sui
   const r1 = hand.hand[0];
   const r2 = hand.type === 'pair' ? hand.hand[0] : hand.hand[1];
   return (
-    <div className="flex gap-2 justify-center my-1">
+    <div className="flex gap-2 justify-center my-1 flex-shrink-0">
       <PlayingCard rank={r1} suit={suits[0]} compact={compact} />
       <PlayingCard rank={r2} suit={suits[1]} compact={compact} />
     </div>
