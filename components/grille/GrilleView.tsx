@@ -1,15 +1,15 @@
 'use client';
-import { useCallback, useEffect, useRef, useState, memo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react';
 import clsx from 'clsx';
 import { useAppStore, getCfg } from '@/store/appStore';
 import { allHands, getNonFoldActions, getHandActions, isMixed, cellType } from '@/lib/poker';
 import { hexRgba, todayStr } from '@/lib/utils';
-import type { HandAction } from '@/lib/types';
+import type { HandItem, SelectedTab } from '@/lib/types';
 
-// hand → { actionName → freq 0-100 }
+const FOLD_COLOR = '#6b7280';
+
 type CellFreqs = Record<string, number>;
 type Selection = Record<string, CellFreqs>;
-
 type CheckState = 'correct' | 'missed' | 'extra' | 'wrong-action';
 
 interface CheckResult {
@@ -18,16 +18,15 @@ interface CheckResult {
   score: number; pct: number;
 }
 
-// ── Gradient builder ──────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────
+
 function buildGradient(freqs: CellFreqs, buttons: [string, string][]): React.CSSProperties {
   const entries = buttons.map(([n, c]) => ({ n, c, v: freqs[n] ?? 0 })).filter(e => e.v > 0);
   if (entries.length === 0) return {};
   const total = entries.reduce((a, e) => a + e.v, 0);
-
   if (entries.length === 1) {
     return { background: hexRgba(entries[0].c, 0.32), borderColor: entries[0].c, color: entries[0].c };
   }
-
   let pos = 0;
   const stops: string[] = [];
   for (const { c, v } of entries) {
@@ -40,7 +39,70 @@ function buildGradient(freqs: CellFreqs, buttons: [string, string][]): React.CSS
   return { background: `linear-gradient(90deg, ${stops.join(', ')})`, borderColor: dominant.c, color: '#dde0f0' };
 }
 
-// ── Cell ──────────────────────────────────────────────────
+function cellIsPlayed(freqs: CellFreqs): boolean {
+  return Object.entries(freqs).some(([k, v]) => !k.toUpperCase().includes('FOLD') && v > 0);
+}
+
+function initAllFold(): Selection {
+  const sel: Selection = {};
+  allHands().forEach(({ hand }) => { sel[hand] = { Fold: 100 }; });
+  return sel;
+}
+
+// ── Score circle ──────────────────────────────────────────────
+
+function ScoreCircle({ score }: { score: number }) {
+  const r = 26;
+  const circ = 2 * Math.PI * r;
+  const dash = (score / 100) * circ;
+  const color = score >= 80 ? '#2ecc8a' : score >= 55 ? '#e09540' : '#e05555';
+  return (
+    <svg width="68" height="68" viewBox="0 0 68 68">
+      <circle cx="34" cy="34" r={r} fill="none" stroke="#2e2e38" strokeWidth="5" />
+      <circle cx="34" cy="34" r={r} fill="none" stroke={color} strokeWidth="5"
+        strokeDasharray={`${dash} ${circ}`}
+        strokeDashoffset={circ / 4}
+        strokeLinecap="round" />
+      <text x="34" y="39" textAnchor="middle" fontSize="13" fontWeight="bold" fill={color}>{score}%</text>
+    </svg>
+  );
+}
+
+// ── Mini result grid ──────────────────────────────────────────
+
+function MiniResultGrid({ hands, selection, actionButtons, selectedTab }: {
+  hands: HandItem[];
+  selection: Selection | null;
+  actionButtons: [string, string][];
+  selectedTab: SelectedTab | null;
+}) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(13, 1fr)', gap: '1px' }}>
+      {hands.map(({ hand }) => {
+        let bg = '#1f1f25';
+        if (selection !== null) {
+          const freqs = selection[hand] ?? {};
+          if (cellIsPlayed(freqs)) {
+            const nonFold = Object.entries(freqs).filter(([k]) => !k.toUpperCase().includes('FOLD'));
+            const dom = nonFold.reduce((a, b) => b[1] > a[1] ? b : a, ['', 0] as [string, number]);
+            const color = actionButtons.find(([n]) => n === dom[0])?.[1] ?? '#888';
+            bg = hexRgba(color, 0.85);
+          }
+        } else if (selectedTab) {
+          const acts = getNonFoldActions(hand, selectedTab.rangeMap);
+          if (acts.length > 0) {
+            const color = actionButtons.find(([n]) => n === acts[0].action)?.[1] ?? '#888';
+            bg = hexRgba(color, 0.85);
+          }
+        }
+        return <div key={hand} style={{ aspectRatio: '1', background: bg, borderRadius: '1px' }} />;
+      })}
+    </div>
+  );
+}
+
+// ── Cell ──────────────────────────────────────────────────────
+
 const HandCell = memo(function HandCell({
   hand, selStyle, checkState, hasDot,
   onPointerDown, onPointerEnter,
@@ -78,18 +140,20 @@ const HandCell = memo(function HandCell({
   );
 });
 
-// ── Main view ─────────────────────────────────────────────
+// ── Main view ─────────────────────────────────────────────────
+
 export function GrilleView() {
   const store = useAppStore();
   const { selectedTab, selectedTabKey, addSession, srs, setPendingSrsKey, pendingSrsKey, srsReviewKey, finishSrsReview } = store;
   const cfg = getCfg(store);
+  const colorOverrides = store.colorOverrides ?? {};
 
-  const [selected, setSelected]       = useState<Selection>({});
-  const [checkResult, setCheckResult] = useState<CheckResult | null>(null);
-  const [revealed, setRevealed]       = useState(false);
-  const [cellSize, setCellSize]       = useState(32);
-  const [activeAction, setActiveAction] = useState<string | null>(null);
-  const [activeFreq, setActiveFreq]   = useState(100);
+  const [selected,     setSelected]     = useState<Selection>(() => initAllFold());
+  const [checkResult,  setCheckResult]  = useState<CheckResult | null>(null);
+  const [revealed,     setRevealed]     = useState(false);
+  const [cellSize,     setCellSize]     = useState(32);
+  const [activeAction, setActiveAction] = useState<string | null>('Fold');
+  const [activeFreq,   setActiveFreq]   = useState(100);
 
   const midRef             = useRef<HTMLDivElement>(null);
   const isDraggingRef      = useRef(false);
@@ -99,20 +163,27 @@ export function GrilleView() {
   const selectedRef        = useRef<Selection>({});
   useEffect(() => { selectedRef.current = selected; }, [selected]);
 
-  // Non-fold action buttons derived from the tab
-  const actionButtons: [string, string][] = selectedTab
+  // Non-fold action buttons + Fold
+  const rawActionButtons: [string, string][] = selectedTab
     ? [...new Map(
         selectedTab.rangeList
           .filter(rl => rl.hands.length > 0)
           .map(rl => {
             const r = store.rangeColors[rl.id];
-            return r && !r.name.toUpperCase().includes('FOLD') ? [r.name, r.color] as [string, string] : null;
+            return r && !r.name.toUpperCase().includes('FOLD')
+              ? [r.name, colorOverrides[r.name] ?? r.color] as [string, string]
+              : null;
           })
           .filter(Boolean) as [string, string][]
       )]
     : [];
 
-  // Resize observer — square cells
+  const allActionButtons: [string, string][] = [
+    ...rawActionButtons,
+    ['Fold', colorOverrides['Fold'] ?? FOLD_COLOR],
+  ];
+
+  // Resize observer
   const sizeGrid = useCallback(() => {
     if (!midRef.current) return;
     const { clientWidth: w, clientHeight: h } = midRef.current;
@@ -127,34 +198,33 @@ export function GrilleView() {
 
   // Reset on tab change
   useEffect(() => {
-    setSelected({});
+    setSelected(initAllFold());
     setCheckResult(null);
     setRevealed(false);
-    const first = selectedTab
-      ? [...new Map(
-          selectedTab.rangeList.filter(rl => rl.hands.length > 0).map(rl => {
-            const r = store.rangeColors[rl.id];
-            return r && !r.name.toUpperCase().includes('FOLD') ? [r.name, r.color] as [string, string] : null;
-          }).filter(Boolean) as [string, string][]
-        )]
-      : [];
-    setActiveAction(first[0]?.[0] ?? null);
+    setActiveAction('Fold');
     setActiveFreq(100);
   }, [selectedTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Painting helpers ─────────────────────────────────────
+  // Action distribution (dominant action per cell)
+  const actionDist = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const freqs of Object.values(selected)) {
+      if (Object.keys(freqs).length === 0) { counts['Fold'] = (counts['Fold'] ?? 0) + 1; continue; }
+      const dom = Object.entries(freqs).reduce((a, b) => b[1] > a[1] ? b : a);
+      counts[dom[0]] = (counts[dom[0]] ?? 0) + 1;
+    }
+    return counts;
+  }, [selected]);
+
+  // ── Painting ──────────────────────────────────────────────────
+
   const applyPaint = (prev: Selection, hand: string, action: string, freq: number): Selection => {
     if (freq === 0) {
-      // freq=0 → remove this action from cell
       const cell = { ...(prev[hand] ?? {}) };
       delete cell[action];
-      if (Object.keys(cell).length === 0) { const s = { ...prev }; delete s[hand]; return s; }
-      return { ...prev, [hand]: cell };
+      return { ...prev, [hand]: Object.keys(cell).length === 0 ? { Fold: 100 } : cell };
     }
-    if (freq === 100) {
-      // exclusive: replace all
-      return { ...prev, [hand]: { [action]: 100 } };
-    }
+    if (freq === 100) return { ...prev, [hand]: { [action]: 100 } };
     return { ...prev, [hand]: { ...(prev[hand] ?? {}), [action]: freq } };
   };
 
@@ -162,12 +232,10 @@ export function GrilleView() {
     if (checkResult || !activeAction) return;
     setSelected(prev => {
       const cell = prev[hand] ?? {};
-      // Toggle off if same action at same freq already present
       if (cell[activeAction] === activeFreq || (activeFreq === 100 && cell[activeAction] !== undefined)) {
         const newCell = { ...cell };
         delete newCell[activeAction];
-        if (Object.keys(newCell).length === 0) { const s = { ...prev }; delete s[hand]; return s; }
-        return { ...prev, [hand]: newCell };
+        return { ...prev, [hand]: Object.keys(newCell).length === 0 ? { Fold: 100 } : newCell };
       }
       return applyPaint(prev, hand, activeAction, activeFreq);
     });
@@ -176,7 +244,6 @@ export function GrilleView() {
   const paintCellRef = useRef(paintCell);
   useEffect(() => { paintCellRef.current = paintCell; }, [paintCell]);
 
-  // Global pointerup → click handler
   useEffect(() => {
     const onUp = () => {
       if (pointerDownRef.current && !dragMovedRef.current && !checkResult) {
@@ -196,7 +263,6 @@ export function GrilleView() {
     isDraggingRef.current = true;
     dragMovedRef.current = false;
     pointerDownRef.current = hand;
-    // Drag mode: deselect if cell already has this action, else paint
     dragDeselectingRef.current = activeAction !== null && (selectedRef.current[hand] ?? {})[activeAction] !== undefined;
   }, [checkResult, activeAction]);
 
@@ -210,8 +276,7 @@ export function GrilleView() {
         if (dragDeselectingRef.current) {
           setSelected(prev => {
             const cell = { ...(prev[origin] ?? {}) }; delete cell[activeAction];
-            if (Object.keys(cell).length === 0) { const s = { ...prev }; delete s[origin]; return s; }
-            return { ...prev, [origin]: cell };
+            return { ...prev, [origin]: Object.keys(cell).length === 0 ? { Fold: 100 } : cell };
           });
         } else {
           setSelected(prev => applyPaint(prev, origin, activeAction, activeFreq));
@@ -221,42 +286,40 @@ export function GrilleView() {
     if (dragDeselectingRef.current) {
       setSelected(prev => {
         const cell = { ...(prev[hand] ?? {}) }; delete cell[activeAction];
-        if (Object.keys(cell).length === 0) { const s = { ...prev }; delete s[hand]; return s; }
-        return { ...prev, [hand]: cell };
+        return { ...prev, [hand]: Object.keys(cell).length === 0 ? { Fold: 100 } : cell };
       });
     } else {
       setSelected(prev => applyPaint(prev, hand, activeAction, activeFreq));
     }
   }, [checkResult, selectedTab, activeAction, activeFreq]);
 
-  // ── Check ─────────────────────────────────────────────────
+  // ── Check ─────────────────────────────────────────────────────
+
   const handleCheck = () => {
     if (!selectedTab) return;
     let correct = 0, wrongAct = 0, missed = 0, extra = 0;
     const states: Record<string, CheckState> = {};
 
     allHands().forEach(({ hand }) => {
-      const nonFold    = getNonFoldActions(hand, selectedTab.rangeMap);
-      const inRange    = nonFold.length > 0;
-      const isSelected = hand in selected;
-      const userFreqs  = selected[hand] ?? {};
-      const dom        = nonFold[0];
+      const nonFoldActs = getNonFoldActions(hand, selectedTab.rangeMap);
+      const inRange = nonFoldActs.length > 0;
+      const userFreqs = selected[hand] ?? {};
+      const played = cellIsPlayed(userFreqs);
 
-      if (inRange && isSelected) {
-        const entries = Object.entries(userFreqs);
-        const userDom = entries.length > 0 ? entries.reduce((a, b) => b[1] > a[1] ? b : a) : null;
-        if (!userDom) { states[hand] = 'missed'; missed++; return; }
-        const [userAct] = userDom;
-        if (userAct === dom?.action) {
+      if (inRange && played) {
+        const nonFoldEntries = Object.entries(userFreqs).filter(([k]) => !k.toUpperCase().includes('FOLD'));
+        const userDom = nonFoldEntries.reduce((a, b) => b[1] > a[1] ? b : a, ['', 0] as [string, number]);
+        const dom = nonFoldActs[0];
+        if (userDom[0] === dom?.action) {
           states[hand] = 'correct'; correct++;
         } else {
-          const validMixed = nonFold.find(a => a.action === userAct && a.freq >= 0.2);
+          const validMixed = nonFoldActs.find(a => a.action === userDom[0] && a.freq >= 0.2);
           if (validMixed) { states[hand] = 'correct'; correct++; }
           else { states[hand] = 'wrong-action'; wrongAct++; }
         }
-      } else if (inRange && !isSelected) {
+      } else if (inRange && !played) {
         states[hand] = 'missed'; missed++;
-      } else if (!inRange && isSelected) {
+      } else if (!inRange && played) {
         states[hand] = 'extra'; extra++;
       }
     });
@@ -266,195 +329,255 @@ export function GrilleView() {
     const pct   = Math.round(total / 169 * 100);
     setCheckResult({ states, correct, wrongAct, missed, extra, score, pct });
 
-    addSession({ key: `grille_${selectedTabKey}`, date: todayStr(), name: selectedTab.name, catName: selectedTab.catName, mode: 'grille', score, correct, missed, extra, wrongAct });
+    addSession({ key: `grille_${selectedTabKey}`, date: todayStr(), name: selectedTab!.name, catName: selectedTab!.catName, mode: 'grille', score, correct, missed, extra, wrongAct });
 
-    // Propose SRS addition if threshold met and not already tracked
     if (selectedTabKey && !srs[selectedTabKey] && score >= cfg.grilleThreshold && pendingSrsKey !== selectedTabKey) {
       setPendingSrsKey(selectedTabKey);
     }
   };
 
+  const handleReset = useCallback(() => {
+    setSelected(initAllFold());
+    setCheckResult(null);
+    setRevealed(false);
+    setActiveAction('Fold');
+    setActiveFreq(100);
+  }, []);
+
   const hands = allHands();
   const inRangeCount = selectedTab ? hands.filter(h => getNonFoldActions(h.hand, selectedTab.rangeMap).length > 0).length : 0;
   const pctRange = Math.round(inRangeCount / 169 * 100);
   const fontSize = Math.max(7, Math.floor(cellSize * 0.38));
-
   const isSrsReview = srsReviewKey === selectedTabKey;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden min-h-0 px-2 md:px-4 py-2">
-      {/* SRS Review banner */}
+
+      {/* SRS banner */}
       {isSrsReview && (
         <div className="flex-shrink-0 mb-1.5 px-3 py-2 bg-accent/10 border border-accent/30 rounded-lg flex items-center justify-between gap-2">
           <div>
             <span className="text-[11px] font-bold text-accent">📅 Révision SRS</span>
             <span className="text-[10px] text-muted ml-2">Reconstituez la range de mémoire, puis vérifiez</span>
           </div>
-          <button
-            onClick={() => store.setMode('srs')}
-            className="text-[10px] text-muted hover:text-text transition-colors flex-shrink-0"
-          >
+          <button onClick={() => store.setMode('srs')}
+            className="text-[10px] text-muted hover:text-text transition-colors flex-shrink-0">
             ✕ Annuler
           </button>
         </div>
       )}
-      <div className="flex-shrink-0">
-        {/* Range legend */}
-        {selectedTab && (
-          <div className="flex items-center gap-2 mb-1.5 overflow-x-auto no-scrollbar">
-            <div className="flex gap-1 flex-nowrap">
-              {actionButtons.map(([name, color]) => (
-                <div key={name} className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border border-border whitespace-nowrap flex-shrink-0">
-                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />{name}
-                </div>
-              ))}
-            </div>
-            <span className="text-[10px] text-muted flex-shrink-0 ml-auto">{inRangeCount} ({pctRange}%)</span>
-          </div>
-        )}
 
-        {/* Action palette — GTO Wizard style */}
-        {selectedTab && !checkResult && !revealed && actionButtons.length > 0 && (
-          <div className="mb-1.5 space-y-1">
-            <div className="flex gap-1.5 items-center overflow-x-auto no-scrollbar">
-              <span className="text-[10px] text-muted flex-shrink-0">Paint:</span>
-              {actionButtons.map(([name, color]) => (
-                <button key={name} onClick={() => setActiveAction(name)}
-                  className={clsx('px-2.5 py-1 text-[11px] font-semibold rounded border transition-all flex-shrink-0',
-                    activeAction === name ? 'text-white' : 'bg-transparent text-muted hover:text-text'
-                  )}
-                  style={activeAction === name ? { background: color, borderColor: color } : { borderColor: color, color }}
-                >
-                  {name}
-                  {activeAction === name && <span className="ml-1.5 opacity-80">{activeFreq}%</span>}
-                </button>
-              ))}
-            </div>
-            {activeAction && (
-              <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-                <span className="text-[10px] text-muted mr-0.5 flex-shrink-0">Freq:</span>
-                {[0, 25, 50, 75, 100].map(f => (
-                  <button key={f} onClick={() => setActiveFreq(f)}
-                    className={clsx('px-1.5 py-0.5 text-[10px] rounded border transition-colors flex-shrink-0',
-                      activeFreq === f ? 'bg-muted2 border-muted2 text-white' : 'border-border text-muted hover:text-text'
-                    )}
-                  >{f}</button>
+      {/* ── Editing UI (hidden when results shown) ──────────────── */}
+      {!checkResult && (
+        <div className="flex-shrink-0">
+          {/* Range info */}
+          {selectedTab && (
+            <div className="flex items-center gap-2 mb-2 overflow-x-auto no-scrollbar">
+              <span className="text-[10px] text-muted flex-shrink-0">{inRangeCount} mains ({pctRange}%)</span>
+              <div className="flex gap-1 flex-wrap">
+                {rawActionButtons.map(([name, color]) => (
+                  <div key={name} className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border border-border whitespace-nowrap flex-shrink-0">
+                    <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
+                    {name}
+                  </div>
                 ))}
-                <input type="number" min="0" max="100" value={activeFreq}
-                  onChange={e => setActiveFreq(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
-                  className="w-11 bg-bg3 border border-border rounded px-1.5 py-0.5 text-[10px] text-text outline-none focus:border-accent ml-1 flex-shrink-0"
-                />
-                <span className="text-[10px] text-muted flex-shrink-0">%</span>
               </div>
-            )}
+            </div>
+          )}
+
+          {/* GTOWizard action cards */}
+          {selectedTab && !revealed && (
+            <div className="mb-2 space-y-1">
+              {allActionButtons.map(([name, color]) => {
+                const isActive = activeAction === name;
+                const count = actionDist[name] ?? 0;
+                const pct = Math.round(count / 169 * 100);
+                return (
+                  <div key={name}
+                    onClick={() => setActiveAction(name)}
+                    className="relative rounded-lg border overflow-hidden cursor-pointer select-none"
+                    style={{ borderColor: isActive ? color : '#2e2e38' }}
+                  >
+                    {/* Distribution fill */}
+                    <div className="absolute inset-0 pointer-events-none"
+                      style={{ width: `${pct}%`, background: hexRgba(color, isActive ? 0.18 : 0.1), right: 'auto', transition: 'width 0.2s' }} />
+
+                    <div className="relative flex items-center gap-2 px-3 py-2 min-h-[38px]">
+                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
+                      <span className="text-[13px] font-bold flex-1 leading-none"
+                        style={{ color: isActive ? color : '#e8e8f0' }}>
+                        {name}
+                      </span>
+
+                      {isActive && (
+                        <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                          <button
+                            className="w-5 h-5 rounded flex items-center justify-center text-sm leading-none cursor-pointer"
+                            style={{ background: hexRgba(color, 0.2) }}
+                            onClick={() => setActiveFreq(f => Math.max(0, f - 25))}>−</button>
+                          <span className="text-[11px] w-7 text-center font-mono text-white">{activeFreq}%</span>
+                          <button
+                            className="w-5 h-5 rounded flex items-center justify-center text-sm leading-none cursor-pointer"
+                            style={{ background: hexRgba(color, 0.2) }}
+                            onClick={() => setActiveFreq(f => Math.min(100, f + 25))}>+</button>
+                          <div className="flex gap-0.5 ml-1">
+                            {[0, 25, 50, 75, 100].map(f => (
+                              <button key={f}
+                                className="px-1 py-0.5 text-[9px] rounded cursor-pointer transition-colors"
+                                style={{
+                                  background: activeFreq === f ? hexRgba(color, 0.5) : hexRgba(color, 0.1),
+                                  color: activeFreq === f ? '#fff' : hexRgba('#ffffff', 0.5),
+                                }}
+                                onClick={() => setActiveFreq(f)}>{f}</button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <span className="text-[10px] text-muted flex-shrink-0 ml-1">{pct}%</span>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="h-[3px] bg-bg3">
+                      <div className="h-full" style={{ width: `${pct}%`, background: color, transition: 'width 0.2s' }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div className="flex gap-1.5 mb-1.5 flex-wrap">
+            <button onClick={handleCheck}
+              className="px-3 py-1.5 text-[11px] font-semibold rounded border bg-accent border-accent text-white hover:opacity-90 transition-opacity cursor-pointer">
+              ✓ Vérifier
+            </button>
+            <button onClick={() => { setRevealed(v => !v); }}
+              className={clsx('px-3 py-1.5 text-[11px] font-semibold rounded border transition-colors cursor-pointer',
+                revealed ? 'bg-blue/20 border-blue text-blue' : 'border-border text-muted hover:text-text hover:border-border2'
+              )}>
+              👁 Révéler
+            </button>
+            <button onClick={handleReset}
+              className="px-3 py-1.5 text-[11px] font-semibold rounded border border-border text-muted hover:text-text hover:border-border2 transition-colors cursor-pointer">
+              ↺ Reset
+            </button>
           </div>
-        )}
-
-        {/* Buttons */}
-        <div className="flex gap-1.5 mb-1 flex-wrap">
-          <button onClick={handleCheck} className="px-3 py-1 text-[11px] font-semibold rounded border bg-accent border-accent text-white hover:opacity-90 transition-opacity">✓ Vérifier</button>
-          <button onClick={() => { setRevealed(true); setCheckResult(null); }} className="px-3 py-1 text-[11px] font-semibold rounded border border-border text-muted hover:text-text hover:border-border2 transition-colors">👁 Révéler</button>
-          <button onClick={() => { setSelected({}); setCheckResult(null); setRevealed(false); }} className="px-3 py-1 text-[11px] font-semibold rounded border border-border text-muted hover:text-text hover:border-border2 transition-colors">↺ Reset</button>
         </div>
+      )}
 
-        {checkResult && (
-          <div className="flex gap-2 flex-wrap mb-0.5">
+      {/* ── Results view ─────────────────────────────────────────── */}
+      {checkResult ? (
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-3 py-1 no-scrollbar">
+          {/* Side-by-side mini grids + score */}
+          <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr auto 1fr' }}>
+            <div>
+              <div className="text-[9px] text-muted text-center mb-1 uppercase tracking-wider">Votre réponse</div>
+              <div className="bg-bg3 rounded-lg p-1.5">
+                <MiniResultGrid hands={hands} selection={selected} actionButtons={allActionButtons} selectedTab={selectedTab} />
+              </div>
+            </div>
+
+            <div className="text-center flex flex-col items-center gap-1 px-1">
+              <ScoreCircle score={checkResult.score} />
+              <div className="text-[9px] text-muted leading-tight text-center">
+                {checkResult.score >= 85 ? 'Excellent' :
+                 checkResult.score >= 70 ? 'Bien' :
+                 checkResult.score >= 55 ? 'À améliorer' : 'À retravailler'}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-[9px] text-muted text-center mb-1 uppercase tracking-wider">Correct</div>
+              <div className="bg-bg3 rounded-lg p-1.5">
+                <MiniResultGrid hands={hands} selection={null} actionButtons={allActionButtons} selectedTab={selectedTab} />
+              </div>
+            </div>
+          </div>
+
+          {/* Counts */}
+          <div className="grid grid-cols-4 gap-1.5">
             {[
-              { color: '#2ecc8a', label: 'Correct' }, { color: '#e05555', label: 'Manqué' },
-              { color: '#e09540', label: 'En trop' }, { color: '#d4c040', label: 'Mauvaise action' },
-            ].map(({ color, label }) => (
-              <div key={label} className="flex items-center gap-1 text-[9px] text-muted">
-                <div className="w-2 h-2 rounded-sm" style={{ background: color }} />{label}
+              { label: 'Correct', val: checkResult.correct,  color: '#2ecc8a' },
+              { label: 'Raté',    val: checkResult.missed,   color: '#e05555' },
+              { label: 'En trop', val: checkResult.extra,    color: '#e09540' },
+              { label: 'Erreur',  val: checkResult.wrongAct, color: '#d4c040' },
+            ].map(({ label, val, color }) => (
+              <div key={label} className="bg-bg2 border border-border rounded-lg py-2 text-center">
+                <div className="text-xl font-bold leading-none" style={{ color }}>{val}</div>
+                <div className="text-[8px] text-muted mt-1 uppercase tracking-wider leading-none">{label}</div>
               </div>
             ))}
           </div>
-        )}
-        {!checkResult && !revealed && <p className="text-[10px] text-muted mb-0.5">Clic / glisser · Re-clic = déselect</p>}
-      </div>
 
-      {/* Grid */}
-      <div ref={midRef} className="flex-1 min-h-0 flex items-center justify-center overflow-hidden">
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(13, ${cellSize}px)`,
-          gridAutoRows: `${cellSize}px`,
-          gap: '2px',
-          fontSize: `${fontSize}px`,
-        }}>
-          {hands.map(({ hand }) => {
-            const acts = selectedTab ? getNonFoldActions(hand, selectedTab.rangeMap) : [];
-            const rawActs = selectedTab ? (getHandActions(hand, selectedTab.rangeMap) ?? []) : [];
-            const hasDot = isMixed(rawActs);
+          {/* Try again */}
+          <button onClick={handleReset}
+            className="w-full py-2.5 rounded-lg bg-bg3 border border-border text-sm font-semibold text-text hover:bg-bg4 hover:border-border2 transition-all cursor-pointer">
+            ↺ Recommencer
+          </button>
 
-            let selStyle: React.CSSProperties | undefined;
-            let cs: CheckState | undefined;
-
-            if (checkResult) {
-              cs = checkResult.states[hand];
-            } else if (revealed) {
-              if (acts.length > 0) {
-                const freqs: CellFreqs = {};
-                for (const a of acts) freqs[a.action] = a.freq * 100;
-                selStyle = buildGradient(freqs, actionButtons);
-              }
-            } else if (hand in selected) {
-              selStyle = buildGradient(selected[hand], actionButtons);
-            }
-
-            return (
-              <HandCell key={hand} hand={hand} selStyle={selStyle} checkState={cs}
-                hasDot={hasDot && (!!checkResult || revealed)}
-                onPointerDown={handlePointerDown}
-                onPointerEnter={handlePointerEnter}
-              />
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Check stats */}
-      {checkResult && (
-        <div className="flex-shrink-0 mt-2 space-y-2">
-          <div className="flex gap-1.5 flex-wrap">
-            {[
-              { val: checkResult.correct,  label: 'Corrects',        color: '#2ecc8a' },
-              { val: checkResult.wrongAct, label: 'Mauvaise action', color: '#d4c040' },
-              { val: checkResult.missed,   label: 'Manqués',         color: '#e05555' },
-              { val: checkResult.extra,    label: 'En trop',         color: '#e09540' },
-              { val: `${checkResult.score}%`, label: 'Score',        color: '#6c63ff' },
-              { val: `${checkResult.pct}%`,   label: '% Range',      color: '#4a9eff' },
-            ].map(({ val, label, color }) => (
-              <div key={label} className="flex-1 min-w-[60px] bg-bg2 border border-border rounded px-2 py-1.5 text-center">
-                <div className="text-lg font-bold" style={{ color }}>{val}</div>
-                <div className="text-[9px] text-muted uppercase tracking-wider mt-px">{label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* SRS Review confirmation */}
+          {/* SRS review confirmation */}
           {isSrsReview && selectedTabKey && (
             <div className={clsx(
               'flex items-center justify-between px-3 py-2.5 rounded-lg border',
-              checkResult.score >= cfg.grilleThreshold
-                ? 'bg-green/10 border-green/30'
-                : 'bg-red/10 border-red/30'
+              checkResult.score >= cfg.grilleThreshold ? 'bg-green/10 border-green/30' : 'bg-red/10 border-red/30'
             )}>
               <div>
                 <div className={clsx('text-[11px] font-bold', checkResult.score >= cfg.grilleThreshold ? 'text-green' : 'text-red')}>
-                  {checkResult.score >= cfg.grilleThreshold ? `✅ Révision réussie (${checkResult.score}%)` : `❌ Score insuffisant (${checkResult.score}% < ${cfg.grilleThreshold}%)`}
+                  {checkResult.score >= cfg.grilleThreshold
+                    ? `✅ Révision réussie (${checkResult.score}%)`
+                    : `❌ Score insuffisant (${checkResult.score}% < ${cfg.grilleThreshold}%)`}
                 </div>
                 <div className="text-[9px] text-muted mt-0.5">
                   {checkResult.score >= cfg.grilleThreshold ? 'Intervalle avancé' : 'Intervalle réduit — réessayer demain'}
                 </div>
               </div>
-              <button
-                onClick={() => finishSrsReview(selectedTabKey, checkResult.score)}
-                className="flex-shrink-0 px-3 py-1.5 text-[11px] font-semibold rounded border bg-accent border-accent text-white hover:opacity-90 transition-opacity ml-3"
-              >
+              <button onClick={() => finishSrsReview(selectedTabKey, checkResult.score)}
+                className="flex-shrink-0 px-3 py-1.5 text-[11px] font-semibold rounded border bg-accent border-accent text-white hover:opacity-90 transition-opacity ml-3 cursor-pointer">
                 Confirmer →
               </button>
             </div>
           )}
+        </div>
+      ) : (
+        /* ── Grid ──────────────────────────────────────────────── */
+        <div ref={midRef} className="flex-1 min-h-0 flex items-center justify-center overflow-hidden">
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(13, ${cellSize}px)`,
+            gridAutoRows: `${cellSize}px`,
+            gap: '2px',
+            fontSize: `${fontSize}px`,
+          }}>
+            {hands.map(({ hand }) => {
+              const acts = selectedTab ? getNonFoldActions(hand, selectedTab.rangeMap) : [];
+              const rawActs = selectedTab ? (getHandActions(hand, selectedTab.rangeMap) ?? []) : [];
+              const hasDot = isMixed(rawActs);
+
+              let selStyle: React.CSSProperties | undefined;
+
+              if (revealed) {
+                if (acts.length > 0) {
+                  const freqs: CellFreqs = {};
+                  for (const a of acts) freqs[a.action] = a.freq * 100;
+                  selStyle = buildGradient(freqs, allActionButtons);
+                } else {
+                  selStyle = { background: hexRgba(colorOverrides['Fold'] ?? FOLD_COLOR, 0.22), borderColor: hexRgba(colorOverrides['Fold'] ?? FOLD_COLOR, 0.35), color: '#7a7a90' };
+                }
+              } else if (hand in selected) {
+                selStyle = buildGradient(selected[hand], allActionButtons);
+              }
+
+              return (
+                <HandCell key={hand} hand={hand} selStyle={selStyle}
+                  hasDot={hasDot && revealed}
+                  onPointerDown={handlePointerDown}
+                  onPointerEnter={handlePointerEnter}
+                />
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

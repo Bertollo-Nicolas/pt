@@ -3,9 +3,11 @@ import { useState, useEffect } from 'react';
 import { useAppStore, getCfg } from '@/store/appStore';
 import { Modal, ModalTitle, ModalActions } from '../ui/Modal';
 
+const FOLD_DEFAULT = '#6b7280';
+
 export function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const store = useAppStore();
-  const { saveConfig } = store;
+  const { saveConfig, saveColorOverride, rmData, colorOverrides } = store;
   const cfg = getCfg(store);
 
   const [threshold, setThreshold] = useState(cfg.threshold);
@@ -96,6 +98,53 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
             className="w-full bg-bg3 border border-border rounded px-2.5 py-1.5 text-xs text-text placeholder-muted outline-none focus:border-accent"
           />
         </div>
+
+        {/* Action color overrides */}
+        {(() => {
+          const actionDefs: Array<{ name: string; defaultColor: string }> = rmData
+            ? [...new Map(
+                Object.values(rmData.ranges)
+                  .filter(r => r.name && r.color && !r.name.toUpperCase().includes('FOLD'))
+                  .map(r => [r.name, r.color] as [string, string])
+              )].map(([name, color]) => ({ name, defaultColor: color }))
+            : [];
+          actionDefs.push({ name: 'Fold', defaultColor: FOLD_DEFAULT });
+          if (actionDefs.length <= 1) return null;
+          return (
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted block mb-1.5">
+                Couleurs des actions
+              </label>
+              <div className="space-y-2">
+                {actionDefs.map(({ name, defaultColor }) => {
+                  const current = colorOverrides?.[name] ?? defaultColor;
+                  const isOverridden = colorOverrides?.[name] && colorOverrides[name] !== defaultColor;
+                  return (
+                    <div key={name} className="flex items-center gap-2.5">
+                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: current }} />
+                      <span className="text-xs text-text flex-1">{name}</span>
+                      <input
+                        type="color"
+                        value={current}
+                        onChange={e => saveColorOverride(name, e.target.value)}
+                        className="w-7 h-7 rounded cursor-pointer border-0 p-0 bg-transparent"
+                        title={`Couleur pour ${name}`}
+                      />
+                      {isOverridden && (
+                        <button
+                          onClick={() => saveColorOverride(name, defaultColor)}
+                          className="text-[9px] text-muted hover:text-text cursor-pointer transition-colors"
+                          title="Réinitialiser">
+                          ↺
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       <div className="mt-5 flex justify-between items-center">

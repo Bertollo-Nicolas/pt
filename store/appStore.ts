@@ -18,6 +18,7 @@ interface Persisted {
   heatmap: Record<string, number>;
   srs: Record<string, SrsEntry>;
   lastSpot: { catId: string; tabId: string } | null;
+  colorOverrides: Record<string, string>; // action name → hex color
 }
 
 // ── Ephemeral ─────────────────────────────────────────────
@@ -51,6 +52,7 @@ interface Actions {
   startSrsReview: (key: string) => void;
   finishSrsReview: (key: string, score: number) => void;
   setCalendar: (year: number, month: number) => void;
+  saveColorOverride: (name: string, color: string) => void;
 }
 
 export type AppStore = Persisted & Ephemeral & Actions;
@@ -77,6 +79,7 @@ export const useAppStore = create<AppStore>()(
       heatmap: {},
       srs: {},
       lastSpot: null,
+      colorOverrides: {},
 
       // ── Ephemeral defaults ────────────────────────────
       rmData: null,
@@ -239,6 +242,9 @@ export const useAppStore = create<AppStore>()(
       },
 
       setCalendar: (year, month) => set({ calYear: year, calMonth: month }),
+
+      saveColorOverride: (name, color) =>
+        set(s => ({ colorOverrides: { ...s.colorOverrides, [name]: color } })),
     }),
     {
       name: 'range-trainer-v5',
@@ -250,6 +256,7 @@ export const useAppStore = create<AppStore>()(
         heatmap: s.heatmap,
         srs: s.srs,
         lastSpot: s.lastSpot,
+        colorOverrides: s.colorOverrides,
       }),
     },
   ),

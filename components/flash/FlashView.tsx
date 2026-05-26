@@ -14,6 +14,7 @@ type TimerMs = 0 | 5000 | 8000 | 12000 | 15000 | 20000;
 
 interface ButtonDef { label: string; color: string; color2?: string; actions: string[] }
 interface FlashStats { correct: number; wrong: number; streak: number; bestStreak: number }
+interface CardDims { w: number; h: number }
 
 // ── Helpers ───────────────────────────────────────────────────
 function pickSuits(type: HandItem['type']): [Suit, Suit] {
@@ -148,14 +149,18 @@ export function FlashView() {
 
   if (!selectedTab) return null;
 
+  const colorOverrides = store.colorOverrides ?? {};
   const rawButtons: [string, string][] = [...new Map(
     selectedTab.rangeList
       .filter(rl => rl.hands.length > 0)
-      .map(rl => { const r = store.rangeColors[rl.id]; return r ? [r.name, r.color] as [string, string] : null; })
+      .map(rl => {
+        const r = store.rangeColors[rl.id];
+        return r ? [r.name, colorOverrides[r.name] ?? r.color] as [string, string] : null;
+      })
       .filter(Boolean) as [string, string][]
   )];
   const hasExplicitFold = rawButtons.some(([n]) => n.toUpperCase().includes('FOLD'));
-  const actionButtons: [string, string][] = hasExplicitFold ? rawButtons : [...rawButtons, ['Fold', '#6b7280']];
+  const actionButtons: [string, string][] = hasExplicitFold ? rawButtons : [...rawButtons, ['Fold', colorOverrides['Fold'] ?? '#6b7280']];
   const allButtons = buildAllButtons(actionButtons);
 
   const tot = totalStats.correct + totalStats.wrong;
@@ -301,7 +306,9 @@ function FlashPanel({
   const [showRangeOverlay, setShowRangeOverlay] = useState(false);
   const [cardAnim,         setCardAnim]         = useState<'shake' | 'pop' | null>(null);
   const [animKey,          setAnimKey]          = useState(0);
+  const [cardDims,         setCardDims]         = useState<CardDims>({ w: 72, h: 100 });
 
+  const panelRef         = useRef<HTMLDivElement>(null);
   const answeredRef      = useRef(false);
   const timerRef         = useRef<ReturnType<typeof setInterval> | null>(null);
   const intervalStartRef = useRef(0);
@@ -312,6 +319,19 @@ function FlashPanel({
   const handleTimeoutRef = useRef<(() => void) | null>(null);
 
   useEffect(() => { autoNextRef.current = autoNext; }, [autoNext]);
+
+  // Dynamic card sizing from panel height
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver(([entry]) => {
+      const h = entry.contentRect.height;
+      const cardH = Math.max(50, Math.min(compact ? 80 : 118, Math.floor(h * 0.26)));
+      setCardDims({ w: Math.round(cardH * 0.72), h: cardH });
+    });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [compact]);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
@@ -425,11 +445,11 @@ function FlashPanel({
   );
 
   return (
-    <div className={clsx(
+    <div ref={panelRef} className={clsx(
       'relative flex flex-col items-center bg-bg2 border border-border rounded-lg overflow-hidden',
       compact
         ? 'h-full gap-1.5 p-2 justify-center'
-        : 'gap-2 md:gap-3 p-3 md:p-5 w-full max-w-[400px]',
+        : 'gap-2 md:gap-3 p-3 md:p-5 w-full max-w-[420px]',
     )}>
       {!compact && (
         <div className="text-[10px] text-muted uppercase tracking-widest text-center">
@@ -442,7 +462,7 @@ function FlashPanel({
         cardAnim === 'shake' && 'animate-shake',
         cardAnim === 'pop'   && 'animate-pop-correct',
       )}>
-        <HandCards hand={hand} suits={suits} compact={compact} />
+        <HandCards hand={hand} suits={suits} w={cardDims.w} h={cardDims.h} />
       </div>
 
       {timerMs > 0 && (
@@ -478,9 +498,9 @@ function FlashPanel({
 
       {feedback && (
         <div key={`fb-${animKey}`} className={clsx(
-          'animate-slide-up rounded text-center w-full flex-shrink-0',
-          compact ? 'px-2 py-1 text-[9px]' : 'px-3 py-2 text-xs font-medium',
-          feedback.type === 'correct' ? 'bg-green/10 border border-green/30 text-green' :
+          'animate-slide-up rounded text-center flex-shrink-0',
+          compact ? 'px-2 py-1 text-[9px] w-full' : 'px-4 py-2 text-xs font-medium self-center max-w-xs',
+          feedback.type === 'correct' ? 'bg-green/10 border border-green/25 text-green' :
           feedback.type === 'partial'  ? 'bg-orange/10 border border-orange/30 text-orange' :
           'bg-red/10 border border-red/30 text-red',
         )}>
@@ -491,8 +511,8 @@ function FlashPanel({
       {answered && (!autoNext || feedback?.type === 'wrong') && (
         <button onClick={draw}
           className={clsx(
-            'w-full rounded border border-border2 text-muted bg-transparent hover:bg-bg3 hover:text-text transition-all active:scale-95 cursor-pointer flex-shrink-0',
-            compact ? 'px-2 py-1 text-[9px]' : 'px-4 py-2 text-xs font-semibold',
+            'rounded border border-border2 text-muted bg-transparent hover:bg-bg3 hover:text-text transition-all active:scale-95 cursor-pointer flex-shrink-0',
+            compact ? 'px-2 py-1 text-[9px] w-full' : 'px-5 py-2 text-xs font-semibold self-center',
           )}>
           Main suivante →
         </button>
@@ -573,32 +593,35 @@ const SUIT_COLORS: Record<string, string> = {
   '♠': '#111827', '♥': '#dc2626', '♦': '#2563eb', '♣': '#16a34a',
 };
 
-function PlayingCard({ rank, suit, compact }: { rank: string; suit: Suit; compact?: boolean }) {
+function PlayingCard({ rank, suit, w, h }: { rank: string; suit: Suit; w: number; h: number }) {
   const color = SUIT_COLORS[suit];
-  const w = compact ? 52 : 72;
-  const h = compact ? 72 : 100;
+  const fontSz = Math.round(h * 0.27);
+  const suitSz = Math.round(h * 0.23);
+  const padV   = Math.round(h * 0.055);
+  const padH   = Math.round(w * 0.1);
+  const radius = Math.round(w * 0.1);
   return (
     <div style={{ width: w, height: h, background: '#ffffff', border: '1.5px solid #d1d5db',
-      borderRadius: 8, padding: compact ? '4px 6px' : '6px 8px',
+      borderRadius: radius, padding: `${padV}px ${padH}px`,
       display: 'flex', flexDirection: 'column', position: 'relative',
       boxShadow: '0 3px 12px rgba(0,0,0,0.35)', color }}>
-      <span style={{ fontSize: compact ? 20 : 28, fontWeight: 900, lineHeight: 1 }}>{rank}</span>
-      <span style={{ fontSize: compact ? 17 : 24, lineHeight: 1.1 }}>{suit}</span>
-      <span style={{ position: 'absolute', bottom: compact ? 4 : 6, right: compact ? 6 : 8,
-        fontSize: compact ? 20 : 28, fontWeight: 900, lineHeight: 1, transform: 'rotate(180deg)' }}>
+      <span style={{ fontSize: fontSz, fontWeight: 900, lineHeight: 1 }}>{rank}</span>
+      <span style={{ fontSize: suitSz, lineHeight: 1.1 }}>{suit}</span>
+      <span style={{ position: 'absolute', bottom: padV, right: padH,
+        fontSize: fontSz, fontWeight: 900, lineHeight: 1, transform: 'rotate(180deg)' }}>
         {rank}
       </span>
     </div>
   );
 }
 
-function HandCards({ hand, suits, compact }: { hand: HandItem; suits: [Suit, Suit]; compact?: boolean }) {
+function HandCards({ hand, suits, w, h }: { hand: HandItem; suits: [Suit, Suit]; w: number; h: number }) {
   const r1 = hand.hand[0];
   const r2 = hand.type === 'pair' ? hand.hand[0] : hand.hand[1];
   return (
     <div className="flex gap-2 justify-center my-1 flex-shrink-0">
-      <PlayingCard rank={r1} suit={suits[0]} compact={compact} />
-      <PlayingCard rank={r2} suit={suits[1]} compact={compact} />
+      <PlayingCard rank={r1} suit={suits[0]} w={w} h={h} />
+      <PlayingCard rank={r2} suit={suits[1]} w={w} h={h} />
     </div>
   );
 }
