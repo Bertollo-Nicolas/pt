@@ -299,6 +299,8 @@ function FlashPanel({
   const [feedback,         setFeedback]         = useState<{ type: 'correct' | 'wrong' | 'partial'; text: string } | null>(null);
   const [timerPct,         setTimerPct]         = useState(100);
   const [showRangeOverlay, setShowRangeOverlay] = useState(false);
+  const [cardAnim,         setCardAnim]         = useState<'shake' | 'pop' | null>(null);
+  const [animKey,          setAnimKey]          = useState(0);
 
   const answeredRef      = useRef(false);
   const timerRef         = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -362,6 +364,7 @@ function FlashPanel({
     clearTimer();
     setAnswered(false); answeredRef.current = false;
     setFeedback(null);
+    setCardAnim(null);
     setTimerPct(100);
     const h = pickNextHand(selectedTab.rangeMap, retryQueueRef.current);
     setHand(h); setSuits(pickSuits(h.type));
@@ -387,6 +390,8 @@ function FlashPanel({
 
     const result = evaluateAnswer(btn, hand.hand, selectedTab.rangeMap);
     setFeedback({ type: result.correct ? 'correct' : result.partial ? 'partial' : 'wrong', text: result.text });
+    setCardAnim((result.correct || result.partial) ? 'pop' : 'shake');
+    setAnimKey(k => k + 1);
 
     if (!result.correct && !result.partial) recordError(hand.hand, btn.label, result.expected);
 
@@ -421,7 +426,7 @@ function FlashPanel({
 
   return (
     <div className={clsx(
-      'flex flex-col items-center bg-bg2 border border-border rounded-lg overflow-hidden',
+      'relative flex flex-col items-center bg-bg2 border border-border rounded-lg overflow-hidden',
       compact
         ? 'h-full gap-1.5 p-2 justify-center'
         : 'gap-2 md:gap-3 p-3 md:p-5 w-full max-w-[400px]',
@@ -432,7 +437,13 @@ function FlashPanel({
         </div>
       )}
 
-      <HandCards hand={hand} suits={suits} compact={compact} />
+      <div key={animKey} className={clsx(
+        'flex-shrink-0',
+        cardAnim === 'shake' && 'animate-shake',
+        cardAnim === 'pop'   && 'animate-pop-correct',
+      )}>
+        <HandCards hand={hand} suits={suits} compact={compact} />
+      </div>
 
       {timerMs > 0 && (
         <div className="w-full h-0.5 bg-bg3 rounded-full overflow-hidden flex-shrink-0">
@@ -466,8 +477,8 @@ function FlashPanel({
       )}
 
       {feedback && (
-        <div className={clsx(
-          'rounded text-center w-full flex-shrink-0',
+        <div key={`fb-${animKey}`} className={clsx(
+          'animate-slide-up rounded text-center w-full flex-shrink-0',
           compact ? 'px-2 py-1 text-[9px]' : 'px-3 py-2 text-xs font-medium',
           feedback.type === 'correct' ? 'bg-green/10 border border-green/30 text-green' :
           feedback.type === 'partial'  ? 'bg-orange/10 border border-orange/30 text-orange' :
