@@ -7,6 +7,7 @@ export const DEFAULT_CFG: AppConfig = {
   minHands: 10,
   grilleThreshold: 80,
   intervals: [1, 3, 7, 14, 30, 90],
+  flashHandFilter: null,
 };
 
 export const MAX_SESSIONS = 200;

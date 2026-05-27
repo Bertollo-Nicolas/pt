@@ -97,4 +97,5 @@ export interface AppConfig {
   minHands: number;
   grilleThreshold: number;
   intervals: number[];
+  flashHandFilter: string[] | null; // persisted per-session filter
 }
