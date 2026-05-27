@@ -357,60 +357,58 @@ function HandFilterOverlay({
 
   const count = active.size;
 
+  const CELL = 30;
+
   return (
-    <div className="absolute inset-0 z-30 bg-bg/90 flex flex-col" onClick={onClose}>
-      <div
-        className="bg-bg2 border-b border-t border-border p-3 mt-auto"
-        onClick={e => e.stopPropagation()}
-      >
+    <div className="absolute inset-0 z-30 bg-bg/85 flex items-center justify-center p-3" onClick={onClose}>
+      <div className="bg-bg2 border border-border rounded-xl p-3 shadow-2xl" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-bold text-text">Filtrer les mains</span>
             <span className="text-[9px] text-muted">{count} / {hands.length}</span>
             {handFilter !== null && count > 0 && (
-              <span className="text-[9px] text-accent font-bold">● actif</span>
+              <span className="text-[9px] text-accent font-semibold">● actif</span>
             )}
           </div>
-          <div className="flex gap-1">
+          <div className="flex gap-1 ml-4">
             <button onClick={selectInRange}
-              className="text-[9px] px-2 py-1 rounded border border-border text-muted hover:text-text transition-colors cursor-pointer">
-              Range seule
+              className="text-[9px] px-2 py-0.5 rounded border border-border text-muted hover:text-text transition-colors cursor-pointer">
+              Range
             </button>
             <button onClick={selectAll}
-              className="text-[9px] px-2 py-1 rounded border border-border text-muted hover:text-text transition-colors cursor-pointer">
+              className="text-[9px] px-2 py-0.5 rounded border border-border text-muted hover:text-text transition-colors cursor-pointer">
               Tout
             </button>
             <button onClick={selectNone}
-              className="text-[9px] px-2 py-1 rounded border border-border text-muted hover:text-text transition-colors cursor-pointer">
+              className="text-[9px] px-2 py-0.5 rounded border border-border text-muted hover:text-text transition-colors cursor-pointer">
               Aucun
             </button>
             <button onClick={onClose}
-              className="text-[9px] px-2 py-1 rounded border border-border text-muted hover:border-red hover:text-red transition-colors cursor-pointer">
-              Fermer ✓
+              className="text-[9px] px-2 py-0.5 rounded border border-border text-muted hover:border-red hover:text-red transition-colors cursor-pointer">
+              ✕
             </button>
           </div>
         </div>
 
-        {/* Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(13, 1fr)', gap: '2px' }}>
+        {/* Grid — fixed cell size, same as MiniRange */}
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(13, ${CELL}px)`, gridAutoRows: `${CELL}px`, gap: '1px' }}>
           {hands.map(({ hand }) => {
             const acts = getNonFoldActions(hand, selectedTab.rangeMap);
             const isSelected = active.has(hand);
 
             let bg: string;
             if (acts.length === 0) {
-              bg = isSelected ? 'rgba(107,114,128,0.3)' : 'rgba(15,15,17,0.6)';
+              bg = isSelected ? 'rgba(107,114,128,0.28)' : 'rgba(15,15,17,0.5)';
             } else if (acts.length === 1 || acts[0].freq > 0.95) {
               const c = actionButtons.find(([n]) => n === acts[0].action)?.[1] ?? '#888';
-              bg = isSelected ? hexRgba(c, 0.75) : hexRgba(c, 0.18);
+              bg = hexRgba(c, isSelected ? 0.8 : 0.18);
             } else {
-              // gradient for mixed hands
               let pos = 0; const stops: string[] = [];
               const total = acts.reduce((s, a) => s + a.freq, 0);
               for (const a of acts) {
                 const c = actionButtons.find(([n]) => n === a.action)?.[1] ?? '#888';
-                const alpha = isSelected ? 0.75 : 0.18;
+                const alpha = isSelected ? 0.8 : 0.18;
                 const pct = (a.freq / total) * 100;
                 stops.push(`${hexRgba(c, alpha)} ${pos.toFixed(0)}%`);
                 stops.push(`${hexRgba(c, alpha)} ${(pos + pct).toFixed(0)}%`);
@@ -420,36 +418,21 @@ function HandFilterOverlay({
             }
 
             return (
-              <div
-                key={hand}
-                onClick={() => toggle(hand)}
-                title={hand}
+              <div key={hand} onClick={() => toggle(hand)} title={hand}
                 style={{
-                  aspectRatio: '1',
-                  borderRadius: 3,
                   background: bg,
-                  opacity: isSelected ? 1 : 0.35,
+                  borderRadius: 2,
+                  opacity: isSelected ? 1 : 0.3,
                   cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '6px',
-                  fontWeight: 700,
-                  color: isSelected ? '#fff' : 'rgba(255,255,255,0.5)',
-                  letterSpacing: '-0.3px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '6.5px', fontWeight: 700, color: '#fff', letterSpacing: '-0.3px',
                   transition: 'opacity 0.1s',
-                  outline: isSelected ? 'none' : '1px solid rgba(255,255,255,0.05)',
-                }}
-              >
+                }}>
                 {hand}
               </div>
             );
           })}
         </div>
-
-        <p className="text-[9px] text-muted mt-2 text-center">
-          Sauvegardé automatiquement — appuie sur le fond ou Fermer pour quitter
-        </p>
       </div>
     </div>
   );
