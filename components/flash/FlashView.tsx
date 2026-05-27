@@ -498,8 +498,8 @@ function FlashPanel({
 
       {feedback && (
         <div key={`fb-${animKey}`} className={clsx(
-          'animate-slide-up rounded text-center flex-shrink-0',
-          compact ? 'px-2 py-1 text-[9px] w-full' : 'px-4 py-2 text-xs font-medium self-center max-w-xs',
+          'animate-slide-up rounded text-center flex-shrink-0 self-center',
+          compact ? 'px-2 py-1 text-[9px]' : 'px-4 py-2 text-xs font-medium max-w-xs',
           feedback.type === 'correct' ? 'bg-green/10 border border-green/25 text-green' :
           feedback.type === 'partial'  ? 'bg-orange/10 border border-orange/30 text-orange' :
           'bg-red/10 border border-red/30 text-red',
@@ -511,8 +511,8 @@ function FlashPanel({
       {answered && (!autoNext || feedback?.type === 'wrong') && (
         <button onClick={draw}
           className={clsx(
-            'rounded border border-border2 text-muted bg-transparent hover:bg-bg3 hover:text-text transition-all active:scale-95 cursor-pointer flex-shrink-0',
-            compact ? 'px-2 py-1 text-[9px] w-full' : 'px-5 py-2 text-xs font-semibold self-center',
+            'rounded border border-border2 text-muted bg-transparent hover:bg-bg3 hover:text-text transition-all active:scale-95 cursor-pointer flex-shrink-0 self-center',
+            compact ? 'px-2 py-1 text-[9px]' : 'px-5 py-2 text-xs font-semibold',
           )}>
           Main suivante →
         </button>
@@ -547,7 +547,7 @@ function MiniRange({ selectedTab, actionButtons, currentHand }: {
   currentHand?: string;
 }) {
   const hands = allHands();
-  const CELL = 24;
+  const CELL = 28;
   return (
     <div className="bg-bg2 border border-border rounded-lg p-2.5 shadow-2xl">
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(13, ${CELL}px)`, gridAutoRows: `${CELL}px`, gap: '1px' }}>
@@ -555,8 +555,8 @@ function MiniRange({ selectedTab, actionButtons, currentHand }: {
           const acts = getNonFoldActions(hand, selectedTab.rangeMap);
           const isCurrent = hand === currentHand;
           if (acts.length === 0) {
-            return <div key={hand} className="rounded-sm bg-bg3"
-              style={isCurrent ? { boxShadow: 'inset 0 0 0 2px #f0b429' } : undefined} title={hand} />;
+            return <div key={hand} className="rounded-sm"
+              style={{ background: 'rgba(107,114,128,0.18)', ...(isCurrent ? { boxShadow: 'inset 0 0 0 2px #f0b429' } : {}) }} title={hand} />;
           }
           const color = actionButtons.find(([n]) => n === acts[0].action)?.[1] ?? '#888';
           let bg: string;
