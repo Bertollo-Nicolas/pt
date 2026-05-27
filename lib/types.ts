@@ -65,6 +65,7 @@ export interface Session {
   mode: 'flash' | 'grille';
   correct?: number;
   wrong?: number;
+  imprecision?: number;
   bestStreak?: number;
   score?: number;
   missed?: number;

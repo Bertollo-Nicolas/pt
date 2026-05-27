@@ -13,7 +13,7 @@ type TableCount = 1 | 2 | 4;
 type TimerMs = 0 | 5000 | 8000 | 12000 | 15000 | 20000;
 
 interface ButtonDef { label: string; color: string; color2?: string; actions: string[] }
-interface FlashStats { correct: number; wrong: number; streak: number; bestStreak: number }
+interface FlashStats { correct: number; wrong: number; imprecision: number; streak: number; bestStreak: number }
 interface CardDims { w: number; h: number }
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -120,12 +120,12 @@ export function FlashView() {
   const [autoNext,     setAutoNext]     = useState(false);
   const [paused,       setPaused]       = useState(false);
   const [sessionEnded, setSessionEnded] = useState(false);
-  const [totalStats,   setTotalStats]   = useState<FlashStats>({ correct: 0, wrong: 0, streak: 0, bestStreak: 0 });
+  const [totalStats,   setTotalStats]   = useState<FlashStats>({ correct: 0, wrong: 0, imprecision: 0, streak: 0, bestStreak: 0 });
   const [retryCount,   setRetryCount]   = useState(0);
   const [handFilter,   setHandFilter]   = useState<Set<string> | null>(null);
   const [showFilter,   setShowFilter]   = useState(false);
 
-  const totalStatsRef    = useRef<FlashStats>({ correct: 0, wrong: 0, streak: 0, bestStreak: 0 });
+  const totalStatsRef    = useRef<FlashStats>({ correct: 0, wrong: 0, imprecision: 0, streak: 0, bestStreak: 0 });
   const sessionErrorsRef = useRef<Map<string, number>>(new Map());
   const retryQueueRef    = useRef<string[]>([]);
 
@@ -136,24 +136,25 @@ export function FlashView() {
   const onAnswer = useCallback((correct: boolean, partial: boolean) => {
     const prev = totalStatsRef.current;
     const next = { ...prev };
-    if (correct || partial) { next.correct++; next.streak++; next.bestStreak = Math.max(next.bestStreak, next.streak); }
+    if (correct) { next.correct++; next.streak++; next.bestStreak = Math.max(next.bestStreak, next.streak); }
+    else if (partial) { next.imprecision++; /* streak unchanged */ }
     else { next.wrong++; next.streak = 0; }
     totalStatsRef.current = next;
     setTotalStats(next);
 
     if (!selectedTab || !selectedTabKey) return;
-    const tot = next.correct + next.wrong;
+    const tot = next.correct + next.wrong + next.imprecision;
     addSession({ key: `flash_${selectedTabKey}`, date: todayStr(),
       name: selectedTab.name, catName: selectedTab.catName,
-      mode: 'flash', correct: next.correct, wrong: next.wrong, bestStreak: next.bestStreak });
+      mode: 'flash', correct: next.correct, wrong: next.wrong, imprecision: next.imprecision, bestStreak: next.bestStreak });
     if (!srs[selectedTabKey] && pendingSrsKey !== selectedTabKey && tot >= cfg.minHands) {
       if (Math.round(next.correct / tot * 100) >= cfg.threshold) setPendingSrsKey(selectedTabKey);
     }
   }, [selectedTab, selectedTabKey, addSession, srs, pendingSrsKey, cfg, setPendingSrsKey]);
 
   const handleNewSession = useCallback(() => {
-    totalStatsRef.current = { correct: 0, wrong: 0, streak: 0, bestStreak: 0 };
-    setTotalStats({ correct: 0, wrong: 0, streak: 0, bestStreak: 0 });
+    totalStatsRef.current = { correct: 0, wrong: 0, imprecision: 0, streak: 0, bestStreak: 0 };
+    setTotalStats({ correct: 0, wrong: 0, imprecision: 0, streak: 0, bestStreak: 0 });
     sessionErrorsRef.current = new Map();
     retryQueueRef.current = [];
     setRetryCount(0);
@@ -179,7 +180,7 @@ export function FlashView() {
   const actionButtons: [string, string][] = hasExplicitFold ? rawButtons : [...rawButtons, ['Fold', colorOverrides['Fold'] ?? '#6b7280']];
   const allButtons = buildAllButtons(actionButtons);
 
-  const tot = totalStats.correct + totalStats.wrong;
+  const tot = totalStats.correct + totalStats.wrong + totalStats.imprecision;
   const acc = tot > 0 ? Math.round(totalStats.correct / tot * 100) : null;
   const resetKey = `${selectedTabKey ?? 'none'}-${tableCount}`;
   const filterActive = handFilter !== null && handFilter.size > 0;
@@ -190,6 +191,7 @@ export function FlashView() {
       {/* ── Row 1: Stats + Session Controls ──────────────────── */}
       <div className="flex items-center gap-2 px-3 py-2 bg-bg2 border-b border-border flex-shrink-0 overflow-x-auto no-scrollbar">
         <span className="text-xs font-bold text-green flex-shrink-0">✓{totalStats.correct}</span>
+        {totalStats.imprecision > 0 && <span className="text-xs font-bold text-orange flex-shrink-0">≈{totalStats.imprecision}</span>}
         <span className="text-xs font-bold text-red flex-shrink-0">✗{totalStats.wrong}</span>
         {acc !== null && <span className="text-xs font-bold text-blue flex-shrink-0">{acc}%</span>}
         {totalStats.streak >= 3 && <span className="text-xs font-bold text-orange flex-shrink-0">🔥{totalStats.streak}</span>}
@@ -294,12 +296,13 @@ export function FlashView() {
           <div className="bg-bg2 border border-border rounded-xl p-6 max-w-[340px] w-full text-center">
             <div className="text-base font-bold mb-0.5">Session terminée</div>
             <div className="text-[11px] text-muted mb-4">{selectedTab.catName} — {selectedTab.name}</div>
-            <div className="grid grid-cols-2 gap-2 mb-5">
+            <div className="grid grid-cols-3 gap-2 mb-5">
               {[
-                { val: totalStats.correct,                label: 'Corrects',    color: 'text-green'  },
-                { val: totalStats.wrong,                  label: 'Erreurs',     color: 'text-red'    },
-                { val: acc !== null ? `${acc}%` : '—',   label: 'Précision',   color: 'text-blue'   },
-                { val: totalStats.bestStreak,             label: 'Best streak', color: 'text-orange' },
+                { val: totalStats.correct,                    label: 'Corrects',      color: 'text-green'  },
+                { val: totalStats.imprecision,                label: 'Imprécisions',  color: 'text-orange' },
+                { val: totalStats.wrong,                      label: 'Erreurs',       color: 'text-red'    },
+                { val: acc !== null ? `${acc}%` : '—',       label: 'Précision',     color: 'text-blue'   },
+                { val: totalStats.bestStreak,                 label: 'Best streak',   color: 'text-yellow' },
               ].map(({ val, label, color }) => (
                 <div key={label} className="bg-bg3 rounded-lg py-2 px-3">
                   <div className={clsx('text-2xl font-bold', color)}>{val}</div>
