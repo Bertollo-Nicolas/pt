@@ -20,52 +20,57 @@ interface CheckResult {
 
 // ── Helpers ───────────────────────────────────────────────────
 
-// Always normalise so Fold = 100 - Σ(non-fold). Total is always ~100.
-function rebalanceFold(cell: CellFreqs): CellFreqs {
-  const nfTotal = Object.entries(cell)
-    .filter(([k]) => !k.toUpperCase().includes('FOLD'))
-    .reduce((s, [, v]) => s + v, 0);
-  const result = { ...cell };
-  if (nfTotal < 100) result['Fold'] = 100 - nfTotal;
-  else delete result['Fold'];
+// Fix rounding so cell always sums to exactly 100.
+function normalizeTo100(cell: CellFreqs): CellFreqs {
+  const entries = Object.entries(cell).filter(([, v]) => v > 0);
+  if (entries.length === 0) return { Fold: 100 };
+  const total = entries.reduce((s, [, v]) => s + v, 0);
+  if (total === 100) return Object.fromEntries(entries);
+  const diff = 100 - total;
+  const sorted = [...entries].sort((a, b) => b[1] - a[1]);
+  const result: CellFreqs = Object.fromEntries(entries);
+  result[sorted[0][0]] = Math.max(1, result[sorted[0][0]] + diff);
   return result;
 }
 
-// Core paint logic — always maintains sum ≈ 100.
+// Proportional redistribution: setting action X to freq F scales all other
+// actions proportionally to fill the remaining (100 - F)%.
 function applyPaint(prev: Selection, hand: string, action: string, freq: number): Selection {
-  const isFold = action.toUpperCase().includes('FOLD');
+  const prevCell = prev[hand] ?? { Fold: 100 };
 
-  // freq=100: exclusive replacement
+  // freq=100 → exclusive replacement
   if (freq === 100) return { ...prev, [hand]: { [action]: 100 } };
 
-  // freq=0: remove this action, rebalance
+  // freq=0 → remove action, scale others up to fill its share
   if (freq === 0) {
-    const cell = { ...(prev[hand] ?? { Fold: 100 }) };
+    const cell = { ...prevCell };
     delete cell[action];
-    if (Object.keys(cell).length === 0) return { ...prev, [hand]: { Fold: 100 } };
-    return { ...prev, [hand]: rebalanceFold(cell) };
+    const remaining = Object.entries(cell).filter(([, v]) => v > 0);
+    if (remaining.length === 0) return { ...prev, [hand]: { Fold: 100 } };
+    const tot = remaining.reduce((s, [, v]) => s + v, 0);
+    const newCell: CellFreqs = {};
+    for (const [k, v] of remaining) newCell[k] = Math.round(v / tot * 100);
+    return { ...prev, [hand]: normalizeTo100(newCell) };
   }
 
-  if (isFold) {
-    // Painting Fold at partial freq: scale non-fold actions down proportionally
-    const prevCell = prev[hand] ?? { Fold: 100 };
-    const nonFold = Object.entries(prevCell).filter(([k]) => !k.toUpperCase().includes('FOLD'));
-    const nfTotal = nonFold.reduce((s, [, v]) => s + v, 0);
-    const remaining = 100 - freq;
-    if (nfTotal === 0) return { ...prev, [hand]: { Fold: 100 } };
-    const newCell: CellFreqs = { Fold: freq };
-    for (const [k, v] of nonFold) {
-      const scaled = Math.round(v / nfTotal * remaining);
+  // 0 < freq < 100 → set action, scale all others to fill (100 - freq)
+  const others = Object.entries(prevCell).filter(([k]) => k !== action);
+  const othersTotal = others.reduce((s, [, v]) => s + v, 0);
+  const remaining = 100 - freq;
+
+  const newCell: CellFreqs = { [action]: freq };
+
+  if (othersTotal === 0) {
+    // No other actions → remainder goes to Fold
+    if (remaining > 0) newCell['Fold'] = remaining;
+  } else {
+    for (const [k, v] of others) {
+      const scaled = Math.round(v / othersTotal * remaining);
       if (scaled > 0) newCell[k] = scaled;
     }
-    return { ...prev, [hand]: newCell };
   }
 
-  // Non-fold at partial freq: set it, recompute Fold automatically
-  const cell = { ...(prev[hand] ?? { Fold: 100 }) };
-  cell[action] = freq;
-  delete cell['Fold'];
-  return { ...prev, [hand]: rebalanceFold(cell) };
+  return { ...prev, [hand]: normalizeTo100(newCell) };
 }
 
 function cellIsPlayed(freqs: CellFreqs): boolean {
@@ -78,7 +83,7 @@ function initAllFold(): Selection {
   return sel;
 }
 
-// buildGradient — proportions come from the cell freqs (always sum ~100 now)
+// buildGradient — props are always ~100% total, so proportions are correct.
 function buildGradient(freqs: CellFreqs, buttons: [string, string][]): React.CSSProperties {
   const entries = buttons.map(([n, c]) => ({ n, c, v: freqs[n] ?? 0 })).filter(e => e.v > 0);
   if (entries.length === 0) return {};
@@ -109,80 +114,106 @@ function ScoreCircle({ score }: { score: number }) {
     <svg width="68" height="68" viewBox="0 0 68 68">
       <circle cx="34" cy="34" r={r} fill="none" stroke="#2e2e38" strokeWidth="5" />
       <circle cx="34" cy="34" r={r} fill="none" stroke={color} strokeWidth="5"
-        strokeDasharray={`${dash} ${circ}`}
-        strokeDashoffset={circ / 4}
-        strokeLinecap="round" />
+        strokeDasharray={`${dash} ${circ}`} strokeDashoffset={circ / 4} strokeLinecap="round" />
       <text x="34" y="39" textAnchor="middle" fontSize="13" fontWeight="bold" fill={color}>{score}%</text>
     </svg>
   );
 }
 
-// ── Mini result grid (for results view) ───────────────────────
+// ── Result grid with hand labels (like main grid, auto-sized) ─
 
-function MiniResultGrid({ hands, selection, actionButtons, selectedTab, hoveredHand, onHoverHand }: {
+function ResultGrid({ hands, selection, actionButtons, selectedTab, label, hoveredHand, onHoverHand }: {
   hands: HandItem[];
-  selection: Selection | null; // null = show correct answer
+  selection: Selection | null; // null = show correct
   actionButtons: [string, string][];
   selectedTab: SelectedTab | null;
+  label: string;
   hoveredHand: string | null;
   onHoverHand: (hand: string | null) => void;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [cellSize, setCellSize] = useState(18);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver(([entry]) => {
+      const w = entry.contentRect.width;
+      setCellSize(Math.max(14, Math.floor((w - 4) / 13)));
+    });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  const fontSize = Math.max(5, Math.floor(cellSize * 0.37));
+
   return (
-    <div
-      style={{ display: 'grid', gridTemplateColumns: 'repeat(13, 1fr)', gap: '1px' }}
-      onMouseLeave={() => onHoverHand(null)}
-    >
-      {hands.map(({ hand }) => {
-        let bg = hexRgba(FOLD_COLOR, 0.22);
+    <div>
+      <div className="text-[9px] text-muted text-center mb-1 uppercase tracking-wider">{label}</div>
+      <div ref={containerRef} className="bg-bg3 rounded-lg p-1">
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(13, ${cellSize}px)`,
+            gridAutoRows: `${cellSize}px`,
+            gap: '1px',
+            fontSize: `${fontSize}px`,
+          }}
+          onMouseLeave={() => onHoverHand(null)}
+        >
+          {hands.map(({ hand }) => {
+            let bg = hexRgba(FOLD_COLOR, 0.22);
 
-        if (selection !== null) {
-          // Yours: show user's painted colour
-          const freqs = selection[hand] ?? {};
-          if (cellIsPlayed(freqs)) {
-            const nonFold = Object.entries(freqs).filter(([k]) => !k.toUpperCase().includes('FOLD'));
-            const dom = nonFold.reduce((a, b) => b[1] > a[1] ? b : a, ['', 0] as [string, number]);
-            const color = actionButtons.find(([n]) => n === dom[0])?.[1] ?? '#888';
-            bg = hexRgba(color, 0.85);
-          }
-        } else if (selectedTab) {
-          // Correct: show actual range colours
-          const acts = getNonFoldActions(hand, selectedTab.rangeMap);
-          if (acts.length > 0) {
-            const color = actionButtons.find(([n]) => n === acts[0].action)?.[1] ?? '#888';
-            bg = hexRgba(color, 0.85);
-          }
-        }
+            if (selection !== null) {
+              const freqs = selection[hand] ?? {};
+              if (cellIsPlayed(freqs)) {
+                const nonFold = Object.entries(freqs).filter(([k]) => !k.toUpperCase().includes('FOLD'));
+                const dom = nonFold.reduce((a, b) => b[1] > a[1] ? b : a, ['', 0] as [string, number]);
+                const color = actionButtons.find(([n]) => n === dom[0])?.[1] ?? '#888';
+                bg = hexRgba(color, 0.85);
+              }
+            } else if (selectedTab) {
+              const acts = getNonFoldActions(hand, selectedTab.rangeMap);
+              if (acts.length > 0) {
+                const color = actionButtons.find(([n]) => n === acts[0].action)?.[1] ?? '#888';
+                bg = hexRgba(color, 0.85);
+              }
+            }
 
-        const isHovered = hoveredHand === hand;
-        return (
-          <div key={hand}
-            onMouseEnter={() => onHoverHand(hand)}
-            style={{
-              aspectRatio: '1',
-              background: bg,
-              borderRadius: '1px',
-              position: 'relative',
-              outline: isHovered ? '1.5px solid rgba(255,255,255,0.85)' : undefined,
-              zIndex: isHovered ? 1 : 0,
-              opacity: hoveredHand && !isHovered ? 0.55 : 1,
-              transition: 'opacity 0.08s',
-            }}
-          />
-        );
-      })}
+            const isHovered = hoveredHand === hand;
+            return (
+              <div key={hand}
+                onMouseEnter={() => onHoverHand(hand)}
+                style={{
+                  background: bg,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 700, color: 'rgba(255,255,255,0.88)',
+                  borderRadius: '2px',
+                  outline: isHovered ? '1.5px solid rgba(255,255,255,0.85)' : undefined,
+                  zIndex: isHovered ? 1 : 0,
+                  position: 'relative',
+                  opacity: hoveredHand && !isHovered ? 0.45 : 1,
+                  transition: 'opacity 0.07s',
+                  userSelect: 'none',
+                }}
+              >
+                {hand}
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
 
-// ── Cell ──────────────────────────────────────────────────────
+// ── Main grid cell ────────────────────────────────────────────
 
 const HandCell = memo(function HandCell({
-  hand, selStyle, checkState, hasDot,
-  onPointerDown, onPointerEnter,
+  hand, selStyle, hasDot, onPointerDown, onPointerEnter,
 }: {
   hand: string;
   selStyle?: React.CSSProperties;
-  checkState?: CheckState;
   hasDot?: boolean;
   onPointerDown: (hand: string, e: React.PointerEvent) => void;
   onPointerEnter: (hand: string) => void;
@@ -190,20 +221,15 @@ const HandCell = memo(function HandCell({
   const type = cellType(hand);
   const baseClass = clsx(
     'hand-cell select-none',
-    !checkState && !selStyle && (
+    !selStyle && (
       type === 'pair'   ? 'bg-yellow/10 text-yellow border-yellow/20' :
       type === 'suited' ? 'bg-blue/10 text-blue border-blue/20' :
                           'bg-bg3 text-muted2 border-border'
     ),
-    checkState === 'correct'      && 'bg-green/20 !text-green !border-green',
-    checkState === 'missed'       && 'bg-red/20 !text-red !border-red',
-    checkState === 'extra'        && 'bg-orange/20 !text-orange !border-orange',
-    checkState === 'wrong-action' && 'bg-yellow/20 !text-yellow !border-yellow',
-    selStyle && !checkState && 'border',
+    selStyle && 'border',
   );
   return (
-    <div className={baseClass} style={checkState ? undefined : selStyle}
-      data-hand={hand}
+    <div className={baseClass} style={selStyle ?? undefined}
       onPointerDown={(e) => onPointerDown(hand, e)}
       onPointerEnter={() => onPointerEnter(hand)}
     >
@@ -233,10 +259,8 @@ export function GrilleView() {
   const isDraggingRef  = useRef(false);
   const pointerDownRef = useRef<string | null>(null);
   const dragMovedRef   = useRef(false);
-  const selectedRef    = useRef<Selection>({});
-  useEffect(() => { selectedRef.current = selected; }, [selected]);
 
-  // Action buttons: all non-fold from file + Fold always last
+  // Action buttons: all non-fold from file + Fold last
   const rawActionButtons: [string, string][] = selectedTab
     ? [...new Map(
         selectedTab.rangeList
@@ -256,7 +280,7 @@ export function GrilleView() {
     ['Fold', colorOverrides['Fold'] ?? FOLD_COLOR],
   ];
 
-  // Resize observer for grid cells
+  // Resize observer for main grid
   const sizeGrid = useCallback(() => {
     if (!midRef.current) return;
     const { clientWidth: w, clientHeight: h } = midRef.current;
@@ -331,14 +355,10 @@ export function GrilleView() {
     if (!dragMovedRef.current) {
       dragMovedRef.current = true;
       const origin = pointerDownRef.current;
-      if (origin) {
-        const freq = freqPerAction[activeAction] ?? 100;
-        setSelected(prev => applyPaint(prev, origin, activeAction, freq));
-      }
+      if (origin) setSelected(prev => applyPaint(prev, origin, activeAction, getFreq(activeAction)));
     }
-    const freq = freqPerAction[activeAction] ?? 100;
-    setSelected(prev => applyPaint(prev, hand, activeAction, freq));
-  }, [checkResult, selectedTab, activeAction, freqPerAction]);
+    setSelected(prev => applyPaint(prev, hand, activeAction, getFreq(activeAction)));
+  }, [checkResult, selectedTab, activeAction, getFreq]);
 
   // ── Check ─────────────────────────────────────────────────────
 
@@ -432,7 +452,7 @@ export function GrilleView() {
             </div>
           )}
 
-          {/* GTOWizard-style action cards (horizontal, full-color) */}
+          {/* GTOWizard action cards */}
           {selectedTab && !revealed && (
             <div className="flex gap-1.5 mb-2 overflow-x-auto no-scrollbar pb-0.5">
               {allActionButtons.map(([name, color]) => {
@@ -485,7 +505,7 @@ export function GrilleView() {
             </div>
           )}
 
-          {/* Control buttons (not full-width) */}
+          {/* Control buttons */}
           <div className="flex gap-1.5 mb-1.5">
             <button onClick={handleCheck}
               className="px-3 py-1.5 text-[11px] font-semibold rounded border bg-accent border-accent text-white hover:opacity-90 transition-opacity cursor-pointer">
@@ -509,7 +529,7 @@ export function GrilleView() {
       {checkResult ? (
         <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar space-y-3 py-1">
 
-          {/* Score circle centered */}
+          {/* Score */}
           <div className="text-center">
             <div className="inline-flex flex-col items-center">
               <ScoreCircle score={checkResult.score} />
@@ -521,28 +541,20 @@ export function GrilleView() {
             </div>
           </div>
 
-          {/* Side-by-side mini grids (hover synced) */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <div className="text-[9px] text-muted text-center mb-1 uppercase tracking-wider">Votre réponse</div>
-              <div className="bg-bg3 rounded-lg p-1.5">
-                <MiniResultGrid
-                  hands={hands} selection={selected}
-                  actionButtons={allActionButtons} selectedTab={selectedTab}
-                  hoveredHand={hoveredHand} onHoverHand={setHoveredHand}
-                />
-              </div>
-            </div>
-            <div>
-              <div className="text-[9px] text-muted text-center mb-1 uppercase tracking-wider">Correct</div>
-              <div className="bg-bg3 rounded-lg p-1.5">
-                <MiniResultGrid
-                  hands={hands} selection={null}
-                  actionButtons={allActionButtons} selectedTab={selectedTab}
-                  hoveredHand={hoveredHand} onHoverHand={setHoveredHand}
-                />
-              </div>
-            </div>
+          {/* Side-by-side grids with hand labels */}
+          <div className="grid grid-cols-2 gap-2">
+            <ResultGrid
+              hands={hands} selection={selected}
+              actionButtons={allActionButtons} selectedTab={selectedTab}
+              label="Votre réponse"
+              hoveredHand={hoveredHand} onHoverHand={setHoveredHand}
+            />
+            <ResultGrid
+              hands={hands} selection={null}
+              actionButtons={allActionButtons} selectedTab={selectedTab}
+              label="Correct"
+              hoveredHand={hoveredHand} onHoverHand={setHoveredHand}
+            />
           </div>
 
           {/* Counts */}
@@ -566,7 +578,7 @@ export function GrilleView() {
             ↺ Recommencer
           </button>
 
-          {/* SRS review confirmation */}
+          {/* SRS confirmation */}
           {isSrsReview && selectedTabKey && (
             <div className={clsx(
               'flex items-center justify-between px-3 py-2.5 rounded-lg border',
@@ -590,7 +602,7 @@ export function GrilleView() {
           )}
         </div>
       ) : (
-        /* ── Grid ──────────────────────────────────────────────── */
+        /* ── Main editing grid ──────────────────────────────────── */
         <div ref={midRef} className="flex-1 min-h-0 flex items-center justify-center overflow-hidden">
           <div style={{
             display: 'grid',
@@ -608,7 +620,6 @@ export function GrilleView() {
 
               if (revealed) {
                 if (acts.length > 0) {
-                  // Include Fold as remainder so partial-freq hands show correct split
                   const freqs: CellFreqs = {};
                   const nfTotal = acts.reduce((s, a) => s + a.freq, 0);
                   for (const a of acts) freqs[a.action] = a.freq * 100;
@@ -618,7 +629,6 @@ export function GrilleView() {
                   selStyle = { background: hexRgba(colorOverrides['Fold'] ?? FOLD_COLOR, 0.22), borderColor: hexRgba(colorOverrides['Fold'] ?? FOLD_COLOR, 0.35), color: '#7a7a90' };
                 }
               } else {
-                // Always has fold data since initAllFold, so always show a style
                 selStyle = buildGradient(selected[hand] ?? { Fold: 100 }, allActionButtons);
               }
 
