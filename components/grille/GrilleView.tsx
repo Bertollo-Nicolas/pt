@@ -20,57 +20,48 @@ interface CheckResult {
 
 // ── Helpers ───────────────────────────────────────────────────
 
-// Fix rounding so cell always sums to exactly 100.
-function normalizeTo100(cell: CellFreqs): CellFreqs {
-  const entries = Object.entries(cell).filter(([, v]) => v > 0);
-  if (entries.length === 0) return { Fold: 100 };
-  const total = entries.reduce((s, [, v]) => s + v, 0);
-  if (total === 100) return Object.fromEntries(entries);
+function normalizeTo100(obj: Record<string, number>, keys: string[]): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const k of keys) result[k] = obj[k] ?? 0;
+  const total = keys.reduce((s, k) => s + result[k], 0);
+  if (total === 0) { result['Fold'] = 100; return result; }
+  if (total === 100) return result;
   const diff = 100 - total;
-  const sorted = [...entries].sort((a, b) => b[1] - a[1]);
-  const result: CellFreqs = Object.fromEntries(entries);
-  result[sorted[0][0]] = Math.max(1, result[sorted[0][0]] + diff);
+  const biggest = keys.reduce((a, b) => result[b] > result[a] ? b : a);
+  result[biggest] = Math.max(0, result[biggest] + diff);
   return result;
 }
 
-// Proportional redistribution: setting action X to freq F scales all other
-// actions proportionally to fill the remaining (100 - F)%.
-function applyPaint(prev: Selection, hand: string, action: string, freq: number): Selection {
-  const prevCell = prev[hand] ?? { Fold: 100 };
+// Adjust one action's freq → scale all others proportionally to fill 100%.
+function redistributeFreqs(
+  prev: Record<string, number>,
+  changed: string,
+  newFreq: number,
+  allNames: string[],
+): Record<string, number> {
+  const clamped = Math.max(0, Math.min(100, newFreq));
+  const others = allNames.filter(n => n !== changed);
+  const othersTotal = others.reduce((s, n) => s + (prev[n] ?? 0), 0);
+  const remaining = 100 - clamped;
 
-  // freq=100 → exclusive replacement
-  if (freq === 100) return { ...prev, [hand]: { [action]: 100 } };
+  const next: Record<string, number> = {};
+  for (const n of allNames) next[n] = prev[n] ?? 0;
+  next[changed] = clamped;
 
-  // freq=0 → remove action, scale others up to fill its share
-  if (freq === 0) {
-    const cell = { ...prevCell };
-    delete cell[action];
-    const remaining = Object.entries(cell).filter(([, v]) => v > 0);
-    if (remaining.length === 0) return { ...prev, [hand]: { Fold: 100 } };
-    const tot = remaining.reduce((s, [, v]) => s + v, 0);
-    const newCell: CellFreqs = {};
-    for (const [k, v] of remaining) newCell[k] = Math.round(v / tot * 100);
-    return { ...prev, [hand]: normalizeTo100(newCell) };
-  }
-
-  // 0 < freq < 100 → set action, scale all others to fill (100 - freq)
-  const others = Object.entries(prevCell).filter(([k]) => k !== action);
-  const othersTotal = others.reduce((s, [, v]) => s + v, 0);
-  const remaining = 100 - freq;
-
-  const newCell: CellFreqs = { [action]: freq };
-
-  if (othersTotal === 0) {
-    // No other actions → remainder goes to Fold
-    if (remaining > 0) newCell['Fold'] = remaining;
+  if (remaining === 0) {
+    for (const n of others) next[n] = 0;
+  } else if (othersTotal === 0) {
+    // Others were all 0 → put remainder in Fold
+    const foldKey = others.find(n => n.toUpperCase().includes('FOLD')) ?? others[0];
+    for (const n of others) next[n] = 0;
+    if (foldKey) next[foldKey] = remaining;
   } else {
-    for (const [k, v] of others) {
-      const scaled = Math.round(v / othersTotal * remaining);
-      if (scaled > 0) newCell[k] = scaled;
+    for (const n of others) {
+      next[n] = Math.round((prev[n] ?? 0) / othersTotal * remaining);
     }
   }
 
-  return { ...prev, [hand]: normalizeTo100(newCell) };
+  return normalizeTo100(next, allNames);
 }
 
 function cellIsPlayed(freqs: CellFreqs): boolean {
@@ -83,7 +74,7 @@ function initAllFold(): Selection {
   return sel;
 }
 
-// buildGradient — props are always ~100% total, so proportions are correct.
+// buildGradient — uses buttons order for consistent left-to-right colouring.
 function buildGradient(freqs: CellFreqs, buttons: [string, string][]): React.CSSProperties {
   const entries = buttons.map(([n, c]) => ({ n, c, v: freqs[n] ?? 0 })).filter(e => e.v > 0);
   if (entries.length === 0) return {};
@@ -120,11 +111,11 @@ function ScoreCircle({ score }: { score: number }) {
   );
 }
 
-// ── Result grid with hand labels (like main grid, auto-sized) ─
+// ── Result grid with hand labels ──────────────────────────────
 
 function ResultGrid({ hands, selection, actionButtons, selectedTab, label, hoveredHand, onHoverHand }: {
   hands: HandItem[];
-  selection: Selection | null; // null = show correct
+  selection: Selection | null;
   actionButtons: [string, string][];
   selectedTab: SelectedTab | null;
   label: string;
@@ -138,8 +129,7 @@ function ResultGrid({ hands, selection, actionButtons, selectedTab, label, hover
     const el = containerRef.current;
     if (!el) return;
     const obs = new ResizeObserver(([entry]) => {
-      const w = entry.contentRect.width;
-      setCellSize(Math.max(14, Math.floor((w - 4) / 13)));
+      setCellSize(Math.max(14, Math.floor((entry.contentRect.width - 4) / 13)));
     });
     obs.observe(el);
     return () => obs.disconnect();
@@ -152,18 +142,11 @@ function ResultGrid({ hands, selection, actionButtons, selectedTab, label, hover
       <div className="text-[9px] text-muted text-center mb-1 uppercase tracking-wider">{label}</div>
       <div ref={containerRef} className="bg-bg3 rounded-lg p-1">
         <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: `repeat(13, ${cellSize}px)`,
-            gridAutoRows: `${cellSize}px`,
-            gap: '1px',
-            fontSize: `${fontSize}px`,
-          }}
+          style={{ display: 'grid', gridTemplateColumns: `repeat(13, ${cellSize}px)`, gridAutoRows: `${cellSize}px`, gap: '1px', fontSize: `${fontSize}px` }}
           onMouseLeave={() => onHoverHand(null)}
         >
           {hands.map(({ hand }) => {
             let bg = hexRgba(FOLD_COLOR, 0.22);
-
             if (selection !== null) {
               const freqs = selection[hand] ?? {};
               if (cellIsPlayed(freqs)) {
@@ -175,30 +158,20 @@ function ResultGrid({ hands, selection, actionButtons, selectedTab, label, hover
             } else if (selectedTab) {
               const acts = getNonFoldActions(hand, selectedTab.rangeMap);
               if (acts.length > 0) {
-                const color = actionButtons.find(([n]) => n === acts[0].action)?.[1] ?? '#888';
-                bg = hexRgba(color, 0.85);
+                bg = hexRgba(actionButtons.find(([n]) => n === acts[0].action)?.[1] ?? '#888', 0.85);
               }
             }
-
             const isHovered = hoveredHand === hand;
             return (
-              <div key={hand}
-                onMouseEnter={() => onHoverHand(hand)}
+              <div key={hand} onMouseEnter={() => onHoverHand(hand)}
                 style={{
-                  background: bg,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontWeight: 700, color: 'rgba(255,255,255,0.88)',
-                  borderRadius: '2px',
+                  background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 700, color: 'rgba(255,255,255,0.88)', borderRadius: '2px',
                   outline: isHovered ? '1.5px solid rgba(255,255,255,0.85)' : undefined,
-                  zIndex: isHovered ? 1 : 0,
-                  position: 'relative',
+                  zIndex: isHovered ? 1 : 0, position: 'relative',
                   opacity: hoveredHand && !isHovered ? 0.45 : 1,
-                  transition: 'opacity 0.07s',
-                  userSelect: 'none',
-                }}
-              >
-                {hand}
-              </div>
+                  transition: 'opacity 0.07s', userSelect: 'none',
+                }}>{hand}</div>
             );
           })}
         </div>
@@ -209,9 +182,7 @@ function ResultGrid({ hands, selection, actionButtons, selectedTab, label, hover
 
 // ── Main grid cell ────────────────────────────────────────────
 
-const HandCell = memo(function HandCell({
-  hand, selStyle, hasDot, onPointerDown, onPointerEnter,
-}: {
+const HandCell = memo(function HandCell({ hand, selStyle, hasDot, onPointerDown, onPointerEnter }: {
   hand: string;
   selStyle?: React.CSSProperties;
   hasDot?: boolean;
@@ -219,17 +190,18 @@ const HandCell = memo(function HandCell({
   onPointerEnter: (hand: string) => void;
 }) {
   const type = cellType(hand);
-  const baseClass = clsx(
-    'hand-cell select-none',
-    !selStyle && (
-      type === 'pair'   ? 'bg-yellow/10 text-yellow border-yellow/20' :
-      type === 'suited' ? 'bg-blue/10 text-blue border-blue/20' :
-                          'bg-bg3 text-muted2 border-border'
-    ),
-    selStyle && 'border',
-  );
   return (
-    <div className={baseClass} style={selStyle ?? undefined}
+    <div
+      className={clsx(
+        'hand-cell select-none',
+        !selStyle && (
+          type === 'pair'   ? 'bg-yellow/10 text-yellow border-yellow/20' :
+          type === 'suited' ? 'bg-blue/10 text-blue border-blue/20' :
+                              'bg-bg3 text-muted2 border-border'
+        ),
+        selStyle && 'border',
+      )}
+      style={selStyle}
       onPointerDown={(e) => onPointerDown(hand, e)}
       onPointerEnter={() => onPointerEnter(hand)}
     >
@@ -251,7 +223,6 @@ export function GrilleView() {
   const [checkResult,   setCheckResult]   = useState<CheckResult | null>(null);
   const [revealed,      setRevealed]      = useState(false);
   const [cellSize,      setCellSize]      = useState(32);
-  const [activeAction,  setActiveAction]  = useState<string>('Fold');
   const [freqPerAction, setFreqPerAction] = useState<Record<string, number>>({});
   const [hoveredHand,   setHoveredHand]   = useState<string | null>(null);
 
@@ -260,7 +231,7 @@ export function GrilleView() {
   const pointerDownRef = useRef<string | null>(null);
   const dragMovedRef   = useRef(false);
 
-  // Action buttons: all non-fold from file + Fold last
+  // Build action buttons: non-fold from file + Fold last
   const rawActionButtons: [string, string][] = selectedTab
     ? [...new Map(
         selectedTab.rangeList
@@ -275,17 +246,14 @@ export function GrilleView() {
       )]
     : [];
 
-  const allActionButtons: [string, string][] = [
-    ...rawActionButtons,
-    ['Fold', colorOverrides['Fold'] ?? FOLD_COLOR],
-  ];
+  const allActionButtons: [string, string][] = [...rawActionButtons, ['Fold', colorOverrides['Fold'] ?? FOLD_COLOR]];
+  const allActionNames = allActionButtons.map(([n]) => n);
 
   // Resize observer for main grid
   const sizeGrid = useCallback(() => {
     if (!midRef.current) return;
     const { clientWidth: w, clientHeight: h } = midRef.current;
-    const size = Math.min(w, h) - 8;
-    setCellSize(Math.max(16, Math.floor((size - 26) / 13)));
+    setCellSize(Math.max(16, Math.floor((Math.min(w, h) - 34) / 13)));
   }, []);
   useEffect(() => {
     const obs = new ResizeObserver(sizeGrid);
@@ -293,17 +261,18 @@ export function GrilleView() {
     return () => obs.disconnect();
   }, [sizeGrid]);
 
-  // Reset on tab change
+  // Reset on tab change — init freqPerAction to Fold=100%, others=0%
   useEffect(() => {
     setSelected(initAllFold());
     setCheckResult(null);
     setRevealed(false);
-    setActiveAction('Fold');
-    setFreqPerAction({});
     setHoveredHand(null);
+    const init: Record<string, number> = {};
+    for (const [n] of allActionButtons) init[n] = n === 'Fold' ? 100 : 0;
+    setFreqPerAction(init);
   }, [selectedTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Distribution: dominant action per cell → count
+  // Distribution: dominant action per cell → count (for display in cards)
   const actionDist = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const freqs of Object.values(selected)) {
@@ -315,15 +284,23 @@ export function GrilleView() {
     return counts;
   }, [selected]);
 
-  // ── Painting ──────────────────────────────────────────────────
+  // Adjust one action's freq; scale others proportionally
+  const adjustFreq = useCallback((name: string, newFreq: number) => {
+    setFreqPerAction(prev => redistributeFreqs(prev, name, newFreq, allActionNames));
+  }, [allActionNames.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const getFreq = useCallback((action: string) => freqPerAction[action] ?? 100, [freqPerAction]);
+  // ── Painting — apply current freqPerAction snapshot ───────────
 
   const paintCell = useCallback((hand: string) => {
-    if (checkResult || !activeAction) return;
-    const freq = getFreq(activeAction);
-    setSelected(prev => applyPaint(prev, hand, activeAction, freq));
-  }, [checkResult, activeAction, getFreq]);
+    if (checkResult) return;
+    const snapshot: CellFreqs = {};
+    for (const [n] of allActionButtons) {
+      const f = freqPerAction[n] ?? 0;
+      if (f > 0) snapshot[n] = f;
+    }
+    if (Object.keys(snapshot).length === 0) snapshot['Fold'] = 100;
+    setSelected(prev => ({ ...prev, [hand]: snapshot }));
+  }, [checkResult, freqPerAction, allActionButtons]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const paintCellRef = useRef(paintCell);
   useEffect(() => { paintCellRef.current = paintCell; }, [paintCell]);
@@ -350,15 +327,14 @@ export function GrilleView() {
   }, [checkResult]);
 
   const handlePointerEnter = useCallback((hand: string) => {
-    if (!isDraggingRef.current || checkResult || !selectedTab || !activeAction) return;
+    if (!isDraggingRef.current || checkResult || !selectedTab) return;
     if (hand === pointerDownRef.current) return;
     if (!dragMovedRef.current) {
       dragMovedRef.current = true;
-      const origin = pointerDownRef.current;
-      if (origin) setSelected(prev => applyPaint(prev, origin, activeAction, getFreq(activeAction)));
+      if (pointerDownRef.current) paintCellRef.current(pointerDownRef.current);
     }
-    setSelected(prev => applyPaint(prev, hand, activeAction, getFreq(activeAction)));
-  }, [checkResult, selectedTab, activeAction, getFreq]);
+    paintCellRef.current(hand);
+  }, [checkResult, selectedTab]);
 
   // ── Check ─────────────────────────────────────────────────────
 
@@ -370,11 +346,10 @@ export function GrilleView() {
     allHands().forEach(({ hand }) => {
       const nonFoldActs = getNonFoldActions(hand, selectedTab.rangeMap);
       const inRange = nonFoldActs.length > 0;
-      const userFreqs = selected[hand] ?? {};
-      const played = cellIsPlayed(userFreqs);
+      const played = cellIsPlayed(selected[hand] ?? {});
 
       if (inRange && played) {
-        const nonFoldEntries = Object.entries(userFreqs).filter(([k]) => !k.toUpperCase().includes('FOLD'));
+        const nonFoldEntries = Object.entries(selected[hand] ?? {}).filter(([k]) => !k.toUpperCase().includes('FOLD'));
         const userDom = nonFoldEntries.reduce((a, b) => b[1] > a[1] ? b : a, ['', 0] as [string, number]);
         const dom = nonFoldActs[0];
         if (userDom[0] === dom?.action) {
@@ -393,11 +368,8 @@ export function GrilleView() {
 
     const total = correct + wrongAct + missed;
     const score = total > 0 ? Math.round(correct / total * 100) : 100;
-    const pct   = Math.round(total / 169 * 100);
-    setCheckResult({ states, correct, wrongAct, missed, extra, score, pct });
-
+    setCheckResult({ states, correct, wrongAct, missed, extra, score, pct: Math.round(total / 169 * 100) });
     addSession({ key: `grille_${selectedTabKey}`, date: todayStr(), name: selectedTab.name, catName: selectedTab.catName, mode: 'grille', score, correct, missed, extra, wrongAct });
-
     if (selectedTabKey && !srs[selectedTabKey] && score >= cfg.grilleThreshold && pendingSrsKey !== selectedTabKey) {
       setPendingSrsKey(selectedTabKey);
     }
@@ -407,14 +379,14 @@ export function GrilleView() {
     setSelected(initAllFold());
     setCheckResult(null);
     setRevealed(false);
-    setActiveAction('Fold');
-    setFreqPerAction({});
     setHoveredHand(null);
-  }, []);
+    const init: Record<string, number> = {};
+    for (const [n] of allActionButtons) init[n] = n === 'Fold' ? 100 : 0;
+    setFreqPerAction(init);
+  }, [allActionButtons]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const hands = allHands();
   const inRangeCount = selectedTab ? hands.filter(h => getNonFoldActions(h.hand, selectedTab.rangeMap).length > 0).length : 0;
-  const pctRange = Math.round(inRangeCount / 169 * 100);
   const fontSize = Math.max(7, Math.floor(cellSize * 0.38));
   const isSrsReview = srsReviewKey === selectedTabKey;
 
@@ -428,76 +400,71 @@ export function GrilleView() {
             <span className="text-[11px] font-bold text-accent">📅 Révision SRS</span>
             <span className="text-[10px] text-muted ml-2">Reconstituez la range de mémoire, puis vérifiez</span>
           </div>
-          <button onClick={() => store.setMode('srs')}
-            className="text-[10px] text-muted hover:text-text transition-colors flex-shrink-0">
-            ✕ Annuler
-          </button>
+          <button onClick={() => store.setMode('srs')} className="text-[10px] text-muted hover:text-text transition-colors flex-shrink-0">✕ Annuler</button>
         </div>
       )}
 
       {/* ── Editing UI ──────────────────────────────────────────── */}
       {!checkResult && (
         <div className="flex-shrink-0">
+
           {/* Range info */}
           {selectedTab && (
             <div className="flex items-center gap-2 mb-2 overflow-x-auto no-scrollbar">
-              <span className="text-[10px] text-muted flex-shrink-0">{inRangeCount} mains ({pctRange}%)</span>
-              <div className="flex gap-1 flex-wrap">
-                {rawActionButtons.map(([name, color]) => (
-                  <div key={name} className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border border-border whitespace-nowrap flex-shrink-0">
-                    <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />{name}
-                  </div>
-                ))}
-              </div>
+              <span className="text-[10px] text-muted flex-shrink-0">{inRangeCount} mains ({Math.round(inRangeCount / 169 * 100)}%)</span>
             </div>
           )}
 
-          {/* GTOWizard action cards */}
+          {/* Action cards — always fully expanded, no selection */}
           {selectedTab && !revealed && (
             <div className="flex gap-1.5 mb-2 overflow-x-auto no-scrollbar pb-0.5">
               {allActionButtons.map(([name, color]) => {
-                const isActive = activeAction === name;
-                const freq = getFreq(name);
+                const freq = freqPerAction[name] ?? 0;
                 const distPct = Math.round((actionDist[name] ?? 0) / 169 * 100);
+                const isActive = freq > 0;
                 return (
                   <div key={name}
-                    onClick={() => setActiveAction(name)}
-                    className="flex-1 min-w-[72px] rounded-lg overflow-hidden cursor-pointer select-none flex-shrink-0"
+                    className="flex-1 min-w-[80px] rounded-lg overflow-hidden flex-shrink-0"
                     style={{
-                      background: isActive ? color : hexRgba(color, 0.28),
-                      border: `2px solid ${isActive ? color : hexRgba(color, 0.55)}`,
+                      background: isActive ? hexRgba(color, 0.35) : hexRgba(color, 0.1),
+                      border: `2px solid ${isActive ? color : hexRgba(color, 0.3)}`,
                     }}
                   >
-                    <div className="px-2 py-2.5 flex flex-col items-center gap-1.5">
-                      <span className="text-white font-bold text-[13px] leading-tight text-center">{name}</span>
+                    <div className="px-2 py-2 flex flex-col items-center gap-1.5">
+                      {/* Action name + painted % */}
+                      <div className="flex items-center gap-1.5 w-full justify-between">
+                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
+                        <span className="text-white font-bold text-[12px] flex-1 text-center leading-tight">{name}</span>
+                        <span className="text-[9px] text-white/50">{distPct}%</span>
+                      </div>
 
-                      {isActive ? (
-                        <div className="flex flex-col items-center gap-1 w-full" onClick={e => e.stopPropagation()}>
-                          <div className="flex items-center gap-1.5 justify-center">
-                            <button
-                              className="w-5 h-5 rounded flex items-center justify-center text-base leading-none cursor-pointer text-white"
-                              style={{ background: 'rgba(0,0,0,0.25)' }}
-                              onClick={() => setFreqPerAction(p => ({ ...p, [name]: Math.max(0, (p[name] ?? 100) - 25) }))}>−</button>
-                            <span className="text-white font-bold font-mono text-sm w-8 text-center">{freq}</span>
-                            <button
-                              className="w-5 h-5 rounded flex items-center justify-center text-base leading-none cursor-pointer text-white"
-                              style={{ background: 'rgba(0,0,0,0.25)' }}
-                              onClick={() => setFreqPerAction(p => ({ ...p, [name]: Math.min(100, (p[name] ?? 100) + 25) }))}>+</button>
-                          </div>
-                          <div className="flex gap-0.5 justify-center flex-wrap">
-                            {[0, 25, 50, 75, 100].map(f => (
-                              <button key={f}
-                                className="px-1 py-0.5 text-[9px] rounded cursor-pointer text-white"
-                                style={{ background: freq === f ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.22)' }}
-                                onClick={() => setFreqPerAction(p => ({ ...p, [name]: f }))}>
-                                {f}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-white/60 text-[10px]">{distPct}%</span>
-                      )}
+                      {/* Freq stepper */}
+                      <div className="flex items-center gap-1 justify-center">
+                        <button
+                          className="w-5 h-5 rounded flex items-center justify-center text-sm leading-none cursor-pointer text-white select-none"
+                          style={{ background: 'rgba(0,0,0,0.3)' }}
+                          onClick={() => adjustFreq(name, Math.max(0, freq - 5))}>−</button>
+                        <span className="font-mono font-bold text-sm text-white w-9 text-center">{freq}%</span>
+                        <button
+                          className="w-5 h-5 rounded flex items-center justify-center text-sm leading-none cursor-pointer text-white select-none"
+                          style={{ background: 'rgba(0,0,0,0.3)' }}
+                          onClick={() => adjustFreq(name, Math.min(100, freq + 5))}>+</button>
+                      </div>
+
+                      {/* Presets */}
+                      <div className="flex gap-0.5 justify-center">
+                        {[0, 25, 50, 75, 100].map(f => (
+                          <button key={f}
+                            className="px-1 py-0.5 text-[8px] rounded cursor-pointer text-white select-none"
+                            style={{ background: freq === f ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)' }}
+                            onClick={() => adjustFreq(name, f)}>{f}</button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Distribution bar at bottom */}
+                    <div className="h-[3px] bg-black/20">
+                      <div style={{ width: `${distPct}%`, background: color, height: '100%', transition: 'width 0.2s' }} />
                     </div>
                   </div>
                 );
@@ -528,36 +495,20 @@ export function GrilleView() {
       {/* ── Results view ─────────────────────────────────────────── */}
       {checkResult ? (
         <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar space-y-3 py-1">
-
-          {/* Score */}
           <div className="text-center">
             <div className="inline-flex flex-col items-center">
               <ScoreCircle score={checkResult.score} />
               <div className="text-[10px] text-muted mt-1">
-                {checkResult.score >= 85 ? 'Excellent' :
-                 checkResult.score >= 70 ? 'Bien' :
-                 checkResult.score >= 55 ? 'À améliorer' : 'À retravailler'}
+                {checkResult.score >= 85 ? 'Excellent' : checkResult.score >= 70 ? 'Bien' : checkResult.score >= 55 ? 'À améliorer' : 'À retravailler'}
               </div>
             </div>
           </div>
 
-          {/* Side-by-side grids with hand labels */}
           <div className="grid grid-cols-2 gap-2">
-            <ResultGrid
-              hands={hands} selection={selected}
-              actionButtons={allActionButtons} selectedTab={selectedTab}
-              label="Votre réponse"
-              hoveredHand={hoveredHand} onHoverHand={setHoveredHand}
-            />
-            <ResultGrid
-              hands={hands} selection={null}
-              actionButtons={allActionButtons} selectedTab={selectedTab}
-              label="Correct"
-              hoveredHand={hoveredHand} onHoverHand={setHoveredHand}
-            />
+            <ResultGrid hands={hands} selection={selected} actionButtons={allActionButtons} selectedTab={selectedTab} label="Votre réponse" hoveredHand={hoveredHand} onHoverHand={setHoveredHand} />
+            <ResultGrid hands={hands} selection={null} actionButtons={allActionButtons} selectedTab={selectedTab} label="Correct" hoveredHand={hoveredHand} onHoverHand={setHoveredHand} />
           </div>
 
-          {/* Counts */}
           <div className="grid grid-cols-4 gap-1.5">
             {[
               { label: 'Correct', val: checkResult.correct,  color: '#2ecc8a' },
@@ -572,23 +523,17 @@ export function GrilleView() {
             ))}
           </div>
 
-          {/* Try again */}
           <button onClick={handleReset}
             className="w-full py-2.5 rounded-lg bg-bg3 border border-border text-sm font-semibold text-text hover:bg-bg4 hover:border-border2 transition-all cursor-pointer">
             ↺ Recommencer
           </button>
 
-          {/* SRS confirmation */}
           {isSrsReview && selectedTabKey && (
-            <div className={clsx(
-              'flex items-center justify-between px-3 py-2.5 rounded-lg border',
-              checkResult.score >= cfg.grilleThreshold ? 'bg-green/10 border-green/30' : 'bg-red/10 border-red/30'
-            )}>
+            <div className={clsx('flex items-center justify-between px-3 py-2.5 rounded-lg border',
+              checkResult.score >= cfg.grilleThreshold ? 'bg-green/10 border-green/30' : 'bg-red/10 border-red/30')}>
               <div>
                 <div className={clsx('text-[11px] font-bold', checkResult.score >= cfg.grilleThreshold ? 'text-green' : 'text-red')}>
-                  {checkResult.score >= cfg.grilleThreshold
-                    ? `✅ Révision réussie (${checkResult.score}%)`
-                    : `❌ Score insuffisant (${checkResult.score}% < ${cfg.grilleThreshold}%)`}
+                  {checkResult.score >= cfg.grilleThreshold ? `✅ Révision réussie (${checkResult.score}%)` : `❌ Score insuffisant (${checkResult.score}% < ${cfg.grilleThreshold}%)`}
                 </div>
                 <div className="text-[9px] text-muted mt-0.5">
                   {checkResult.score >= cfg.grilleThreshold ? 'Intervalle avancé' : 'Intervalle réduit — réessayer demain'}
@@ -617,7 +562,6 @@ export function GrilleView() {
               const hasDot = isMixed(rawActs);
 
               let selStyle: React.CSSProperties | undefined;
-
               if (revealed) {
                 if (acts.length > 0) {
                   const freqs: CellFreqs = {};
