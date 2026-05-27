@@ -65,8 +65,9 @@ function evaluateAnswer(
   if (btn.actions.length === 1) {
     const clicked = btn.actions[0];
     if (sigActs.length > 1) {
-      const partial = clicked === dominant?.action;
-      return { correct: false, partial, expected, text: `✗ Main mixte — ${detail}` };
+      const isPartial = clicked === dominant?.action;
+      return { correct: false, partial: isPartial, expected,
+        text: isPartial ? `≈ Imprécision — ${detail}` : `✗ Erreur — ${detail}` };
     }
     const correct = clicked === dominant?.action;
     return { correct, partial: false, expected,
@@ -83,15 +84,28 @@ function evaluateAnswer(
   return { correct: false, partial: false, expected, text: `✗ Erreur — ${detail}` };
 }
 
-function pickNextHand(rangeMap: Record<string, HandAction[]>, retryQueue: string[]): HandItem {
-  const all = allHands();
-  if (retryQueue.length > 0 && Math.random() < 0.35) {
-    const idx = Math.floor(Math.random() * retryQueue.length);
-    const found = all.find(h => h.hand === retryQueue[idx]);
+function pickNextHand(
+  rangeMap: Record<string, HandAction[]>,
+  retryQueue: string[],
+  handFilter?: Set<string> | null,
+): HandItem {
+  const baseAll = allHands();
+  const all = handFilter && handFilter.size > 0
+    ? baseAll.filter(h => handFilter.has(h.hand))
+    : baseAll;
+  const safeAll = all.length > 0 ? all : baseAll;
+
+  const filteredRetry = handFilter && handFilter.size > 0
+    ? retryQueue.filter(h => handFilter.has(h))
+    : retryQueue;
+
+  if (filteredRetry.length > 0 && Math.random() < 0.35) {
+    const idx = Math.floor(Math.random() * filteredRetry.length);
+    const found = safeAll.find(h => h.hand === filteredRetry[idx]);
     if (found) return found;
   }
-  const ir = all.filter(h => getHandActions(h.hand, rangeMap) !== null);
-  const pool = ir.length > 0 && Math.random() < 0.65 ? ir : all;
+  const ir = safeAll.filter(h => getHandActions(h.hand, rangeMap) !== null);
+  const pool = ir.length > 0 && Math.random() < 0.65 ? ir : safeAll;
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -108,6 +122,8 @@ export function FlashView() {
   const [sessionEnded, setSessionEnded] = useState(false);
   const [totalStats,   setTotalStats]   = useState<FlashStats>({ correct: 0, wrong: 0, streak: 0, bestStreak: 0 });
   const [retryCount,   setRetryCount]   = useState(0);
+  const [handFilter,   setHandFilter]   = useState<Set<string> | null>(null);
+  const [showFilter,   setShowFilter]   = useState(false);
 
   const totalStatsRef    = useRef<FlashStats>({ correct: 0, wrong: 0, streak: 0, bestStreak: 0 });
   const sessionErrorsRef = useRef<Map<string, number>>(new Map());
@@ -166,6 +182,7 @@ export function FlashView() {
   const tot = totalStats.correct + totalStats.wrong;
   const acc = tot > 0 ? Math.round(totalStats.correct / tot * 100) : null;
   const resetKey = `${selectedTabKey ?? 'none'}-${tableCount}`;
+  const filterActive = handFilter !== null && handFilter.size > 0;
 
   return (
     <div className="flex-1 flex flex-col relative overflow-hidden">
@@ -179,6 +196,17 @@ export function FlashView() {
         {retryCount > 0 && <span className="text-[10px] font-bold text-yellow flex-shrink-0">🔁{retryCount}</span>}
         <div className="flex-1" />
         <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            onClick={() => setShowFilter(v => !v)}
+            className={clsx('text-[10px] px-2 py-1 rounded border transition-all',
+              filterActive
+                ? 'bg-accent/20 border-accent text-accent'
+                : showFilter
+                  ? 'bg-bg3 border-border text-text'
+                  : 'border-border text-muted hover:text-text',
+            )}>
+            {filterActive ? `🎯 ${handFilter!.size}` : '🎯'}
+          </button>
           <button onClick={() => setAutoNext(v => !v)}
             className={clsx('text-[10px] px-2 py-1 rounded border transition-all',
               autoNext ? 'bg-accent/20 border-accent text-accent' : 'border-border text-muted hover:text-text'
@@ -198,7 +226,7 @@ export function FlashView() {
         </div>
       </div>
 
-      {/* ── Row 2: Timer + Tables (always visible) ────────────── */}
+      {/* ── Row 2: Timer + Tables ─────────────────────────────── */}
       <div className="flex items-center gap-1.5 px-3 py-1.5 bg-bg3 border-b border-border flex-shrink-0 overflow-x-auto no-scrollbar">
         <span className="text-[9px] text-muted uppercase tracking-wider flex-shrink-0">Timer</span>
         {([0, 5000, 8000, 12000, 15000, 20000] as TimerMs[]).map(ms => (
@@ -228,6 +256,7 @@ export function FlashView() {
             selectedTab={selectedTab} allButtons={allButtons} actionButtons={actionButtons}
             timerMs={timerMs} autoNext={autoNext} paused={paused || sessionEnded}
             compact={false} sessionErrorsRef={sessionErrorsRef} retryQueueRef={retryQueueRef}
+            handFilter={handFilter}
             onAnswer={onAnswer} onRetryCountChange={onRetryCountChange}
           />
         </div>
@@ -241,10 +270,22 @@ export function FlashView() {
               selectedTab={selectedTab} allButtons={allButtons} actionButtons={actionButtons}
               timerMs={timerMs} autoNext={autoNext} paused={paused || sessionEnded}
               compact sessionErrorsRef={sessionErrorsRef} retryQueueRef={retryQueueRef}
+              handFilter={handFilter}
               onAnswer={onAnswer} onRetryCountChange={onRetryCountChange}
             />
           ))}
         </div>
+      )}
+
+      {/* ── Hand filter overlay ────────────────────────────────── */}
+      {showFilter && (
+        <HandFilterOverlay
+          selectedTab={selectedTab}
+          actionButtons={actionButtons}
+          handFilter={handFilter}
+          setHandFilter={setHandFilter}
+          onClose={() => setShowFilter(false)}
+        />
       )}
 
       {/* ── Session ended overlay ──────────────────────────────── */}
@@ -277,6 +318,99 @@ export function FlashView() {
   );
 }
 
+// ── HandFilterOverlay ─────────────────────────────────────────
+function HandFilterOverlay({
+  selectedTab, actionButtons, handFilter, setHandFilter, onClose,
+}: {
+  selectedTab: SelectedTab;
+  actionButtons: [string, string][];
+  handFilter: Set<string> | null;
+  setHandFilter: (f: Set<string> | null) => void;
+  onClose: () => void;
+}) {
+  const hands = allHands();
+  const active = handFilter ?? new Set(hands.map(h => h.hand));
+
+  const toggle = (hand: string) => {
+    const next = new Set(active);
+    if (next.has(hand)) next.delete(hand); else next.add(hand);
+    if (next.size === hands.length) setHandFilter(null);
+    else setHandFilter(next.size > 0 ? next : null);
+  };
+
+  const selectAll = () => setHandFilter(null);
+  const selectNone = () => setHandFilter(new Set());
+  const selectInRange = () => {
+    const inRange = hands.filter(h => getHandActions(h.hand, selectedTab.rangeMap) !== null);
+    setHandFilter(new Set(inRange.map(h => h.hand)));
+  };
+
+  const count = active.size;
+
+  return (
+    <div className="absolute inset-0 z-30 bg-bg/85 flex items-center justify-center p-3">
+      <div className="bg-bg2 border border-border rounded-xl p-3 w-full max-w-[320px]">
+        <div className="flex items-center justify-between mb-2.5">
+          <span className="text-[11px] font-bold text-text">Filtrer les mains</span>
+          <div className="flex gap-1">
+            <button onClick={selectInRange}
+              className="text-[9px] px-2 py-0.5 rounded border border-border text-muted hover:text-text transition-colors cursor-pointer">
+              Range
+            </button>
+            <button onClick={selectAll}
+              className="text-[9px] px-2 py-0.5 rounded border border-border text-muted hover:text-text transition-colors cursor-pointer">
+              Tout
+            </button>
+            <button onClick={selectNone}
+              className="text-[9px] px-2 py-0.5 rounded border border-border text-muted hover:text-text transition-colors cursor-pointer">
+              Aucun
+            </button>
+            <button onClick={onClose}
+              className="text-[9px] px-2 py-0.5 rounded border border-border text-muted hover:border-red hover:text-red transition-colors cursor-pointer">
+              ✕
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(13, 1fr)', gap: '1px' }}>
+          {hands.map(({ hand }) => {
+            const acts = getNonFoldActions(hand, selectedTab.rangeMap);
+            const isSelected = active.has(hand);
+            const baseColor = acts.length > 0
+              ? (actionButtons.find(([n]) => n === acts[0].action)?.[1] ?? '#888')
+              : '#6b7280';
+            return (
+              <div
+                key={hand}
+                onClick={() => toggle(hand)}
+                title={hand}
+                style={{
+                  aspectRatio: '1',
+                  borderRadius: 2,
+                  background: isSelected
+                    ? hexRgba(baseColor, acts.length > 0 ? 0.75 : 0.22)
+                    : 'rgba(15,15,17,0.8)',
+                  outline: isSelected ? 'none' : '1px solid rgba(255,255,255,0.06)',
+                  opacity: isSelected ? 1 : 0.25,
+                  cursor: 'pointer',
+                  transition: 'opacity 0.1s',
+                }}
+              />
+            );
+          })}
+        </div>
+
+        <div className="mt-2 text-[9px] text-muted text-center">
+          {count} / {hands.length} mains sélectionnées
+          {handFilter !== null && count > 0 && (
+            <span className="ml-2 text-accent">● Filtre actif</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── FlashPanel (self-contained per-table) ─────────────────────
 interface FlashPanelProps {
   selectedTab: SelectedTab;
@@ -288,13 +422,14 @@ interface FlashPanelProps {
   compact: boolean;
   sessionErrorsRef: MutableRefObject<Map<string, number>>;
   retryQueueRef: MutableRefObject<string[]>;
+  handFilter?: Set<string> | null;
   onAnswer: (correct: boolean, partial: boolean) => void;
   onRetryCountChange: () => void;
 }
 
 function FlashPanel({
   selectedTab, allButtons, actionButtons, timerMs, autoNext, paused, compact,
-  sessionErrorsRef, retryQueueRef, onAnswer, onRetryCountChange,
+  sessionErrorsRef, retryQueueRef, handFilter, onAnswer, onRetryCountChange,
 }: FlashPanelProps) {
   const { recordError } = useAppStore();
 
@@ -315,10 +450,19 @@ function FlashPanel({
   const pausedAtRef      = useRef<number | null>(null);
   const timerMsRef       = useRef(timerMs);
   const pausedRef        = useRef(paused);
-  const autoNextRef      = useRef(autoNext);
   const handleTimeoutRef = useRef<(() => void) | null>(null);
 
-  useEffect(() => { autoNextRef.current = autoNext; }, [autoNext]);
+  // Seed retry queue from global errors on mount
+  useEffect(() => {
+    const globalErrors = useAppStore.getState().errors;
+    const errorHands = Object.entries(globalErrors)
+      .filter(([, e]) => e.count >= 2)
+      .map(([h]) => h);
+    if (errorHands.length > 0) {
+      retryQueueRef.current = [...new Set([...retryQueueRef.current, ...errorHands])];
+      onRetryCountChange();
+    }
+  }, []); // eslint-disable-line
 
   // Dynamic card sizing from panel height
   useEffect(() => {
@@ -386,21 +530,22 @@ function FlashPanel({
     setFeedback(null);
     setCardAnim(null);
     setTimerPct(100);
-    const h = pickNextHand(selectedTab.rangeMap, retryQueueRef.current);
+    const h = pickNextHand(selectedTab.rangeMap, retryQueueRef.current, handFilter);
     setHand(h); setSuits(pickSuits(h.type));
     intervalStartRef.current = Date.now();
     pausedAtRef.current = pausedRef.current ? Date.now() : null;
     if (timerMsRef.current > 0 && !pausedRef.current) startTimer();
-  }, [selectedTab.rangeMap, retryQueueRef, clearTimer, startTimer]);
+  }, [selectedTab.rangeMap, retryQueueRef, handFilter, clearTimer, startTimer]);
 
   useEffect(() => { draw(); }, []); // eslint-disable-line
 
+  // Auto-next: also fires when autoNext is toggled on while already answered
   useEffect(() => {
     if (!answered || !feedback) return;
-    if ((feedback.type === 'correct' || feedback.type === 'partial') && autoNextRef.current && !pausedRef.current) {
+    if ((feedback.type === 'correct' || feedback.type === 'partial') && autoNext && !pausedRef.current) {
       const t = setTimeout(draw, 700); return () => clearTimeout(t);
     }
-  }, [answered, feedback, draw]);
+  }, [answered, feedback, autoNext, draw]);
 
   useEffect(() => () => clearTimer(), [clearTimer]);
 
