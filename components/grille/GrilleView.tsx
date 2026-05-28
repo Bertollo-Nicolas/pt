@@ -146,26 +146,30 @@ function ResultGrid({ hands, selection, actionButtons, selectedTab, label, hover
           onMouseLeave={() => onHoverHand(null)}
         >
           {hands.map(({ hand }) => {
-            let bg = hexRgba(FOLD_COLOR, 0.22);
+            let cellStyle: React.CSSProperties = { background: hexRgba(FOLD_COLOR, 0.22) };
             if (selection !== null) {
-              const freqs = selection[hand] ?? {};
-              if (cellIsPlayed(freqs)) {
-                const nonFold = Object.entries(freqs).filter(([k]) => !k.toUpperCase().includes('FOLD'));
-                const dom = nonFold.reduce((a, b) => b[1] > a[1] ? b : a, ['', 0] as [string, number]);
-                const color = actionButtons.find(([n]) => n === dom[0])?.[1] ?? '#888';
-                bg = hexRgba(color, 0.85);
-              }
+              // "Votre réponse" — painted freqs → gradient
+              const freqs = selection[hand] ?? { Fold: 100 };
+              const gs = buildGradient(freqs, actionButtons);
+              if (gs.background) cellStyle = gs;
             } else if (selectedTab) {
+              // "Correct" — build freqs from range data → gradient
               const acts = getNonFoldActions(hand, selectedTab.rangeMap);
               if (acts.length > 0) {
-                bg = hexRgba(actionButtons.find(([n]) => n === acts[0].action)?.[1] ?? '#888', 0.85);
+                const freqs: CellFreqs = {};
+                const nfTotal = acts.reduce((s, a) => s + a.freq, 0);
+                for (const a of acts) freqs[a.action] = a.freq * 100;
+                if (nfTotal < 0.99) freqs['Fold'] = Math.round((1 - nfTotal) * 100);
+                const gs = buildGradient(freqs, actionButtons);
+                if (gs.background) cellStyle = gs;
               }
             }
             const isHovered = hoveredHand === hand;
             return (
               <div key={hand} onMouseEnter={() => onHoverHand(hand)}
                 style={{
-                  background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  ...cellStyle,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontWeight: 700, color: 'rgba(255,255,255,0.88)', borderRadius: '2px',
                   outline: isHovered ? '1.5px solid rgba(255,255,255,0.85)' : undefined,
                   zIndex: isHovered ? 1 : 0, position: 'relative',
