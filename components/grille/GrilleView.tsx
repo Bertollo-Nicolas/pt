@@ -353,15 +353,28 @@ export function GrilleView() {
       const played = cellIsPlayed(selected[hand] ?? {});
 
       if (inRange && played) {
-        const nonFoldEntries = Object.entries(selected[hand] ?? {}).filter(([k]) => !k.toUpperCase().includes('FOLD'));
-        const userDom = nonFoldEntries.reduce((a, b) => b[1] > a[1] ? b : a, ['', 0] as [string, number]);
-        const dom = nonFoldActs[0];
-        if (userDom[0] === dom?.action) {
+        const userNonFoldEntries = Object.entries(selected[hand] ?? {}).filter(([k]) => !k.toUpperCase().includes('FOLD'));
+        
+        let isAllCorrect = true;
+        
+        // Check if user played same number of non-fold actions
+        if (userNonFoldEntries.length !== nonFoldActs.length) {
+          isAllCorrect = false;
+        } else {
+          // Check each user action against expected
+          for (const [uAction, uFreq] of userNonFoldEntries) {
+            const expected = nonFoldActs.find(a => a.action === uAction);
+            if (!expected || Math.round(expected.freq * 100) !== uFreq) {
+              isAllCorrect = false;
+              break;
+            }
+          }
+        }
+
+        if (isAllCorrect) {
           states[hand] = 'correct'; correct++;
         } else {
-          const validMixed = nonFoldActs.find(a => a.action === userDom[0] && a.freq >= 0.2);
-          if (validMixed) { states[hand] = 'correct'; correct++; }
-          else { states[hand] = 'wrong-action'; wrongAct++; }
+          states[hand] = 'wrong-action'; wrongAct++;
         }
       } else if (inRange && !played) {
         states[hand] = 'missed'; missed++;
@@ -370,7 +383,7 @@ export function GrilleView() {
       }
     });
 
-    const total = correct + wrongAct + missed;
+    const total = correct + wrongAct + missed + extra;
     const score = total > 0 ? Math.round(correct / total * 100) : 100;
     setCheckResult({ states, correct, wrongAct, missed, extra, score, pct: Math.round(total / 169 * 100) });
     addSession({ key: `grille_${selectedTabKey}`, date: todayStr(), name: selectedTab.name, catName: selectedTab.catName, mode: 'grille', score, correct, missed, extra, wrongAct });

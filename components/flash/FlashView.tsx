@@ -88,6 +88,7 @@ function pickNextHand(
   rangeMap: Record<string, HandAction[]>,
   retryQueue: string[],
   handFilter?: Set<string> | null,
+  focusMode?: boolean,
 ): HandItem {
   const baseAll = allHands();
   const all = handFilter && handFilter.size > 0
@@ -98,6 +99,13 @@ function pickNextHand(
   const filteredRetry = handFilter && handFilter.size > 0
     ? retryQueue.filter(h => handFilter.has(h))
     : retryQueue;
+
+  // Mode Focus: 100% pick from errors if available
+  if (focusMode && filteredRetry.length > 0) {
+    const idx = Math.floor(Math.random() * filteredRetry.length);
+    const found = safeAll.find(h => h.hand === filteredRetry[idx]);
+    if (found) return found;
+  }
 
   if (filteredRetry.length > 0 && Math.random() < 0.35) {
     const idx = Math.floor(Math.random() * filteredRetry.length);
@@ -118,6 +126,7 @@ export function FlashView() {
   const [tableCount,   setTableCount]   = useState<TableCount>(1);
   const [timerMs,      setTimerMs]      = useState<TimerMs>(0);
   const [autoNext,     setAutoNext]     = useState(false);
+  const [focusMode,    setFocusMode]    = useState(false);
   const [paused,       setPaused]       = useState(false);
   const [sessionEnded, setSessionEnded] = useState(false);
   const [totalStats,   setTotalStats]   = useState<FlashStats>({ correct: 0, wrong: 0, imprecision: 0, streak: 0, bestStreak: 0 });
@@ -216,6 +225,13 @@ export function FlashView() {
             )}>
             {filterActive ? `🎯 ${handFilter!.size}` : '🎯'}
           </button>
+          <button onClick={() => setFocusMode(v => !v)}
+            className={clsx('text-[10px] px-2 py-1 rounded border transition-all',
+              focusMode ? 'bg-orange/20 border-orange text-orange' : 'border-border text-muted hover:text-text'
+            )}
+            title="Mode Focus : ne révise que vos erreurs">
+            Focus🎯
+          </button>
           <button onClick={() => setAutoNext(v => !v)}
             className={clsx('text-[10px] px-2 py-1 rounded border transition-all',
               autoNext ? 'bg-accent/20 border-accent text-accent' : 'border-border text-muted hover:text-text'
@@ -264,6 +280,7 @@ export function FlashView() {
           <FlashPanel key={resetKey}
             selectedTab={selectedTab} allButtons={allButtons} actionButtons={actionButtons}
             timerMs={timerMs} autoNext={autoNext} paused={paused || sessionEnded}
+            focusMode={focusMode}
             compact={false} sessionErrorsRef={sessionErrorsRef} retryQueueRef={retryQueueRef}
             handFilter={handFilter}
             onAnswer={onAnswer} onRetryCountChange={onRetryCountChange}
@@ -278,6 +295,7 @@ export function FlashView() {
             <FlashPanel key={`${resetKey}-${i}`}
               selectedTab={selectedTab} allButtons={allButtons} actionButtons={actionButtons}
               timerMs={timerMs} autoNext={autoNext} paused={paused || sessionEnded}
+              focusMode={focusMode}
               compact sessionErrorsRef={sessionErrorsRef} retryQueueRef={retryQueueRef}
               handFilter={handFilter}
               onAnswer={onAnswer} onRetryCountChange={onRetryCountChange}
@@ -446,6 +464,7 @@ interface FlashPanelProps {
   timerMs: number;
   autoNext: boolean;
   paused: boolean;
+  focusMode: boolean;
   compact: boolean;
   sessionErrorsRef: MutableRefObject<Map<string, number>>;
   retryQueueRef: MutableRefObject<string[]>;
@@ -455,7 +474,7 @@ interface FlashPanelProps {
 }
 
 function FlashPanel({
-  selectedTab, allButtons, actionButtons, timerMs, autoNext, paused, compact,
+  selectedTab, allButtons, actionButtons, timerMs, autoNext, paused, focusMode, compact,
   sessionErrorsRef, retryQueueRef, handFilter, onAnswer, onRetryCountChange,
 }: FlashPanelProps) {
   const { recordError } = useAppStore();
@@ -557,12 +576,12 @@ function FlashPanel({
     setFeedback(null);
     setCardAnim(null);
     setTimerPct(100);
-    const h = pickNextHand(selectedTab.rangeMap, retryQueueRef.current, handFilter);
+    const h = pickNextHand(selectedTab.rangeMap, retryQueueRef.current, handFilter, focusMode);
     setHand(h); setSuits(pickSuits(h.type));
     intervalStartRef.current = Date.now();
     pausedAtRef.current = pausedRef.current ? Date.now() : null;
     if (timerMsRef.current > 0 && !pausedRef.current) startTimer();
-  }, [selectedTab.rangeMap, retryQueueRef, handFilter, clearTimer, startTimer]);
+  }, [selectedTab.rangeMap, retryQueueRef, handFilter, focusMode, clearTimer, startTimer]);
 
   useEffect(() => { draw(); }, []); // eslint-disable-line
 
