@@ -7,7 +7,7 @@ import { todayStr, diffDays } from '@/lib/utils';
 import type { Category, SrsEntry } from '@/lib/types';
 
 export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings: () => void; onClose?: () => void; onLogout?: () => void }) {
-  const { rmData, rmFiles, srs, importRmFile, deleteRmFile, selectTab, setMode, selectedTabKey } = useAppStore();
+  const { rmData, rmFiles, srs, importRmFile, deleteRmFile, renameRmFile, selectTab, setMode, selectedTabKey } = useAppStore();
   const [search, setSearch] = useState('');
   const [openCats, setOpenCats] = useState<Set<string>>(new Set());
   const [showFiles, setShowFiles] = useState(false);
@@ -46,6 +46,23 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
     deleteRmFile(name);
     try {
       await fetch(`/api/rm-files?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
+    } catch { /* ignore */ }
+  };
+
+  const handleRenameFile = async (oldName: string) => {
+    const currentName = oldName.replace(/\.rm$/, '');
+    let newName = prompt('Nouveau nom pour ce dossier ?', currentName);
+    if (newName === null || !newName || newName === currentName) return;
+    
+    if (!newName.endsWith('.rm')) newName += '.rm';
+    renameRmFile(oldName, newName);
+
+    try {
+      await fetch('/api/rm-files', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName, oldName }),
+      });
     } catch { /* ignore */ }
   };
 
@@ -167,14 +184,23 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
           <div className="mt-2 space-y-1 max-h-32 overflow-y-auto no-scrollbar">
             {Object.keys(rmFiles).map(name => (
               <div key={name} className="flex items-center justify-between gap-2 px-1.5 py-1 bg-bg3 rounded text-[10px] group">
-                <span className="truncate text-muted group-hover:text-text transition-colors">{name.replace(/\.rm$/, '')}</span>
-                <button
-                  onClick={() => handleDeleteFile(name)}
-                  className="text-muted hover:text-red transition-colors cursor-pointer"
-                  title="Supprimer"
-                >
-                  ✕
-                </button>
+                <span className="truncate text-muted group-hover:text-text transition-colors flex-1">{name.replace(/\.rm$/, '')}</span>
+                <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => handleRenameFile(name)}
+                    className="text-muted hover:text-accent transition-colors cursor-pointer"
+                    title="Renommer"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={() => handleDeleteFile(name)}
+                    className="text-muted hover:text-red transition-colors cursor-pointer"
+                    title="Supprimer"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
             ))}
           </div>

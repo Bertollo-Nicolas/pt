@@ -38,6 +38,7 @@ interface Ephemeral {
 interface Actions {
   importRmFile: (name: string, content: string) => void;
   deleteRmFile: (name: string) => void;
+  renameRmFile: (oldName: string, newName: string) => void;
   rehydrateRmData: () => void;
   selectTab: (catId: string, tabId: string) => void;
   setMode: (mode: Mode) => void;
@@ -163,6 +164,41 @@ export const useAppStore = create<AppStore>()(
           delete nextFiles[name];
           const { rmData, rangeColors } = mergeRmFiles(nextFiles);
           return { rmFiles: nextFiles, rmData, rangeColors };
+        });
+      },
+
+      renameRmFile: (oldName, newName) => {
+        if (!newName.endsWith('.rm')) newName += '.rm';
+        set((s) => {
+          const content = s.rmFiles[oldName];
+          if (!content) return s;
+
+          const nextFiles = { ...s.rmFiles };
+          delete nextFiles[oldName];
+          nextFiles[newName] = content;
+
+          // Migrate SRS keys
+          const oldPrefix = oldName.replace(/\.rm$/, '').replace(/[^a-zA-Z0-9]/g, '_');
+          const newPrefix = newName.replace(/\.rm$/, '').replace(/[^a-zA-Z0-9]/g, '_');
+          const nextSrs = { ...s.srs };
+          let srsChanged = false;
+
+          for (const key of Object.keys(nextSrs)) {
+            if (key.startsWith(`${oldPrefix}__`)) {
+              const newKey = key.replace(`${oldPrefix}__`, `${newPrefix}__`);
+              nextSrs[newKey] = { ...nextSrs[key], key: newKey };
+              delete nextSrs[key];
+              srsChanged = true;
+            }
+          }
+
+          const { rmData, rangeColors } = mergeRmFiles(nextFiles);
+          return { 
+            rmFiles: nextFiles, 
+            rmData, 
+            rangeColors, 
+            srs: srsChanged ? nextSrs : s.srs 
+          };
         });
       },
 

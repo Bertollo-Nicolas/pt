@@ -1,0 +1,12 @@
+Failed to compile.
+./store/appStore.ts:106:25
+Type error: Cannot find name 'Category'.
+  104 |
+  105 |           const newId = idMap[oldId];
+> 106 |           const newCat: Category = { ...cat };
+      |                         ^
+  107 |           if (cat.children) newCat.children = cat.children.map(c => idMap[c]).filter(Boolean);
+  108 |           
+  109 |           if (cat.tabs) {
+Next.js build worker exited with code: 1 and signal: null
+Error: Command "npm run build" exited with 1

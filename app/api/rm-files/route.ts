@@ -12,17 +12,30 @@ export async function GET() {
   return NextResponse.json(files);
 }
 
-// POST /api/rm-files — upload a new .rm file
+// POST /api/rm-files — upload or rename a .rm file
 export async function POST(req: NextRequest) {
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { name, content } = await req.json();
-  if (!name || !content) return NextResponse.json({ error: 'Missing name or content' }, { status: 400 });
+  const { name, content, oldName } = await req.json();
+  if (!name) return NextResponse.json({ error: 'Missing name' }, { status: 400 });
 
-  const id = await saveRmFile(supabase, user.id, name, content);
-  return NextResponse.json({ id });
+  if (oldName) {
+    // Rename existing file
+    const { error } = await supabase
+      .from('rm_files')
+      .update({ name })
+      .eq('user_id', user.id)
+      .eq('name', oldName);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  } else {
+    // Upload new file
+    if (!content) return NextResponse.json({ error: 'Missing content' }, { status: 400 });
+    const id = await saveRmFile(supabase, user.id, name, content);
+    return NextResponse.json({ id });
+  }
 }
 
 // DELETE /api/rm-files?id=xxx or ?name=xxx
