@@ -29,6 +29,9 @@ export function useSync() {
         if (data.sessions) useAppStore.setState({ sessions: data.sessions });
         if (data.errors)   useAppStore.setState({ errors: data.errors });
         if (data.heatmap)  useAppStore.setState({ heatmap: data.heatmap });
+        
+        // Migrate keys after sync
+        useAppStore.getState().rehydrateRmData();
       }
 
       // Load .rm files from DB

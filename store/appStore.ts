@@ -217,22 +217,22 @@ export const useAppStore = create<AppStore>()(
 
         // ── 2. Handle legacy single-file migration ──
         const raw = localStorage.getItem('range-trainer-v5');
-        const folderId = 'Mes_Ranges';
-        const fileName = 'Mes Ranges.rm';
+        const defaultFileName = 'Mes Ranges.rm';
+        const defaultFolderId = 'Mes_Ranges';
 
         if (raw && Object.keys(rmFiles).length === 0) {
           try {
             const parsed = JSON.parse(raw);
             const legacyContent = parsed.state?.rmFileContent;
             if (legacyContent && typeof legacyContent === 'string') {
-              const nextFiles = { [fileName]: legacyContent };
+              const nextFiles = { [defaultFileName]: legacyContent };
               const { rmData: d, rangeColors } = mergeRmFiles(nextFiles);
               
               // Migrate ALL SRS keys that don't already have a folder prefix
               for (const key of Object.keys(cleanSrs)) {
-                if (!key.startsWith(folderId + '__')) {
+                if (key.split('__').length <= 2) {
                   const entry = cleanSrs[key];
-                  const newKey = `${folderId}__${key}`;
+                  const newKey = `${defaultFolderId}__${key}`;
                   cleanSrs[newKey] = { ...entry, key: newKey };
                   delete cleanSrs[key];
                   srsChanged = true;
@@ -245,15 +245,17 @@ export const useAppStore = create<AppStore>()(
           } catch (e) { console.error('Migration failed', e); }
         }
 
-        // ── 3. Ongoing migration check ──
-        // If we have "Mes Ranges.rm" in rmFiles but some SRS keys are still in legacy format
-        if (rmFiles[fileName]) {
+        // ── 3. Ongoing migration check for SRS keys ──
+        // If we have at least one file, try to map legacy keys to the first one
+        const fileNames = Object.keys(rmFiles);
+        if (fileNames.length > 0) {
+          const firstFolderId = fileNames[0].replace(/\.rm$/, '').replace(/[^a-zA-Z0-9]/g, '_');
           for (const key of Object.keys(cleanSrs)) {
-            // Legacy keys usually look like "catId__tabId"
-            // New keys look like "Mes_Ranges__catId__tabId"
-            if (!key.startsWith(folderId + '__')) {
+            // Legacy keys look like "catId__tabId" (2 segments)
+            // New keys look like "folderId__catId__tabId" (3+ segments)
+            if (key.split('__').length === 2) {
               const entry = cleanSrs[key];
-              const newKey = `${folderId}__${key}`;
+              const newKey = `${firstFolderId}__${key}`;
               cleanSrs[newKey] = { ...entry, key: newKey };
               delete cleanSrs[key];
               srsChanged = true;
