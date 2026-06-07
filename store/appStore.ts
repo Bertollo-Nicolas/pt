@@ -6,7 +6,7 @@ import { DEFAULT_CFG, MAX_SESSIONS } from '@/lib/constants';
 import { todayStr, addDays } from '@/lib/utils';
 import type {
   RmData, RangeColor, SelectedTab, Mode,
-  Session, ErrorEntry, SrsEntry, AppConfig,
+  Session, ErrorEntry, SrsEntry, AppConfig, Category, RangeInfo,
 } from '@/lib/types';
 
 // ── Persisted (localStorage) ──────────────────────────────
@@ -75,7 +75,7 @@ function mergeRmFiles(files: Record<string, string>): { rmData: RmData; rangeCol
 
       // Merge ranges
       if (data.ranges) {
-        for (const [id, r] of Object.entries(data.ranges)) {
+        for (const [id, r] of Object.entries(data.ranges) as [string, RangeInfo][]) {
           merged.ranges[id] = r;
           rangeColors[id] = { color: r.color || '#888', name: r.name || id };
         }
@@ -90,7 +90,7 @@ function mergeRmFiles(files: Record<string, string>): { rmData: RmData; rangeCol
           idMap[oldId] = `${folderId}__${oldId}`;
         }
 
-        for (const [oldId, cat] of Object.entries(data.categories)) {
+        for (const [oldId, cat] of Object.entries(data.categories) as [string, Category][]) {
           if (oldId === 'root') {
             // Root children from this file go into our folder
             if (cat.children) {
