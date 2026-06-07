@@ -25,15 +25,27 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ id });
 }
 
-// DELETE /api/rm-files?id=xxx
+// DELETE /api/rm-files?id=xxx or ?name=xxx
 export async function DELETE(req: NextRequest) {
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const id = req.nextUrl.searchParams.get('id');
-  if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+  const name = req.nextUrl.searchParams.get('name');
+  
+  if (id) {
+    await deleteRmFile(supabase, id);
+  } else if (name) {
+    const { error } = await supabase
+      .from('rm_files')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('name', name);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  } else {
+    return NextResponse.json({ error: 'Missing id or name' }, { status: 400 });
+  }
 
-  await deleteRmFile(supabase, id);
   return NextResponse.json({ ok: true });
 }

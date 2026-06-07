@@ -4,12 +4,13 @@ import clsx from 'clsx';
 import { useAppStore } from '@/store/appStore';
 import { countCombos, tabKey } from '@/lib/poker';
 import { todayStr, diffDays } from '@/lib/utils';
-import type { Category } from '@/lib/types';
+import type { Category, SrsEntry } from '@/lib/types';
 
 export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings: () => void; onClose?: () => void; onLogout?: () => void }) {
-  const { rmData, srs, loadRmFile, selectTab, setMode, selectedTabKey } = useAppStore();
+  const { rmData, rmFiles, srs, importRmFile, deleteRmFile, selectTab, setMode, selectedTabKey } = useAppStore();
   const [search, setSearch] = useState('');
   const [openCats, setOpenCats] = useState<Set<string>>(new Set());
+  const [showFiles, setShowFiles] = useState(false);
   const dropRef = useRef<HTMLDivElement>(null);
 
   const handleFile = useCallback(
@@ -18,20 +19,35 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
       r.onload = async (e) => {
         const content = e.target?.result as string;
         if (!content) return;
-        loadRmFile(content);
+        
+        let name = prompt('Nom pour ce dossier de ranges ?', f.name.replace(/\.rm$/, ''));
+        if (name === null) return;
+        if (!name) name = f.name.replace(/\.rm$/, '');
+        if (!name.endsWith('.rm')) name += '.rm';
+
+        importRmFile(name, content);
+
         // Also persist to DB
         try {
           await fetch('/api/rm-files', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: f.name, content }),
+            body: JSON.stringify({ name, content }),
           });
         } catch { /* offline — localStorage fallback */ }
       };
       r.readAsText(f);
     },
-    [loadRmFile],
+    [importRmFile],
   );
+
+  const handleDeleteFile = async (name: string) => {
+    if (!confirm(`Supprimer le dossier "${name.replace(/\.rm$/, '')}" ?`)) return;
+    deleteRmFile(name);
+    try {
+      await fetch(`/api/rm-files?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
+    } catch { /* ignore */ }
+  };
 
   const toggleCat = (id: string) => {
     setOpenCats((prev) => {
@@ -42,7 +58,7 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
   };
 
   const today = todayStr();
-  const dueCount = Object.values(srs).filter((e) => e.nextReview <= today).length;
+  const dueCount = Object.values(srs).filter((e: SrsEntry) => e.nextReview <= today).length;
 
   return (
     <aside className="bg-bg2 border-r border-border flex flex-col overflow-hidden h-full">
@@ -118,7 +134,7 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
 
       {/* Tree */}
       <div className="flex-1 overflow-y-auto p-1.5 min-h-0 pb-0">
-        {!rmData ? (
+        {!rmData || (rmData.categories.root.children?.length ?? 0) === 0 ? (
           <p className="p-3 text-[11px] text-muted text-center">Importe un fichier .rm</p>
         ) : (
           (rmData.categories.root.children ?? []).map((id) => (
@@ -135,6 +151,33 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
               onSelectTab={(catId, tabId) => selectTab(catId, tabId)}
             />
           ))
+        )}
+      </div>
+
+      {/* Files management toggle */}
+      <div className="px-2.5 py-2 border-t border-border flex-shrink-0">
+        <button
+          onClick={() => setShowFiles(!showFiles)}
+          className="w-full text-[10px] text-muted hover:text-text flex items-center justify-between uppercase tracking-wider font-bold transition-colors cursor-pointer"
+        >
+          <span>📁 Gérer les dossiers ({Object.keys(rmFiles).length})</span>
+          <span>{showFiles ? '▾' : '▸'}</span>
+        </button>
+        {showFiles && (
+          <div className="mt-2 space-y-1 max-h-32 overflow-y-auto no-scrollbar">
+            {Object.keys(rmFiles).map(name => (
+              <div key={name} className="flex items-center justify-between gap-2 px-1.5 py-1 bg-bg3 rounded text-[10px] group">
+                <span className="truncate text-muted group-hover:text-text transition-colors">{name.replace(/\.rm$/, '')}</span>
+                <button
+                  onClick={() => handleDeleteFile(name)}
+                  className="text-muted hover:text-red transition-colors cursor-pointer"
+                  title="Supprimer"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
@@ -163,7 +206,7 @@ function TreeNode({
   onToggle: (id: string) => void;
   search: string;
   selectedTabKey: string | null;
-  srs: Record<string, import('@/lib/types').SrsEntry>;
+  srs: Record<string, SrsEntry>;
   today: string;
   onSelectTab: (catId: string, tabId: string) => void;
 }) {

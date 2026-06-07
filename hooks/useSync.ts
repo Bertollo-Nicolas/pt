@@ -31,18 +31,19 @@ export function useSync() {
         if (data.heatmap)  useAppStore.setState({ heatmap: data.heatmap });
       }
 
-      // Load latest .rm file from DB if localStorage doesn't have one
-      const { rmFileContent } = useAppStore.getState();
-      if (!rmFileContent) {
-        const rmRes = await fetch('/api/rm-files');
-        if (rmRes.ok) {
-          const files: { id: string; name: string }[] = await rmRes.json();
-          if (files.length > 0) {
-            // Fetch the most recent file's content
-            const fileRes = await fetch(`/api/rm-files/${files[0].id}`);
+      // Load .rm files from DB
+      const rmRes = await fetch('/api/rm-files');
+      if (rmRes.ok) {
+        const files: { id: string; name: string }[] = await rmRes.json();
+        const { rmFiles } = useAppStore.getState();
+        
+        // Find files we don't have locally
+        for (const file of files) {
+          if (!rmFiles[file.name]) {
+            const fileRes = await fetch(`/api/rm-files/${file.id}`);
             if (fileRes.ok) {
               const { content } = await fileRes.json();
-              useAppStore.getState().loadRmFile(content);
+              useAppStore.getState().importRmFile(file.name, content);
             }
           }
         }

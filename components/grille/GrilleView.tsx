@@ -97,23 +97,23 @@ function buildGradient(freqs: CellFreqs, buttons: [string, string][]): React.CSS
 // ── Score circle ──────────────────────────────────────────────
 
 function ScoreCircle({ score }: { score: number }) {
-  const r = 26;
+  const r = 22;
   const circ = 2 * Math.PI * r;
   const dash = (score / 100) * circ;
   const color = score >= 80 ? '#2ecc8a' : score >= 55 ? '#e09540' : '#e05555';
   return (
-    <svg width="68" height="68" viewBox="0 0 68 68">
-      <circle cx="34" cy="34" r={r} fill="none" stroke="#2e2e38" strokeWidth="5" />
-      <circle cx="34" cy="34" r={r} fill="none" stroke={color} strokeWidth="5"
+    <svg width="56" height="56" viewBox="0 0 56 56">
+      <circle cx="28" cy="28" r={r} fill="none" stroke="#2e2e38" strokeWidth="4" />
+      <circle cx="28" cy="28" r={r} fill="none" stroke={color} strokeWidth="4"
         strokeDasharray={`${dash} ${circ}`} strokeDashoffset={circ / 4} strokeLinecap="round" />
-      <text x="34" y="39" textAnchor="middle" fontSize="13" fontWeight="bold" fill={color}>{score}%</text>
+      <text x="28" y="32" textAnchor="middle" fontSize="11" fontWeight="bold" fill={color}>{score}%</text>
     </svg>
   );
 }
 
 // ── Result grid with hand labels ──────────────────────────────
 
-function ResultGrid({ hands, selection, actionButtons, selectedTab, label, hoveredHand, onHoverHand }: {
+function ResultGrid({ hands, selection, actionButtons, selectedTab, label, hoveredHand, onHoverHand, checkResult, hoveredState, cellSize }: {
   hands: HandItem[];
   selection: Selection | null;
   actionButtons: [string, string][];
@@ -121,28 +121,24 @@ function ResultGrid({ hands, selection, actionButtons, selectedTab, label, hover
   label: string;
   hoveredHand: string | null;
   onHoverHand: (hand: string | null) => void;
+  checkResult: CheckResult | null;
+  hoveredState: CheckState | null;
+  cellSize: number;
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [cellSize, setCellSize] = useState(18);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const obs = new ResizeObserver(([entry]) => {
-      setCellSize(Math.max(14, Math.floor((entry.contentRect.width - 4) / 13)));
-    });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
-
-  const fontSize = Math.max(5, Math.floor(cellSize * 0.37));
+  const fontSize = Math.max(4, Math.floor(cellSize * 0.35));
 
   return (
-    <div>
-      <div className="text-[9px] text-muted text-center mb-1 uppercase tracking-wider">{label}</div>
-      <div ref={containerRef} className="bg-bg3 rounded-lg p-1">
+    <div className="flex flex-col items-center">
+      <div className="text-[8px] text-muted text-center mb-0.5 uppercase tracking-wider">{label}</div>
+      <div className="bg-bg3 rounded-lg p-0.5">
         <div
-          style={{ display: 'grid', gridTemplateColumns: `repeat(13, ${cellSize}px)`, gridAutoRows: `${cellSize}px`, gap: '1px', fontSize: `${fontSize}px` }}
+          style={{ 
+            display: 'grid', 
+            gridTemplateColumns: `repeat(13, ${cellSize}px)`, 
+            gridAutoRows: `${cellSize}px`, 
+            gap: '1px', 
+            fontSize: `${fontSize}px` 
+          }}
           onMouseLeave={() => onHoverHand(null)}
         >
           {hands.map(({ hand }) => {
@@ -164,16 +160,21 @@ function ResultGrid({ hands, selection, actionButtons, selectedTab, label, hover
                 if (gs.background) cellStyle = gs;
               }
             }
-            const isHovered = hoveredHand === hand;
+            const handState = checkResult?.states[hand];
+            const isHoveredByHand = hoveredHand === hand;
+            const isHoveredByState = hoveredState && handState === hoveredState;
+            const isAnyHovered = !!hoveredHand || !!hoveredState;
+            const isHighlighted = isHoveredByHand || isHoveredByState;
+
             return (
               <div key={hand} onMouseEnter={() => onHoverHand(hand)}
                 style={{
                   ...cellStyle,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontWeight: 700, color: 'rgba(255,255,255,0.88)', borderRadius: '2px',
-                  outline: isHovered ? '1.5px solid rgba(255,255,255,0.85)' : undefined,
-                  zIndex: isHovered ? 1 : 0, position: 'relative',
-                  opacity: hoveredHand && !isHovered ? 0.45 : 1,
+                  fontWeight: 700, color: 'rgba(255,255,255,0.88)', borderRadius: '1.5px',
+                  outline: isHighlighted ? '1.5px solid rgba(255,255,255,0.85)' : undefined,
+                  zIndex: isHighlighted ? 1 : 0, position: 'relative',
+                  opacity: isAnyHovered && !isHighlighted ? 0.45 : 1,
                   transition: 'opacity 0.07s', userSelect: 'none',
                 }}>{hand}</div>
             );
@@ -227,9 +228,12 @@ export function GrilleView() {
   const [checkResult,   setCheckResult]   = useState<CheckResult | null>(null);
   const [revealed,      setRevealed]      = useState(false);
   const [cellSize,      setCellSize]      = useState(32);
+  const [resCellSize,   setResCellSize]   = useState(18);
   const [freqPerAction, setFreqPerAction] = useState<Record<string, number>>({});
   const [hoveredHand,   setHoveredHand]   = useState<string | null>(null);
+  const [hoveredState,  setHoveredState]  = useState<CheckState | null>(null);
 
+  const containerRef   = useRef<HTMLDivElement>(null);
   const midRef         = useRef<HTMLDivElement>(null);
   const isDraggingRef  = useRef(false);
   const pointerDownRef = useRef<string | null>(null);
@@ -253,17 +257,30 @@ export function GrilleView() {
   const allActionButtons: [string, string][] = [...rawActionButtons, ['Fold', colorOverrides['Fold'] ?? FOLD_COLOR]];
   const allActionNames = allActionButtons.map(([n]) => n);
 
-  // Resize observer for main grid
-  const sizeGrid = useCallback(() => {
-    if (!midRef.current) return;
-    const { clientWidth: w, clientHeight: h } = midRef.current;
-    setCellSize(Math.max(16, Math.floor((Math.min(w, h) - 34) / 13)));
+  // Resize observer for grids
+  const updateSizes = useCallback(() => {
+    if (!containerRef.current) return;
+    const { clientWidth: w, clientHeight: h } = containerRef.current;
+    
+    // Main grid sizing
+    if (midRef.current) {
+      const { clientWidth: mw, clientHeight: mh } = midRef.current;
+      setCellSize(Math.max(16, Math.floor((Math.min(mw, mh) - 34) / 13)));
+    }
+
+    // Result grids sizing (2 grids side by side)
+    // Non-grid height estimates: Score (~65), Stats (~55), Button (~45), Banner (~40), Spacings (~60)
+    const fixedH = 265; 
+    const maxResH = Math.max(10, Math.floor((h - fixedH) / 13));
+    const maxResW = Math.max(10, Math.floor((w - 40) / 2 / 13));
+    setResCellSize(Math.min(maxResH, maxResW));
   }, []);
+
   useEffect(() => {
-    const obs = new ResizeObserver(sizeGrid);
-    if (midRef.current) obs.observe(midRef.current);
+    const obs = new ResizeObserver(updateSizes);
+    if (containerRef.current) obs.observe(containerRef.current);
     return () => obs.disconnect();
-  }, [sizeGrid]);
+  }, [updateSizes]);
 
   // Reset on tab change — init freqPerAction to Fold=100%, others=0%
   useEffect(() => {
@@ -271,6 +288,7 @@ export function GrilleView() {
     setCheckResult(null);
     setRevealed(false);
     setHoveredHand(null);
+    setHoveredState(null);
     const init: Record<string, number> = {};
     for (const [n] of allActionButtons) init[n] = n === 'Fold' ? 100 : 0;
     setFreqPerAction(init);
@@ -397,6 +415,7 @@ export function GrilleView() {
     setCheckResult(null);
     setRevealed(false);
     setHoveredHand(null);
+    setHoveredState(null);
     const init: Record<string, number> = {};
     for (const [n] of allActionButtons) init[n] = n === 'Fold' ? 100 : 0;
     setFreqPerAction(init);
@@ -408,7 +427,7 @@ export function GrilleView() {
   const isSrsReview = srsReviewKey === selectedTabKey;
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden min-h-0 px-2 md:px-4 py-2">
+    <div ref={containerRef} className="flex-1 flex flex-col overflow-hidden min-h-0 px-2 md:px-4 py-2">
 
       {/* SRS banner */}
       {isSrsReview && (
@@ -511,53 +530,57 @@ export function GrilleView() {
 
       {/* ── Results view ─────────────────────────────────────────── */}
       {checkResult ? (
-        <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar space-y-3 py-1">
+        <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar space-y-2 py-0.5 w-full">
           <div className="text-center">
             <div className="inline-flex flex-col items-center">
               <ScoreCircle score={checkResult.score} />
-              <div className="text-[10px] text-muted mt-1">
+              <div className="text-[10px] text-muted mt-0.5">
                 {checkResult.score >= 85 ? 'Excellent' : checkResult.score >= 70 ? 'Bien' : checkResult.score >= 55 ? 'À améliorer' : 'À retravailler'}
               </div>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <ResultGrid hands={hands} selection={selected} actionButtons={allActionButtons} selectedTab={selectedTab} label="Votre réponse" hoveredHand={hoveredHand} onHoverHand={setHoveredHand} />
-            <ResultGrid hands={hands} selection={null} actionButtons={allActionButtons} selectedTab={selectedTab} label="Correct" hoveredHand={hoveredHand} onHoverHand={setHoveredHand} />
+            <ResultGrid hands={hands} selection={selected} actionButtons={allActionButtons} selectedTab={selectedTab} label="Votre réponse" hoveredHand={hoveredHand} onHoverHand={setHoveredHand} checkResult={checkResult} hoveredState={hoveredState} cellSize={resCellSize} />
+            <ResultGrid hands={hands} selection={null} actionButtons={allActionButtons} selectedTab={selectedTab} label="Correct" hoveredHand={hoveredHand} onHoverHand={setHoveredHand} checkResult={checkResult} hoveredState={hoveredState} cellSize={resCellSize} />
           </div>
 
           <div className="grid grid-cols-4 gap-1.5">
             {[
-              { label: 'Correct', val: checkResult.correct,  color: '#2ecc8a' },
-              { label: 'Raté',    val: checkResult.missed,   color: '#e05555' },
-              { label: 'En trop', val: checkResult.extra,    color: '#e09540' },
-              { label: 'Erreur',  val: checkResult.wrongAct, color: '#d4c040' },
-            ].map(({ label, val, color }) => (
-              <div key={label} className="bg-bg2 border border-border rounded-lg py-2 text-center">
-                <div className="text-xl font-bold leading-none" style={{ color }}>{val}</div>
-                <div className="text-[8px] text-muted mt-1 uppercase tracking-wider leading-none">{label}</div>
+              { label: 'Correct', val: checkResult.correct,  color: '#2ecc8a', state: 'correct' as const },
+              { label: 'Raté',    val: checkResult.missed,   color: '#e05555', state: 'missed' as const },
+              { label: 'En trop', val: checkResult.extra,    color: '#e09540', state: 'extra' as const },
+              { label: 'Erreur',  val: checkResult.wrongAct, color: '#d4c040', state: 'wrong-action' as const },
+            ].map(({ label, val, color, state }) => (
+              <div key={label}
+                className="bg-bg2 border border-border rounded-lg py-1.5 text-center transition-colors hover:bg-bg3 cursor-default"
+                onMouseEnter={() => setHoveredState(state)}
+                onMouseLeave={() => setHoveredState(null)}
+              >
+                <div className="text-lg font-bold leading-none" style={{ color }}>{val}</div>
+                <div className="text-[7px] text-muted mt-0.5 uppercase tracking-wider leading-none">{label}</div>
               </div>
             ))}
           </div>
 
           <button onClick={handleReset}
-            className="w-full py-2.5 rounded-lg bg-bg3 border border-border text-sm font-semibold text-text hover:bg-bg4 hover:border-border2 transition-all cursor-pointer">
+            className="w-full py-2 rounded-lg bg-bg3 border border-border text-xs font-semibold text-text hover:bg-bg4 hover:border-border2 transition-all cursor-pointer">
             ↺ Recommencer
           </button>
 
           {isSrsReview && selectedTabKey && (
-            <div className={clsx('flex items-center justify-between px-3 py-2.5 rounded-lg border',
+            <div className={clsx('flex items-center justify-between px-3 py-1.5 rounded-lg border',
               checkResult.score >= cfg.grilleThreshold ? 'bg-green/10 border-green/30' : 'bg-red/10 border-red/30')}>
               <div>
-                <div className={clsx('text-[11px] font-bold', checkResult.score >= cfg.grilleThreshold ? 'text-green' : 'text-red')}>
+                <div className={clsx('text-[10px] font-bold', checkResult.score >= cfg.grilleThreshold ? 'text-green' : 'text-red')}>
                   {checkResult.score >= cfg.grilleThreshold ? `✅ Révision réussie (${checkResult.score}%)` : `❌ Score insuffisant (${checkResult.score}% < ${cfg.grilleThreshold}%)`}
                 </div>
-                <div className="text-[9px] text-muted mt-0.5">
+                <div className="text-[8px] text-muted mt-0.5">
                   {checkResult.score >= cfg.grilleThreshold ? 'Intervalle avancé' : 'Intervalle réduit — réessayer demain'}
                 </div>
               </div>
               <button onClick={() => finishSrsReview(selectedTabKey, checkResult.score)}
-                className="flex-shrink-0 px-3 py-1.5 text-[11px] font-semibold rounded border bg-accent border-accent text-white hover:opacity-90 transition-opacity ml-3 cursor-pointer">
+                className="flex-shrink-0 px-2 py-1 text-[10px] font-semibold rounded border bg-accent border-accent text-white hover:opacity-90 transition-opacity ml-3 cursor-pointer">
                 Confirmer →
               </button>
             </div>

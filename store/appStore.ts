@@ -11,7 +11,7 @@ import type {
 
 // ── Persisted (localStorage) ──────────────────────────────
 interface Persisted {
-  rmFileContent: string | null;
+  rmFiles: Record<string, string>; // name → content
   config: Partial<AppConfig>;
   sessions: Session[];
   errors: Record<string, ErrorEntry>;
@@ -36,7 +36,8 @@ interface Ephemeral {
 
 // ── Actions ───────────────────────────────────────────────
 interface Actions {
-  loadRmFile: (content: string) => void;
+  importRmFile: (name: string, content: string) => void;
+  deleteRmFile: (name: string) => void;
   rehydrateRmData: () => void;
   selectTab: (catId: string, tabId: string) => void;
   setMode: (mode: Mode) => void;
@@ -57,22 +58,77 @@ interface Actions {
 
 export type AppStore = Persisted & Ephemeral & Actions;
 
-function parseRmContent(content: string): { rmData: RmData; rangeColors: Record<string, RangeColor> } {
-  const rmData: RmData = JSON.parse(content);
+function mergeRmFiles(files: Record<string, string>): { rmData: RmData; rangeColors: Record<string, RangeColor> } {
+  const merged: RmData = { ranges: {}, categories: { root: { name: 'root', children: [] } } };
   const rangeColors: Record<string, RangeColor> = {};
-  if (rmData.ranges) {
-    for (const [id, r] of Object.entries(rmData.ranges)) {
-      rangeColors[id] = { color: r.color || '#888', name: r.name || id };
+
+  for (const [fileName, content] of Object.entries(files)) {
+    try {
+      const data: RmData = JSON.parse(content);
+      const folderId = fileName.replace(/\.rm$/, '').replace(/[^a-zA-Z0-9]/g, '_');
+      
+      // Add folder to root if not exists
+      if (!merged.categories[folderId]) {
+        merged.categories[folderId] = { name: fileName.replace(/\.rm$/, ''), children: [] };
+        merged.categories.root.children!.push(folderId);
+      }
+
+      // Merge ranges
+      if (data.ranges) {
+        for (const [id, r] of Object.entries(data.ranges)) {
+          merged.ranges[id] = r;
+          rangeColors[id] = { color: r.color || '#888', name: r.name || id };
+        }
+      }
+
+      // Merge categories into folder
+      if (data.categories) {
+        // Map old IDs to new prefixed IDs to avoid collisions
+        const idMap: Record<string, string> = {};
+        for (const oldId of Object.keys(data.categories)) {
+          if (oldId === 'root') continue;
+          idMap[oldId] = `${folderId}__${oldId}`;
+        }
+
+        for (const [oldId, cat] of Object.entries(data.categories)) {
+          if (oldId === 'root') {
+            // Root children from this file go into our folder
+            if (cat.children) {
+              for (const childId of cat.children) {
+                const newId = idMap[childId];
+                if (newId) merged.categories[folderId].children!.push(newId);
+              }
+            }
+            continue;
+          }
+
+          const newId = idMap[oldId];
+          const newCat: Category = { ...cat };
+          if (cat.children) newCat.children = cat.children.map(c => idMap[c]).filter(Boolean);
+          
+          if (cat.tabs) {
+            newCat.tabs = {};
+            for (const [tId, t] of Object.entries(cat.tabs)) {
+              newCat.tabs[tId] = t;
+            }
+          }
+
+          merged.categories[newId] = newCat;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to parse RM file:', fileName, e);
     }
   }
-  return { rmData, rangeColors };
+
+  return { rmData: merged, rangeColors };
 }
 
 export const useAppStore = create<AppStore>()(
   persist(
     (set, get) => ({
       // ── Persisted defaults ────────────────────────────
-      rmFileContent: null,
+      rmFiles: {},
       config: {},
       sessions: [],
       errors: {},
@@ -93,19 +149,27 @@ export const useAppStore = create<AppStore>()(
       calMonth: new Date().getMonth(),
 
       // ── Actions ───────────────────────────────────────
-      loadRmFile: (content) => {
-        try {
-          const { rmData, rangeColors } = parseRmContent(content);
-          set({ rmFileContent: content, rmData, rangeColors });
-        } catch {
-          alert('Fichier .rm invalide');
-        }
+      importRmFile: (name, content) => {
+        set((s) => {
+          const nextFiles = { ...s.rmFiles, [name]: content };
+          const { rmData, rangeColors } = mergeRmFiles(nextFiles);
+          return { rmFiles: nextFiles, rmData, rangeColors };
+        });
+      },
+
+      deleteRmFile: (name) => {
+        set((s) => {
+          const nextFiles = { ...s.rmFiles };
+          delete nextFiles[name];
+          const { rmData, rangeColors } = mergeRmFiles(nextFiles);
+          return { rmFiles: nextFiles, rmData, rangeColors };
+        });
       },
 
       rehydrateRmData: () => {
-        const { rmFileContent, rmData, srs } = get();
+        const { rmFiles, rmData, srs } = get();
 
-        // Clean up legacy interval: -1 proposal entries (migration from old schema)
+        // Clean up legacy interval: -1 proposal entries
         const cleanSrs = { ...srs };
         let changed = false;
         for (const key of Object.keys(cleanSrs)) {
@@ -116,11 +180,9 @@ export const useAppStore = create<AppStore>()(
         }
         if (changed) set({ srs: cleanSrs });
 
-        if (rmFileContent && !rmData) {
-          try {
-            const { rmData: d, rangeColors } = parseRmContent(rmFileContent);
-            set({ rmData: d, rangeColors });
-          } catch { /* ignore */ }
+        if (Object.keys(rmFiles).length > 0 && !rmData) {
+          const { rmData: d, rangeColors } = mergeRmFiles(rmFiles);
+          set({ rmData: d, rangeColors });
         }
       },
 
@@ -249,7 +311,7 @@ export const useAppStore = create<AppStore>()(
     {
       name: 'range-trainer-v5',
       partialize: (s) => ({
-        rmFileContent: s.rmFileContent,
+        rmFiles: s.rmFiles,
         config: s.config,
         sessions: s.sessions,
         errors: s.errors,
