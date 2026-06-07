@@ -6,11 +6,15 @@ import { countCombos, tabKey } from '@/lib/poker';
 import { todayStr, diffDays } from '@/lib/utils';
 import type { Category, SrsEntry } from '@/lib/types';
 
+import { Modal, ModalTitle, ModalBody, ModalActions } from './ui/Modal';
+
 export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings: () => void; onClose?: () => void; onLogout?: () => void }) {
   const { rmData, rmFiles, srs, importRmFile, deleteRmFile, renameRmFile, selectTab, setMode, selectedTabKey } = useAppStore();
   const [search, setSearch] = useState('');
   const [openCats, setOpenCats] = useState<Set<string>>(new Set());
   const [showFiles, setShowFiles] = useState(false);
+  const [pendingFile, setPendingFile] = useState<{ name: string; content: string } | null>(null);
+  const [newFolderName, setNewFolderName] = useState('');
   const dropRef = useRef<HTMLDivElement>(null);
 
   const handleFile = useCallback(
@@ -19,27 +23,32 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
       r.onload = async (e) => {
         const content = e.target?.result as string;
         if (!content) return;
-        
-        let name = prompt('Nom pour ce dossier de ranges ?', f.name.replace(/\.rm$/, ''));
-        if (name === null) return;
-        if (!name) name = f.name.replace(/\.rm$/, '');
-        if (!name.endsWith('.rm')) name += '.rm';
-
-        importRmFile(name, content);
-
-        // Also persist to DB
-        try {
-          await fetch('/api/rm-files', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, content }),
-          });
-        } catch { /* offline — localStorage fallback */ }
+        setPendingFile({ name: f.name.replace(/\.rm$/, ''), content });
+        setNewFolderName('');
       };
       r.readAsText(f);
     },
-    [importRmFile],
+    [],
   );
+
+  const confirmImport = async (targetName: string) => {
+    if (!pendingFile) return;
+    let finalName = targetName;
+    if (!finalName.endsWith('.rm')) finalName += '.rm';
+
+    importRmFile(finalName, pendingFile.content);
+
+    // Also persist to DB
+    try {
+      await fetch('/api/rm-files', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: finalName, content: pendingFile.content }),
+      });
+    } catch { /* offline — localStorage fallback */ }
+    
+    setPendingFile(null);
+  };
 
   const handleDeleteFile = async (name: string) => {
     if (!confirm(`Supprimer le dossier "${name.replace(/\.rm$/, '')}" ?`)) return;
@@ -218,6 +227,65 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
           </button>
         </div>
       )}
+
+      {/* Import Modal */}
+      <Modal open={!!pendingFile} onClose={() => setPendingFile(null)} className="max-w-[360px]">
+        <ModalTitle>📂 Importer des ranges</ModalTitle>
+        <ModalBody>
+          Choisissez un dossier existant pour mettre à jour les ranges, ou créez-en un nouveau.
+        </ModalBody>
+
+        <div className="space-y-3 mb-6 mt-4">
+          {/* Existing folders list */}
+          {Object.keys(rmFiles).length > 0 && (
+            <div className="space-y-1.5">
+              <label className="text-[10px] text-muted uppercase font-bold tracking-wider ml-1">Mettre à jour un dossier</label>
+              <div className="grid grid-cols-1 gap-1 max-h-40 overflow-y-auto no-scrollbar">
+                {Object.keys(rmFiles).map(name => (
+                  <button
+                    key={name}
+                    onClick={() => confirmImport(name)}
+                    className="w-full text-left px-3 py-2 bg-bg3 hover:bg-bg4 rounded border border-border text-[12px] transition-colors font-medium text-text"
+                  >
+                    {name.replace(/\.rm$/, '')}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* New folder input */}
+          <div className="space-y-2 pt-3 border-t border-border">
+            <label className="text-[10px] text-muted uppercase font-bold tracking-wider ml-1">Nouveau dossier</label>
+            <div className="flex gap-2">
+              <input
+                autoFocus
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                placeholder="Ex: Cash Game, MTT..."
+                className="flex-1 bg-bg3 border border-border rounded px-3 py-2 text-[12px] text-text outline-none focus:border-accent/50"
+                onKeyDown={(e) => { if (e.key === 'Enter' && newFolderName.trim()) confirmImport(newFolderName.trim()); }}
+              />
+              <button
+                disabled={!newFolderName.trim()}
+                onClick={() => confirmImport(newFolderName.trim())}
+                className="bg-accent text-white px-4 py-2 rounded text-[11px] font-bold disabled:opacity-50 transition-opacity cursor-pointer whitespace-nowrap"
+              >
+                Créer
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <ModalActions>
+          <button
+            onClick={() => setPendingFile(null)}
+            className="w-full py-2 bg-bg3 hover:bg-bg4 text-muted text-[11px] font-bold rounded transition-colors"
+          >
+            Annuler
+          </button>
+        </ModalActions>
+      </Modal>
     </aside>
   );
 }
