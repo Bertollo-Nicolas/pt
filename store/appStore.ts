@@ -169,16 +169,49 @@ export const useAppStore = create<AppStore>()(
       rehydrateRmData: () => {
         const { rmFiles, rmData, srs } = get();
 
-        // Clean up legacy interval: -1 proposal entries
+        // ── 1. Clean up legacy interval: -1 proposal entries ──
         const cleanSrs = { ...srs };
-        let changed = false;
+        let srsChanged = false;
         for (const key of Object.keys(cleanSrs)) {
           if (cleanSrs[key].interval === -1) {
             delete cleanSrs[key];
-            changed = true;
+            srsChanged = true;
           }
         }
-        if (changed) set({ srs: cleanSrs });
+
+        // ── 2. Handle legacy single-file migration ──
+        // If we have rmFileContent but no rmFiles, migrate it
+        // Note: rmFileContent is not in the Persisted interface anymore, but might be in localStorage
+        const raw = localStorage.getItem('range-trainer-v5');
+        if (raw && Object.keys(rmFiles).length === 0) {
+          try {
+            const parsed = JSON.parse(raw);
+            const legacyContent = parsed.state?.rmFileContent;
+            if (legacyContent && typeof legacyContent === 'string') {
+              const fileName = 'Mes Ranges.rm';
+              const nextFiles = { [fileName]: legacyContent };
+              const { rmData: d, rangeColors } = mergeRmFiles(nextFiles);
+              
+              // Migrate SRS keys if they are legacy (no folder prefix)
+              const folderId = fileName.replace(/\.rm$/, '').replace(/[^a-zA-Z0-9]/g, '_');
+              for (const key of Object.keys(cleanSrs)) {
+                if (!key.includes('__') || key.split('__').length === 2) {
+                  // This looks like a legacy cat__tab key
+                  const entry = cleanSrs[key];
+                  const newKey = `${folderId}__${key}`;
+                  cleanSrs[newKey] = { ...entry, key: newKey };
+                  delete cleanSrs[key];
+                  srsChanged = true;
+                }
+              }
+
+              set({ rmFiles: nextFiles, rmData: d, rangeColors, srs: cleanSrs });
+              return; // Done
+            }
+          } catch (e) { console.error('Migration failed', e); }
+        }
+
+        if (srsChanged) set({ srs: cleanSrs });
 
         if (Object.keys(rmFiles).length > 0 && !rmData) {
           const { rmData: d, rangeColors } = mergeRmFiles(rmFiles);
