@@ -254,8 +254,12 @@ export function GrilleView() {
       )]
     : [];
 
-  const allActionButtons: [string, string][] = [...rawActionButtons, ['Fold', colorOverrides['Fold'] ?? FOLD_COLOR]];
-  const allActionNames = allActionButtons.map(([n]) => n);
+  const allActionButtons = useMemo((): [string, string][] => [
+    ...rawActionButtons,
+    ['Fold', colorOverrides['Fold'] ?? FOLD_COLOR]
+  ], [rawActionButtons, colorOverrides]);
+
+  const allActionNames = useMemo(() => allActionButtons.map(([n]) => n), [allActionButtons]);
 
   // Resize observer for grids
   const updateSizes = useCallback(() => {
@@ -309,7 +313,7 @@ export function GrilleView() {
   // Adjust one action's freq; scale others proportionally
   const adjustFreq = useCallback((name: string, newFreq: number) => {
     setFreqPerAction(prev => redistributeFreqs(prev, name, newFreq, allActionNames));
-  }, [allActionNames.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [allActionNames]);
 
   // ── Painting — apply current freqPerAction snapshot ───────────
 
@@ -322,7 +326,7 @@ export function GrilleView() {
     }
     if (Object.keys(snapshot).length === 0) snapshot['Fold'] = 100;
     setSelected(prev => ({ ...prev, [hand]: snapshot }));
-  }, [checkResult, freqPerAction, allActionButtons]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [checkResult, freqPerAction, allActionButtons]);
 
   const paintCellRef = useRef(paintCell);
   useEffect(() => { paintCellRef.current = paintCell; }, [paintCell]);

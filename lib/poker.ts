@@ -76,8 +76,8 @@ export function normalizeHand(cards: string[]): string {
   const r2 = cards[1][0];
   const s2 = cards[1][1];
 
-  const v1 = RANKS.indexOf(r1);
-  const v2 = RANKS.indexOf(r2);
+  const v1 = RANKS.indexOf(r1 as any);
+  const v2 = RANKS.indexOf(r2 as any);
 
   if (v1 === v2) return r1 + r1;
 
