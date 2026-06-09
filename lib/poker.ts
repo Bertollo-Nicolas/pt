@@ -70,6 +70,22 @@ export function cellType(hand: string): HandType {
   return 'pair';
 }
 
+export function normalizeHand(cards: string[]): string {
+  const r1 = cards[0][0];
+  const s1 = cards[0][1];
+  const r2 = cards[1][0];
+  const s2 = cards[1][1];
+
+  const v1 = RANKS.indexOf(r1);
+  const v2 = RANKS.indexOf(r2);
+
+  if (v1 === v2) return r1 + r1;
+
+  const sorted = v1 < v2 ? [r1, r2] : [r2, r1];
+  const suffix = s1 === s2 ? 's' : 'o';
+  return sorted[0] + sorted[1] + suffix;
+}
+
 export function countCombos(rangeList: RangeEntry[]): number {
   const s = new Set<string>();
   for (const r of rangeList) for (const h of r.hands) s.add(h.split(':')[0]);

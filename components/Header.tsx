@@ -7,6 +7,7 @@ const MODES: { id: Mode; label: string; icon: string }[] = [
   { id: 'flash',  label: 'Flash',  icon: '⚡' },
   { id: 'grille', label: 'Grille', icon: '⊞' },
   { id: 'srs',    label: 'SRS',    icon: '📅' },
+  { id: 'tracker', label: 'Tracker', icon: '📊' },
 ];
 
 export function Header({ onOpenSidebar }: { onOpenSidebar: () => void }) {

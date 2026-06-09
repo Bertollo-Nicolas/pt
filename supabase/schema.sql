@@ -66,3 +66,49 @@ $$ language plpgsql;
 create trigger user_data_updated_at
   before update on public.user_data
   for each row execute procedure public.handle_updated_at();
+
+-- ── preflop_stats ─────────────────────────────────────────────
+-- Agrégation des mains suivies (Day/Pos/Hand/Action)
+create table if not exists public.preflop_stats (
+  id          uuid primary key default uuid_generate_v4(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  day         date not null,
+  position    text not null, -- EP, MP, CO, BTN, SB, BB
+  hand        text not null, -- ex: "AKs", "72o", "JJ"
+  action      text not null, -- "Raise", "Fold", "Call"
+  count       integer not null default 1,
+  net_bb      numeric not null default 0,
+  unique(user_id, day, position, hand, action)
+);
+
+alter table public.preflop_stats enable row level security;
+
+create policy "preflop_stats_select" on public.preflop_stats
+  for select using (auth.uid() = user_id);
+create policy "preflop_stats_insert" on public.preflop_stats
+  for insert with check (auth.uid() = user_id);
+create policy "preflop_stats_update" on public.preflop_stats
+  for update using (auth.uid() = user_id);
+create policy "preflop_stats_delete" on public.preflop_stats
+  for delete using (auth.uid() = user_id);
+
+-- ── upsert_preflop_stat ───────────────────────────────────────
+-- Permet d'incrémenter les stats lors de l'import
+create or replace function public.upsert_preflop_stat(
+  p_user_id uuid,
+  p_day date,
+  p_position text,
+  p_hand text,
+  p_action text,
+  p_count int,
+  p_net_bb numeric
+) returns void as $$
+begin
+  insert into public.preflop_stats (user_id, day, position, hand, action, count, net_bb)
+  values (p_user_id, p_day, p_position, p_hand, p_action, p_count, p_net_bb)
+  on conflict (user_id, day, position, hand, action)
+  do update set
+    count = public.preflop_stats.count + excluded.count,
+    net_bb = public.preflop_stats.net_bb + excluded.net_bb;
+end;
+$$ language plpgsql;

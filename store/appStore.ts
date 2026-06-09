@@ -358,7 +358,15 @@ export const useAppStore = create<AppStore>()(
 
       // Navigate to grille for an SRS review session
       startSrsReview: (key) => {
-        const [catId, tabId] = key.split('__');
+        // SRS keys are folderId__catId__tabId. 
+        // Since the multi-folder update, catId itself is prefixed with folderId (folderId__catId).
+        // So we need to split and take all but the last segment as catId.
+        const parts = key.split('__');
+        if (parts.length < 2) return;
+        
+        const tabId = parts.pop()!;
+        const catId = parts.join('__');
+        
         get().selectTab(catId, tabId);
         set({ srsReviewKey: key, currentMode: 'grille' });
       },

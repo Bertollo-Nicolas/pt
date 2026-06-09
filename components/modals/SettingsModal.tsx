@@ -14,6 +14,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   const [minHands, setMinHands] = useState(cfg.minHands);
   const [grilleThreshold, setGrilleThreshold] = useState(cfg.grilleThreshold);
   const [intervals, setIntervals] = useState(cfg.intervals.join(', '));
+  const [trackerHeroName, setTrackerHeroName] = useState(cfg.trackerHeroName || '');
 
   // Sync with store values when modal opens
   useEffect(() => {
@@ -22,13 +23,14 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
       setMinHands(cfg.minHands);
       setGrilleThreshold(cfg.grilleThreshold);
       setIntervals(cfg.intervals.join(', '));
+      setTrackerHeroName(cfg.trackerHeroName || '');
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSave = () => {
     const parsed = intervals.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n) && n > 0);
     if (parsed.length === 0) return;
-    saveConfig({ threshold, minHands, grilleThreshold, intervals: parsed });
+    saveConfig({ threshold, minHands, grilleThreshold, intervals: parsed, trackerHeroName });
     onClose();
   };
 
@@ -95,6 +97,21 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
             value={intervals}
             onChange={e => setIntervals(e.target.value)}
             placeholder="1, 3, 7, 14, 30, 90"
+            className="w-full bg-bg3 border border-border rounded px-2.5 py-1.5 text-xs text-text placeholder-muted outline-none focus:border-accent"
+          />
+        </div>
+
+        {/* Tracker Hero Name */}
+        <div>
+          <label className="text-[10px] font-bold uppercase tracking-widest text-muted block mb-1.5">
+            Pseudo Tracker (Winamax)
+          </label>
+          <p className="text-[10px] text-muted mb-1.5">Utilisé pour identifier vos mains dans les fichiers d&apos;historique.</p>
+          <input
+            type="text"
+            value={trackerHeroName}
+            onChange={e => setTrackerHeroName(e.target.value)}
+            placeholder="Ex: Hero_Name"
             className="w-full bg-bg3 border border-border rounded px-2.5 py-1.5 text-xs text-text placeholder-muted outline-none focus:border-accent"
           />
         </div>

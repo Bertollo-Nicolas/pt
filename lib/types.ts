@@ -54,7 +54,7 @@ export interface HandItem {
 }
 
 // ── App modes ─────────────────────────────────────────────
-export type Mode = 'flash' | 'grille' | 'srs';
+export type Mode = 'flash' | 'grille' | 'srs' | 'tracker';
 
 // ── Session / Stats ───────────────────────────────────────
 export interface Session {
@@ -97,5 +97,17 @@ export interface AppConfig {
   minHands: number;
   grilleThreshold: number;
   intervals: number[];
-  flashHandFilter: string[] | null; // persisted per-session filter
+  flashHandFilter: string[] | null;
+  trackerHeroName?: string;
+  trackerMappings?: Record<string, string>; // position -> tabKey (folderId__catId__tabId)
+}
+
+// ── Tracker ───────────────────────────────────────────────
+export interface PreflopStat {
+  day: string;
+  position: string;
+  hand: string;
+  action: string;
+  count: number;
+  net_bb: number;
 }

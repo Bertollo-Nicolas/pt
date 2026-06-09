@@ -7,6 +7,7 @@ import { Header } from './Header';
 import { FlashView } from './flash/FlashView';
 import { GrilleView } from './grille/GrilleView';
 import { SrsView } from './srs/SrsView';
+import { TrackerView } from './tracker/TrackerView';
 import { SrsToast } from './ui/SrsToast';
 import { SettingsModal } from './modals/SettingsModal';
 
@@ -28,6 +29,7 @@ export default function RangeTrainer() {
 
   const renderMain = () => {
     if (currentMode === 'srs') return <SrsView />;
+    if (currentMode === 'tracker') return <TrackerView />;
     if (!selectedTab) return <EmptyView />;
     switch (currentMode) {
       case 'flash':  return <FlashView />;
