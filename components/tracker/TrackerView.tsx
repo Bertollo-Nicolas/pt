@@ -3,7 +3,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useAppStore, getCfg } from '@/store/appStore';
 import { parseWinamaxHH } from '@/lib/parser/winamax';
 import { upsertPreflopStats, loadPreflopStats } from '@/lib/db';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase';
 import { Button } from '../ui/Button';
 import type { PreflopStat } from '@/lib/types';
 
@@ -13,7 +13,7 @@ export function TrackerView() {
   const [importing, setImporting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [stats, setStats] = useState<PreflopStat[]>([]);
-  const supabase = createClientComponentClient();
+  const supabase = createClient();
 
   const refreshStats = useCallback(async () => {
     const data = await loadPreflopStats(supabase);
