@@ -89,10 +89,13 @@ function parseHand(text: string, heroName: string): PreflopStat | null {
   let heroHandRaw: string[] = [];
   const dealtLine = lines.find(l => l.startsWith(`Dealt to ${heroName}`));
   if (dealtLine) {
-    const m = dealtLine.match(/\[(.+?) (.+?)\]/);
-    if (m) heroHandRaw = [m[1], m[2]];
+    // Match [As Ks] or [As] or [As, Ks]
+    const m = dealtLine.match(/\[(.+?)\]/);
+    if (m) {
+      heroHandRaw = m[1].split(/[\s,]+/).filter(Boolean);
+    }
   }
-  if (heroHandRaw.length === 0) return null;
+  if (heroHandRaw.length < 2) return null; // Need at least 2 cards for holdem
   const heroHand = normalizeHand(heroHandRaw);
 
   // 5. Action Analysis (Pre-flop RFI)
@@ -104,26 +107,28 @@ function parseHand(text: string, heroName: string): PreflopStat | null {
   
   let rfiSpot = true;
   let heroAction = '';
-  let heroFirstActionLine = -1;
 
   for (let i = 0; i < preflopLines.length; i++) {
     const line = preflopLines[i];
     
-    // Check if someone entered before Hero
-    const playerActionMatch = line.match(/^(.+?) (folds|calls|raises|checks)/);
+    // Skip blind posts that might be in pre-flop section (rare but possible in some formats)
+    if (line.includes('posts small blind') || line.includes('posts big blind')) continue;
+
+    const playerActionMatch = line.match(/^(.+?) (folds|calls|raises|checks|collected|bets)/);
     if (playerActionMatch) {
       const pName = playerActionMatch[1];
       const action = playerActionMatch[2];
       
       if (pName === heroName) {
-        heroFirstActionLine = i;
         if (action === 'raises') heroAction = 'Raise';
         else if (action === 'calls') heroAction = 'Call';
         else if (action === 'folds') heroAction = 'Fold';
         else if (action === 'checks') heroAction = 'Check';
+        else if (action === 'collected') heroAction = 'Fold'; // Everyone folded to us
         break;
       }
       
+      // If someone else did something other than folding, it's not an RFI spot for us
       if (action !== 'folds') {
         rfiSpot = false;
         break;
@@ -131,8 +136,11 @@ function parseHand(text: string, heroName: string): PreflopStat | null {
     }
   }
 
-  // We only care about RFI spots for V1
-  if (!rfiSpot || !heroAction) return null;
+  // Basic validation: did we find an action?
+  if (!heroAction) return null;
+  
+  // We only care about RFI spots for the main stats (for now)
+  if (!rfiSpot) return null;
   // Also, BB can't really RFI in the same sense, but SB can.
   if (heroPos === 'BB' && heroAction === 'Check') return null; // Natural BB behavior
 
