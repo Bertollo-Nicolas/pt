@@ -37,11 +37,22 @@ export function useSync() {
       // Load .rm files from DB
       const rmRes = await fetch('/api/rm-files');
       if (rmRes.ok) {
-        const files: { id: string; name: string }[] = await rmRes.json();
+        const dbFiles: { id: string; name: string }[] = await rmRes.json();
         const { rmFiles } = useAppStore.getState();
         
-        // Find files we don't have locally
-        for (const file of files) {
+        const dbFileNames = new Set(dbFiles.map(f => f.name));
+        const localFileNames = Object.keys(rmFiles);
+
+        // 1. Remove local files that are NOT in DB anymore (deleted on another device)
+        for (const name of localFileNames) {
+          if (!dbFileNames.has(name)) {
+            useAppStore.getState().deleteRmFile(name);
+          }
+        }
+
+        // 2. Fetch or update files from DB
+        for (const file of dbFiles) {
+          // We fetch if it's new locally
           if (!rmFiles[file.name]) {
             const fileRes = await fetch(`/api/rm-files/${file.id}`);
             if (fileRes.ok) {
