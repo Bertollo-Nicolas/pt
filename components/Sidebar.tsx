@@ -16,6 +16,7 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
   const [pendingFile, setPendingFile] = useState<{ name: string; content: string } | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
   const dropRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback(
     (f: File) => {
@@ -24,7 +25,7 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
         const content = e.target?.result as string;
         if (!content) return;
         setPendingFile({ name: f.name.replace(/\.rm$/, ''), content });
-        setNewFolderName('');
+        setNewFolderName(f.name.replace(/\.rm$/, ''));
       };
       r.readAsText(f);
     },
@@ -120,7 +121,7 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
       {/* Upload zone */}
       <div
         ref={dropRef}
-        onClick={() => document.getElementById('rm-file-input')?.click()}
+        onClick={() => fileInputRef.current?.click()}
         onDragOver={(e) => { e.preventDefault(); dropRef.current?.classList.add('border-accent'); }}
         onDragLeave={() => dropRef.current?.classList.remove('border-accent')}
         onDrop={(e) => { e.preventDefault(); dropRef.current?.classList.remove('border-accent'); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); }}
@@ -130,7 +131,7 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
         <p className="text-[10px] text-muted">Cliquer ou glisser-déposer</p>
       </div>
       <input
-        id="rm-file-input"
+        ref={fileInputRef}
         type="file"
         accept=".rm,.json"
         className="hidden"

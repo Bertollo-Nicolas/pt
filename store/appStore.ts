@@ -77,8 +77,9 @@ function mergeRmFiles(files: Record<string, string>): { rmData: RmData; rangeCol
       // Merge ranges
       if (data.ranges) {
         for (const [id, r] of Object.entries(data.ranges) as [string, RangeInfo][]) {
-          merged.ranges[id] = r;
-          rangeColors[id] = { color: r.color || '#888', name: r.name || id };
+          const newRangeId = `${folderId}__${id}`;
+          merged.ranges[newRangeId] = r;
+          rangeColors[newRangeId] = { color: r.color || '#888', name: r.name || id };
         }
       }
 
@@ -110,7 +111,12 @@ function mergeRmFiles(files: Record<string, string>): { rmData: RmData; rangeCol
           if (cat.tabs) {
             newCat.tabs = {};
             for (const [tId, t] of Object.entries(cat.tabs)) {
-              newCat.tabs[tId] = t;
+              // Prefix range IDs in the tab's rangeList
+              const nextRangeList = t.rangeList.map(rl => ({
+                ...rl,
+                id: `${folderId}__${rl.id}`
+              }));
+              newCat.tabs[tId] = { ...t, rangeList: nextRangeList };
             }
           }
 
