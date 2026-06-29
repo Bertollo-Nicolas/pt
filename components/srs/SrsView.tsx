@@ -2,6 +2,8 @@
 import clsx from 'clsx';
 import { useAppStore, getCfg } from '@/store/appStore';
 import { todayStr, diffDays } from '@/lib/utils';
+import { srsIntervalDays } from '@/lib/srs';
+import { LearningInsights } from '@/components/learning/LearningInsights';
 import type { SrsEntry } from '@/lib/types';
 
 export function SrsView() {
@@ -58,6 +60,8 @@ export function SrsView() {
           </p>
         </div>
       )}
+
+      <LearningInsights />
 
       {/* Due today */}
       {due.length > 0 && (
@@ -116,9 +120,10 @@ function SrsCard({ entry, today, cfg, onReview, onRemove }: {
 }) {
   const isDue = entry.nextReview <= today;
   const days = isDue ? 0 : diffDays(today, entry.nextReview);
-  const intervalLabel = entry.interval < cfg.intervals.length
-    ? `${cfg.intervals[entry.interval]}j`
-    : `${cfg.intervals[cfg.intervals.length - 1]}j`;
+  const intervalLabel = `${srsIntervalDays(entry, cfg)}j`;
+  const ease = entry.ease ?? 2.3;
+  const reviews = entry.reviews ?? 0;
+  const lapses = entry.lapses ?? 0;
 
   return (
     <div className={clsx(
@@ -131,6 +136,15 @@ function SrsCard({ entry, today, cfg, onReview, onRemove }: {
           <span>{entry.catName}</span>
           <span>·</span>
           <span>Intervalle: {intervalLabel}</span>
+          {reviews > 0 && (
+            <><span>·</span><span>{reviews} revue{reviews > 1 ? 's' : ''}</span></>
+          )}
+          {lapses > 0 && (
+            <><span>·</span><span className="text-orange">{lapses} échec{lapses > 1 ? 's' : ''}</span></>
+          )}
+          {reviews > 0 && (
+            <><span>·</span><span>Facilité: {ease.toFixed(2)}</span></>
+          )}
           {entry.lastScore != null && (
             <><span>·</span><span>Dernier: {entry.lastScore}%</span></>
           )}

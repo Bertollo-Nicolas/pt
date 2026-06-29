@@ -283,6 +283,7 @@ export function FlashView() {
             focusMode={focusMode}
             compact={false} sessionErrorsRef={sessionErrorsRef} retryQueueRef={retryQueueRef}
             handFilter={handFilter}
+            spotKey={selectedTabKey}
             onAnswer={onAnswer} onRetryCountChange={onRetryCountChange}
           />
         </div>
@@ -298,6 +299,7 @@ export function FlashView() {
               focusMode={focusMode}
               compact sessionErrorsRef={sessionErrorsRef} retryQueueRef={retryQueueRef}
               handFilter={handFilter}
+              spotKey={selectedTabKey}
               onAnswer={onAnswer} onRetryCountChange={onRetryCountChange}
             />
           ))}
@@ -469,13 +471,14 @@ interface FlashPanelProps {
   sessionErrorsRef: MutableRefObject<Map<string, number>>;
   retryQueueRef: MutableRefObject<string[]>;
   handFilter?: Set<string> | null;
+  spotKey: string | null;
   onAnswer: (correct: boolean, partial: boolean) => void;
   onRetryCountChange: () => void;
 }
 
 function FlashPanel({
   selectedTab, allButtons, actionButtons, timerMs, autoNext, paused, focusMode, compact,
-  sessionErrorsRef, retryQueueRef, handFilter, onAnswer, onRetryCountChange,
+  sessionErrorsRef, retryQueueRef, handFilter, spotKey, onAnswer, onRetryCountChange,
 }: FlashPanelProps) {
   const { recordError } = useAppStore();
 
@@ -502,8 +505,8 @@ function FlashPanel({
   useEffect(() => {
     const globalErrors = useAppStore.getState().errors;
     const errorHands = Object.entries(globalErrors)
-      .filter(([, e]) => e.count >= 2)
-      .map(([h]) => h);
+      .filter(([key, e]) => e.count >= 2 && (!spotKey || e.key === spotKey || !e.key || key === e.hand))
+      .map(([, e]) => e.hand);
     if (errorHands.length > 0) {
       retryQueueRef.current = [...new Set([...retryQueueRef.current, ...errorHands])];
       onRetryCountChange();
@@ -604,7 +607,7 @@ function FlashPanel({
     setCardAnim((result.correct || result.partial) ? 'pop' : 'shake');
     setAnimKey(k => k + 1);
 
-    if (!result.correct && !result.partial) recordError(hand.hand, btn.label, result.expected);
+    if (!result.correct && !result.partial) recordError(hand.hand, btn.label, result.expected, spotKey ?? undefined);
 
     if (!result.correct) {
       const prev = sessionErrorsRef.current.get(hand.hand) ?? 0;
@@ -618,7 +621,7 @@ function FlashPanel({
       if (idx !== -1) { retryQueueRef.current.splice(idx, 1); onRetryCountChange(); }
     }
     onAnswer(result.correct, result.partial);
-  }, [hand, clearTimer, selectedTab.rangeMap, sessionErrorsRef, retryQueueRef, onAnswer, onRetryCountChange, recordError]);
+  }, [hand, clearTimer, selectedTab.rangeMap, sessionErrorsRef, retryQueueRef, spotKey, onAnswer, onRetryCountChange, recordError]);
 
   if (!hand) return null;
 

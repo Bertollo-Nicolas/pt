@@ -13,6 +13,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   const [threshold, setThreshold] = useState(cfg.threshold);
   const [minHands, setMinHands] = useState(cfg.minHands);
   const [grilleThreshold, setGrilleThreshold] = useState(cfg.grilleThreshold);
+  const [grilleFreqTolerance, setGrilleFreqTolerance] = useState(cfg.grilleFreqTolerance);
   const [intervals, setIntervals] = useState(cfg.intervals.join(', '));
   const [trackerHeroName, setTrackerHeroName] = useState(cfg.trackerHeroName || '');
 
@@ -22,6 +23,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
       setThreshold(cfg.threshold);
       setMinHands(cfg.minHands);
       setGrilleThreshold(cfg.grilleThreshold);
+      setGrilleFreqTolerance(cfg.grilleFreqTolerance);
       setIntervals(cfg.intervals.join(', '));
       setTrackerHeroName(cfg.trackerHeroName || '');
     }
@@ -30,7 +32,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   const handleSave = () => {
     const parsed = intervals.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n) && n > 0);
     if (parsed.length === 0) return;
-    saveConfig({ threshold, minHands, grilleThreshold, intervals: parsed, trackerHeroName });
+    saveConfig({ threshold, minHands, grilleThreshold, grilleFreqTolerance, intervals: parsed, trackerHeroName });
     onClose();
   };
 
@@ -86,12 +88,26 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
           />
         </div>
 
+        {/* Grille frequency tolerance */}
+        <div>
+          <label className="text-[10px] font-bold uppercase tracking-widest text-muted block mb-1.5">
+            Tolérance fréquences Grille (%)
+          </label>
+          <p className="text-[10px] text-muted mb-1.5">Écart accepté entre votre fréquence et la fréquence attendue.</p>
+          <input
+            type="number" min="0" max="25"
+            value={grilleFreqTolerance}
+            onChange={e => setGrilleFreqTolerance(Number(e.target.value))}
+            className="w-24 bg-bg3 border border-border rounded px-2.5 py-1.5 text-xs text-text outline-none focus:border-accent"
+          />
+        </div>
+
         {/* SRS intervals */}
         <div>
           <label className="text-[10px] font-bold uppercase tracking-widest text-muted block mb-1.5">
             Intervalles SRS (jours)
           </label>
-          <p className="text-[10px] text-muted mb-1.5">Séquence de révisions, séparés par des virgules.</p>
+          <p className="text-[10px] text-muted mb-1.5">Paliers minimum de révision, séparés par des virgules. Le SRS adapte ensuite la date selon le score.</p>
           <input
             type="text"
             value={intervals}

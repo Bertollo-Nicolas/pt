@@ -6,6 +6,7 @@ export const DEFAULT_CFG: AppConfig = {
   threshold: 80,
   minHands: 10,
   grilleThreshold: 80,
+  grilleFreqTolerance: 5,
   intervals: [1, 3, 7, 14, 30, 90],
   flashHandFilter: null,
 };

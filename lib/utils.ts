@@ -7,17 +7,29 @@ export function hexRgba(hex: string, a: number): string {
 }
 
 export function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  return formatLocalDate(new Date());
 }
 
 export function addDays(dateStr: string, n: number): string {
-  const d = new Date(dateStr);
+  const d = parseLocalDate(dateStr);
   d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+  return formatLocalDate(d);
 }
 
 export function diffDays(a: string, b: string): number {
-  return Math.round((new Date(b).getTime() - new Date(a).getTime()) / (1000 * 60 * 60 * 24));
+  return Math.round((parseLocalDate(b).getTime() - parseLocalDate(a).getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function formatLocalDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
 }
 
 export function esc(s: string): string {

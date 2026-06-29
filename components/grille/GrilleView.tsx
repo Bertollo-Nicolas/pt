@@ -4,19 +4,15 @@ import clsx from 'clsx';
 import { useAppStore, getCfg } from '@/store/appStore';
 import { allHands, getNonFoldActions, getHandActions, isMixed, cellType } from '@/lib/poker';
 import { hexRgba, todayStr } from '@/lib/utils';
+import { scoreGrille, type GrilleCheckResult, type GrilleCheckState } from '@/lib/grille-score';
 import type { HandItem, SelectedTab } from '@/lib/types';
 
 const FOLD_COLOR = '#6b7280';
 
 type CellFreqs = Record<string, number>;
 type Selection = Record<string, CellFreqs>;
-type CheckState = 'correct' | 'missed' | 'extra' | 'wrong-action';
-
-interface CheckResult {
-  states: Record<string, CheckState>;
-  correct: number; wrongAct: number; missed: number; extra: number;
-  score: number; pct: number;
-}
+type CheckState = GrilleCheckState;
+type CheckResult = GrilleCheckResult;
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -62,10 +58,6 @@ function redistributeFreqs(
   }
 
   return normalizeTo100(next, allNames);
-}
-
-function cellIsPlayed(freqs: CellFreqs): boolean {
-  return Object.entries(freqs).some(([k, v]) => !k.toUpperCase().includes('FOLD') && v > 0);
 }
 
 function initAllFold(): Selection {
@@ -222,7 +214,7 @@ export function GrilleView() {
   const store = useAppStore();
   const { selectedTab, selectedTabKey, addSession, srs, setPendingSrsKey, pendingSrsKey, srsReviewKey, finishSrsReview } = store;
   const cfg = getCfg(store);
-  const colorOverrides = store.colorOverrides ?? {};
+  const colorOverrides = store.colorOverrides;
 
   const [selected,      setSelected]      = useState<Selection>(() => initAllFold());
   const [checkResult,   setCheckResult]   = useState<CheckResult | null>(null);
@@ -240,19 +232,19 @@ export function GrilleView() {
   const dragMovedRef   = useRef(false);
 
   // Build action buttons: non-fold from file + Fold last
-  const rawActionButtons: [string, string][] = selectedTab
+  const rawActionButtons = useMemo((): [string, string][] => selectedTab
     ? [...new Map(
-        selectedTab.rangeList
-          .filter(rl => rl.hands.length > 0)
-          .map(rl => {
-            const r = store.rangeColors[rl.id];
-            return r && !r.name.toUpperCase().includes('FOLD')
-              ? [r.name, colorOverrides[r.name] ?? r.color] as [string, string]
-              : null;
-          })
-          .filter(Boolean) as [string, string][]
-      )]
-    : [];
+      selectedTab.rangeList
+        .filter(rl => rl.hands.length > 0)
+        .map(rl => {
+          const r = store.rangeColors[rl.id];
+          return r && !r.name.toUpperCase().includes('FOLD')
+            ? [r.name, colorOverrides[r.name] ?? r.color] as [string, string]
+            : null;
+        })
+        .filter(Boolean) as [string, string][]
+    )]
+    : [], [selectedTab, store.rangeColors, colorOverrides]);
 
   const allActionButtons = useMemo((): [string, string][] => [
     ...rawActionButtons,
@@ -366,50 +358,15 @@ export function GrilleView() {
 
   const handleCheck = () => {
     if (!selectedTab) return;
-    let correct = 0, wrongAct = 0, missed = 0, extra = 0;
-    const states: Record<string, CheckState> = {};
-
-    allHands().forEach(({ hand }) => {
-      const nonFoldActs = getNonFoldActions(hand, selectedTab.rangeMap);
-      const inRange = nonFoldActs.length > 0;
-      const played = cellIsPlayed(selected[hand] ?? {});
-
-      if (inRange && played) {
-        const userNonFoldEntries = Object.entries(selected[hand] ?? {}).filter(([k]) => !k.toUpperCase().includes('FOLD'));
-        
-        let isAllCorrect = true;
-        
-        // Check if user played same number of non-fold actions
-        if (userNonFoldEntries.length !== nonFoldActs.length) {
-          isAllCorrect = false;
-        } else {
-          // Check each user action against expected
-          for (const [uAction, uFreq] of userNonFoldEntries) {
-            const expected = nonFoldActs.find(a => a.action === uAction);
-            if (!expected || Math.round(expected.freq * 100) !== uFreq) {
-              isAllCorrect = false;
-              break;
-            }
-          }
-        }
-
-        if (isAllCorrect) {
-          states[hand] = 'correct'; correct++;
-        } else {
-          states[hand] = 'wrong-action'; wrongAct++;
-        }
-      } else if (inRange && !played) {
-        states[hand] = 'missed'; missed++;
-      } else if (!inRange && played) {
-        states[hand] = 'extra'; extra++;
+    const result = scoreGrille(selected, selectedTab.rangeMap, cfg.grilleFreqTolerance);
+    setCheckResult(result);
+    if (selectedTabKey) {
+      for (const err of result.errors) {
+        store.recordError(err.hand, err.given, err.expected, selectedTabKey);
       }
-    });
-
-    const total = correct + wrongAct + missed + extra;
-    const score = total > 0 ? Math.round(correct / total * 100) : 100;
-    setCheckResult({ states, correct, wrongAct, missed, extra, score, pct: Math.round(total / 169 * 100) });
-    addSession({ key: `grille_${selectedTabKey}`, date: todayStr(), name: selectedTab.name, catName: selectedTab.catName, mode: 'grille', score, correct, missed, extra, wrongAct });
-    if (selectedTabKey && !srs[selectedTabKey] && score >= cfg.grilleThreshold && pendingSrsKey !== selectedTabKey) {
+    }
+    addSession({ key: `grille_${selectedTabKey}`, date: todayStr(), name: selectedTab.name, catName: selectedTab.catName, mode: 'grille', score: result.score, correct: result.correct, missed: result.missed, extra: result.extra, wrongAct: result.wrongAct });
+    if (selectedTabKey && !srs[selectedTabKey] && result.score >= cfg.grilleThreshold && pendingSrsKey !== selectedTabKey) {
       setPendingSrsKey(selectedTabKey);
     }
   };
@@ -580,7 +537,7 @@ export function GrilleView() {
                   {checkResult.score >= cfg.grilleThreshold ? `✅ Révision réussie (${checkResult.score}%)` : `❌ Score insuffisant (${checkResult.score}% < ${cfg.grilleThreshold}%)`}
                 </div>
                 <div className="text-[8px] text-muted mt-0.5">
-                  {checkResult.score >= cfg.grilleThreshold ? 'Intervalle avancé' : 'Intervalle réduit — réessayer demain'}
+                  {checkResult.score >= cfg.grilleThreshold ? 'Prochaine date adaptée au score' : 'Révision rapprochée — réessayer demain'}
                 </div>
               </div>
               <button onClick={() => finishSrsReview(selectedTabKey, checkResult.score)}

@@ -74,12 +74,22 @@ create table if not exists public.preflop_stats (
   user_id     uuid not null references auth.users(id) on delete cascade,
   day         date not null,
   position    text not null, -- EP, MP, CO, BTN, SB, BB
+  spot        text not null default '',
   hand        text not null, -- ex: "AKs", "72o", "JJ"
   action      text not null, -- "Raise", "Fold", "Call"
   count       integer not null default 1,
   net_bb      numeric not null default 0,
-  unique(user_id, day, position, hand, action)
+  unique(user_id, day, position, spot, hand, action)
 );
+
+alter table public.preflop_stats
+  add column if not exists spot text not null default '';
+
+alter table public.preflop_stats
+  drop constraint if exists preflop_stats_user_id_day_position_hand_action_key;
+
+create unique index if not exists preflop_stats_user_day_pos_spot_hand_action_idx
+  on public.preflop_stats (user_id, day, position, spot, hand, action);
 
 alter table public.preflop_stats enable row level security;
 
@@ -98,15 +108,16 @@ create or replace function public.upsert_preflop_stat(
   p_user_id uuid,
   p_day date,
   p_position text,
+  p_spot text,
   p_hand text,
   p_action text,
   p_count int,
   p_net_bb numeric
 ) returns void as $$
 begin
-  insert into public.preflop_stats (user_id, day, position, hand, action, count, net_bb)
-  values (p_user_id, p_day, p_position, p_hand, p_action, p_count, p_net_bb)
-  on conflict (user_id, day, position, hand, action)
+  insert into public.preflop_stats (user_id, day, position, spot, hand, action, count, net_bb)
+  values (p_user_id, p_day, p_position, p_spot, p_hand, p_action, p_count, p_net_bb)
+  on conflict (user_id, day, position, spot, hand, action)
   do update set
     count = public.preflop_stats.count + excluded.count,
     net_bb = public.preflop_stats.net_bb + excluded.net_bb;

@@ -4,9 +4,11 @@ import { persist } from 'zustand/middleware';
 import { buildRangeMap, tabKey } from '@/lib/poker';
 import { DEFAULT_CFG, MAX_SESSIONS } from '@/lib/constants';
 import { todayStr, addDays } from '@/lib/utils';
+import { scheduleSrsReview } from '@/lib/srs';
 import type {
   RmData, RangeColor, SelectedTab, Mode,
   Session, ErrorEntry, SrsEntry, AppConfig, Category, RangeInfo,
+  TrackerImportSession,
 } from '@/lib/types';
 
 // ── Persisted (localStorage) ──────────────────────────────
@@ -19,6 +21,7 @@ interface Persisted {
   srs: Record<string, SrsEntry>;
   lastSpot: { catId: string; tabId: string } | null;
   colorOverrides: Record<string, string>; // action name → hex color
+  trackerSessions: TrackerImportSession[];
 }
 
 // ── Ephemeral ─────────────────────────────────────────────
@@ -44,7 +47,7 @@ interface Actions {
   setMode: (mode: Mode) => void;
   saveConfig: (cfg: Partial<AppConfig>) => void;
   addSession: (session: Session) => void;
-  recordError: (hand: string, given: string, expected: string) => void;
+  recordError: (hand: string, given: string, expected: string, spotKey?: string) => void;
   addSrs: (key: string, entry: SrsEntry) => void;
   updateSrs: (key: string, updates: Partial<SrsEntry>) => void;
   removeSrs: (key: string) => void;
@@ -55,6 +58,7 @@ interface Actions {
   finishSrsReview: (key: string, score: number) => void;
   setCalendar: (year: number, month: number) => void;
   saveColorOverride: (name: string, color: string) => void;
+  addTrackerSession: (session: TrackerImportSession) => void;
 }
 
 export type AppStore = Persisted & Ephemeral & Actions;
@@ -143,6 +147,7 @@ export const useAppStore = create<AppStore>()(
       srs: {},
       lastSpot: null,
       colorOverrides: {},
+      trackerSessions: [],
 
       // ── Ephemeral defaults ────────────────────────────
       rmData: null,
@@ -302,28 +307,25 @@ export const useAppStore = create<AppStore>()(
 
       addSession: (session) =>
         set((s) => {
-          const idx = s.sessions.findIndex(x => x.key === session.key && x.date === session.date);
-          let sessions: Session[];
-          if (idx !== -1) {
-            sessions = [...s.sessions];
-            sessions[idx] = session;
-          } else {
-            sessions = [...s.sessions, session];
-          }
+          const createdAt = session.createdAt ?? new Date().toISOString();
+          const id = session.id ?? `${session.key}_${createdAt}`;
+          const sessions = [...s.sessions, { ...session, id, createdAt }];
           return { sessions: sessions.length > MAX_SESSIONS ? sessions.slice(-MAX_SESSIONS) : sessions };
         }),
 
-      recordError: (hand, given, expected) =>
+      recordError: (hand, given, expected, spotKey) =>
         set((s) => {
           const errors = { ...s.errors };
-          const prev = errors[hand] ?? { hand, count: 0, givenActions: {}, expected };
-          errors[hand] = {
+          const selectedTab = get().selectedTab;
+          const errorKey = spotKey ? `${spotKey}__${hand}` : hand;
+          const prev = errors[errorKey] ?? { hand, key: spotKey, name: selectedTab?.name, catName: selectedTab?.catName, count: 0, givenActions: {}, expected };
+          errors[errorKey] = {
             ...prev,
             count: prev.count + 1,
             givenActions: { ...prev.givenActions, [given]: (prev.givenActions[given] ?? 0) + 1 },
             expected,
           };
-          return { errors, heatmap: { ...s.heatmap, [hand]: (s.heatmap[hand] ?? 0) + 1 } };
+          return { errors, heatmap: { ...s.heatmap, [errorKey]: (s.heatmap[errorKey] ?? 0) + 1 } };
         }),
 
       addSrs: (key, entry) => set((s) => ({ srs: { ...s.srs, [key]: entry } })),
@@ -358,6 +360,10 @@ export const useAppStore = create<AppStore>()(
           nextReview: addDays(today, cfg.intervals[0] ?? 1),
           lastScore: null,
           added: today,
+          ease: 2.3,
+          reviews: 0,
+          lapses: 0,
+          streak: 0,
         });
         set({ pendingSrsKey: null });
       },
@@ -385,20 +391,7 @@ export const useAppStore = create<AppStore>()(
         if (!entry) { set({ srsReviewKey: null, currentMode: 'srs' }); return; }
 
         const today = todayStr();
-        if (score >= cfg.grilleThreshold) {
-          const nextIdx = Math.min(entry.interval + 1, cfg.intervals.length - 1);
-          get().updateSrs(key, {
-            lastScore: score,
-            interval: nextIdx,
-            nextReview: addDays(today, cfg.intervals[nextIdx]),
-          });
-        } else {
-          get().updateSrs(key, {
-            lastScore: score,
-            interval: Math.max(0, entry.interval - 1),
-            nextReview: addDays(today, cfg.intervals[0] ?? 1),
-          });
-        }
+        get().updateSrs(key, scheduleSrsReview(entry, score, cfg, today));
         set({ srsReviewKey: null, currentMode: 'srs' });
       },
 
@@ -406,6 +399,9 @@ export const useAppStore = create<AppStore>()(
 
       saveColorOverride: (name, color) =>
         set(s => ({ colorOverrides: { ...s.colorOverrides, [name]: color } })),
+
+      addTrackerSession: (session) =>
+        set(s => ({ trackerSessions: [...s.trackerSessions, session].slice(-50) })),
     }),
     {
       name: 'range-trainer-v5',
@@ -418,6 +414,7 @@ export const useAppStore = create<AppStore>()(
         srs: s.srs,
         lastSpot: s.lastSpot,
         colorOverrides: s.colorOverrides,
+        trackerSessions: s.trackerSessions,
       }),
     },
   ),

@@ -58,8 +58,10 @@ export type Mode = 'flash' | 'grille' | 'srs' | 'tracker';
 
 // ── Session / Stats ───────────────────────────────────────
 export interface Session {
+  id?: string;
   key: string;
   date: string;
+  createdAt?: string;
   name: string;
   catName: string;
   mode: 'flash' | 'grille';
@@ -75,6 +77,9 @@ export interface Session {
 
 export interface ErrorEntry {
   hand: string;
+  key?: string;
+  name?: string;
+  catName?: string;
   count: number;
   givenActions: Record<string, number>;
   expected: string;
@@ -89,6 +94,11 @@ export interface SrsEntry {
   nextReview: string; // ISO date string YYYY-MM-DD
   lastScore: number | null;
   added: string;
+  lastReview?: string;
+  ease?: number;
+  reviews?: number;
+  lapses?: number;
+  streak?: number;
 }
 
 // ── Settings ──────────────────────────────────────────────
@@ -96,6 +106,7 @@ export interface AppConfig {
   threshold: number;
   minHands: number;
   grilleThreshold: number;
+  grilleFreqTolerance: number;
   intervals: number[];
   flashHandFilter: string[] | null;
   trackerHeroName?: string;
@@ -106,8 +117,18 @@ export interface AppConfig {
 export interface PreflopStat {
   day: string;
   position: string;
+  spot: string;
   hand: string;
   action: string;
   count: number;
   net_bb: number;
+}
+
+export interface TrackerImportSession {
+  id: string;
+  name: string;
+  importedAt: string;
+  fileCount: number;
+  handCount: number;
+  stats: PreflopStat[];
 }

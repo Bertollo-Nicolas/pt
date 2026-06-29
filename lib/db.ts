@@ -84,7 +84,7 @@ export async function upsertPreflopStats(
   // Aggregate
   const agg: Record<string, PreflopStat> = {};
   for (const s of stats) {
-    const key = `${s.day}__${s.position}__${s.hand}__${s.action}`;
+    const key = `${s.day}__${s.position}__${s.spot}__${s.hand}__${s.action}`;
     if (!agg[key]) {
       agg[key] = { ...s };
     } else {
@@ -103,6 +103,7 @@ export async function upsertPreflopStats(
           p_user_id: userId,
           p_day: s.day,
           p_position: s.position,
+          p_spot: s.spot,
           p_hand: s.hand,
           p_action: s.action,
           p_count: s.count,
@@ -114,6 +115,6 @@ export async function upsertPreflopStats(
 }
 
 export async function loadPreflopStats(supabase: SupabaseClient): Promise<PreflopStat[]> {
-  const { data } = await supabase.from('preflop_stats').select('day, position, hand, action, count, net_bb');
-  return (data ?? []) as PreflopStat[];
+  const { data } = await supabase.from('preflop_stats').select('day, position, spot, hand, action, count, net_bb');
+  return ((data ?? []) as PreflopStat[]).map(s => ({ ...s, spot: s.spot || `${s.position} imported` }));
 }
