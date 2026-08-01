@@ -85,7 +85,7 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
   };
 
   const today = todayStr();
-  const dueCount = Object.values(srs).filter((e: SrsEntry) => e.nextReview <= today).length;
+  const dueCount = Object.values(srs).filter((e: SrsEntry) => e.nextReview <= today || e.drillRequired).length;
 
   return (
     <aside className="bg-bg2 border-r border-border flex flex-col overflow-hidden h-full">

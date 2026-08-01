@@ -4,7 +4,7 @@ import { persist } from 'zustand/middleware';
 import { buildRangeMap, tabKey } from '@/lib/poker';
 import { DEFAULT_CFG, MAX_SESSIONS } from '@/lib/constants';
 import { todayStr, addDays } from '@/lib/utils';
-import { scheduleSrsReview } from '@/lib/srs';
+import { scheduleSrsReview, SRS_DRILL_HANDS, srsNeedsDrill } from '@/lib/srs';
 import type {
   RmData, RangeColor, SelectedTab, Mode,
   Session, ErrorEntry, SrsEntry, AppConfig, Category, RangeInfo,
@@ -55,6 +55,8 @@ interface Actions {
   setPendingSrsKey: (key: string | null) => void;
   confirmSrsProposal: (key: string) => void;
   startSrsReview: (key: string) => void;
+  startSrsDrill: (key: string) => void;
+  progressSrsDrill: (key: string) => void;
   finishSrsReview: (key: string, score: number) => void;
   setCalendar: (year: number, month: number) => void;
   saveColorOverride: (name: string, color: string) => void;
@@ -364,12 +366,20 @@ export const useAppStore = create<AppStore>()(
           reviews: 0,
           lapses: 0,
           streak: 0,
+          consecutiveFailures: 0,
+          drillRequired: false,
+          drillProgress: 0,
         });
         set({ pendingSrsKey: null });
       },
 
       // Navigate to grille for an SRS review session
       startSrsReview: (key) => {
+        const entry = get().srs[key];
+        if (entry && srsNeedsDrill(entry)) {
+          get().startSrsDrill(key);
+          return;
+        }
         // SRS keys are folderId__catId__tabId. 
         // Since the multi-folder update, catId itself is prefixed with folderId (folderId__catId).
         // So we need to split and take all but the last segment as catId.
@@ -382,6 +392,33 @@ export const useAppStore = create<AppStore>()(
         get().selectTab(catId, tabId);
         set({ srsReviewKey: key, currentMode: 'grille' });
       },
+
+      startSrsDrill: (key) => {
+        const entry = get().srs[key];
+        if (!entry || !srsNeedsDrill(entry)) return;
+        const parts = key.split('__');
+        if (parts.length < 2) return;
+        const tabId = parts.pop()!;
+        const catId = parts.join('__');
+        get().selectTab(catId, tabId);
+        set({ srsReviewKey: null, currentMode: 'flash' });
+      },
+
+      progressSrsDrill: (key) => set((s) => {
+        const entry = s.srs[key];
+        if (!entry || !srsNeedsDrill(entry)) return s;
+        const drillProgress = Math.min(SRS_DRILL_HANDS, (entry.drillProgress ?? 0) + 1);
+        return {
+          srs: {
+            ...s.srs,
+            [key]: {
+              ...entry,
+              drillProgress,
+              drillCompletedAt: drillProgress === SRS_DRILL_HANDS ? new Date().toISOString() : entry.drillCompletedAt,
+            },
+          },
+        };
+      }),
 
       // Called from GrilleView after Vérifier when in SRS review mode
       finishSrsReview: (key, score) => {

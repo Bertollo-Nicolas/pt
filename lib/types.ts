@@ -99,6 +99,11 @@ export interface SrsEntry {
   reviews?: number;
   lapses?: number;
   streak?: number;
+  consecutiveFailures?: number;
+  drillRequired?: boolean;
+  drillProgress?: number;
+  drillStartedAt?: string;
+  drillCompletedAt?: string;
 }
 
 // ── Settings ──────────────────────────────────────────────

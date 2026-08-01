@@ -4,6 +4,16 @@ import { addDays, clamp } from './utils';
 const DEFAULT_EASE = 2.3;
 const MIN_EASE = 1.3;
 const MAX_EASE = 3.0;
+export const SRS_FAILURES_BEFORE_DRILL = 3;
+export const SRS_DRILL_HANDS = 50;
+
+export function srsDrillProgress(entry: SrsEntry): number {
+  return Math.min(SRS_DRILL_HANDS, Math.max(0, entry.drillProgress ?? 0));
+}
+
+export function srsNeedsDrill(entry: SrsEntry): boolean {
+  return Boolean(entry.drillRequired) && srsDrillProgress(entry) < SRS_DRILL_HANDS;
+}
 
 export function srsIntervalDays(entry: SrsEntry, cfg: AppConfig): number {
   const intervals = cfg.intervals.length > 0 ? cfg.intervals : [1];
@@ -30,6 +40,9 @@ export function scheduleSrsReview(
     const nextIdx = Math.max(0, entry.interval - (severeMiss ? 2 : 1));
     const nextEase = clamp(ease - (severeMiss ? 0.25 : 0.15), MIN_EASE, MAX_EASE);
 
+    const consecutiveFailures = (entry.consecutiveFailures ?? 0) + 1;
+    const drillRequired = consecutiveFailures >= SRS_FAILURES_BEFORE_DRILL;
+
     return {
       lastScore: score,
       lastReview: today,
@@ -39,6 +52,11 @@ export function scheduleSrsReview(
       reviews: reviews + 1,
       lapses: lapses + 1,
       streak: 0,
+      consecutiveFailures,
+      drillRequired,
+      drillProgress: drillRequired ? 0 : (entry.drillProgress ?? 0),
+      drillStartedAt: drillRequired ? today : entry.drillStartedAt,
+      drillCompletedAt: drillRequired ? undefined : entry.drillCompletedAt,
     };
   }
 
@@ -70,5 +88,10 @@ export function scheduleSrsReview(
     reviews: reviews + 1,
     lapses,
     streak: streak + 1,
+    consecutiveFailures: 0,
+    drillRequired: false,
+    drillProgress: 0,
+    drillStartedAt: undefined,
+    drillCompletedAt: undefined,
   };
 }
