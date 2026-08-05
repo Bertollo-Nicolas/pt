@@ -1,11 +1,11 @@
 'use client';
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, type CSSProperties } from 'react';
 import { useAppStore, getCfg } from '@/store/appStore';
 import { parseWinamaxHH } from '@/lib/parser/winamax';
 import { upsertPreflopStats, loadPreflopStats } from '@/lib/db';
 import { createClient } from '@/lib/supabase';
-import { buildRangeMap } from '@/lib/poker';
-import { aggregateStats, buildTrackerReport, commonTrackerSpots, type TrackerDeviation } from '@/lib/tracker-analysis';
+import { allHands, buildRangeMap, getDecisionActions, isFoldAction } from '@/lib/poker';
+import { buildTrackerRangeReports, commonTrackerSpots, type TrackerHandReport, type TrackerRangeReport } from '@/lib/tracker-analysis';
 import { suggestTrackerMappings } from '@/lib/tracker-mapping';
 import type { Category, PreflopStat, RmData } from '@/lib/types';
 
@@ -19,12 +19,15 @@ interface RangeOption {
 export function TrackerView() {
   const store = useAppStore();
   const cfg = getCfg(store);
-  const { rmData, rangeColors, saveConfig, trackerSessions, addTrackerSession } = store;
+  const { rmData, rangeColors, saveConfig } = store;
   const [importing, setImporting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [stats, setStats] = useState<PreflopStat[]>([]);
   const [reportMode, setReportMode] = useState<'session' | 'global'>('session');
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [selectedRangeKey, setSelectedRangeKey] = useState<string | null>(null);
+  const [errorFilter, setErrorFilter] = useState<'all' | 'missed' | 'extra' | 'different'>('all');
+  const [selectedHand, setSelectedHand] = useState<string | null>(null);
   const supabase = createClient();
 
   const refreshStats = useCallback(async () => {
@@ -65,17 +68,8 @@ export function TrackerView() {
         }
       }
       if (sessionStats.length > 0) {
-        const importedAt = new Date().toISOString();
-        const session = {
-          id: `tracker_${importedAt}`,
-          name: `Session ${new Date(importedAt).toLocaleString('fr-FR')}`,
-          importedAt,
-          fileCount: files.length,
-          handCount: totalParsed,
-          stats: aggregateStats(sessionStats),
-        };
-        addTrackerSession(session);
-        setSelectedSessionId(session.id);
+        const newestDay = [...new Set(sessionStats.map(stat => stat.day))].sort().at(-1) ?? null;
+        setSelectedDay(newestDay);
         setReportMode('session');
       }
       setStatus(`Importation terminée : ${totalParsed} mains analysées.`);
@@ -86,10 +80,8 @@ export function TrackerView() {
     } finally {
       setImporting(false);
     }
-  }, [cfg.trackerHeroName, supabase, refreshStats, addTrackerSession]);
+  }, [cfg.trackerHeroName, supabase, refreshStats]);
 
-  const totalHands = stats.reduce((acc, s) => acc + s.count, 0);
-  const totalNet = stats.reduce((acc, s) => acc + s.net_bb, 0);
   const mappings = useMemo(() => cfg.trackerMappings ?? {}, [cfg.trackerMappings]);
 
   const rangeOptions = useMemo(() => buildRangeOptions(rmData), [rmData]);
@@ -102,6 +94,10 @@ export function TrackerView() {
     }
     return result;
   }, [rmData, rangeColors, rangeOptions]);
+  const rangeLabels = useMemo(
+    () => Object.fromEntries(rangeOptions.map(option => [option.key, option.label])),
+    [rangeOptions],
+  );
 
   const spotKeys = useMemo(() => {
     const keys = [...new Set([...commonTrackerSpots(), ...stats.flatMap(s => [s.spot, s.position]).filter(Boolean)])];
@@ -121,12 +117,21 @@ export function TrackerView() {
     [mappingSuggestions, mappings],
   );
 
-  const selectedSession = trackerSessions.find(s => s.id === selectedSessionId) ?? trackerSessions[trackerSessions.length - 1] ?? null;
-  const reportStats = reportMode === 'session' && selectedSession ? selectedSession.stats : stats;
-  const report = useMemo(() => buildTrackerReport(reportStats, mappings, rangeMaps), [reportStats, mappings, rangeMaps]);
-
-  const mappedHands = report.mappedHands;
-  const deviationHands = report.deviationHands;
+  const sessionDays = useMemo(() => [...new Set(stats.map(stat => stat.day))].sort().reverse(), [stats]);
+  const activeDay = selectedDay ?? sessionDays[0] ?? null;
+  const reportStats = useMemo(
+    () => reportMode === 'session' && activeDay ? stats.filter(stat => stat.day === activeDay) : stats,
+    [reportMode, activeDay, stats],
+  );
+  const rangeReports = useMemo(
+    () => buildTrackerRangeReports(reportStats, mappings, rangeMaps, rangeLabels),
+    [reportStats, mappings, rangeMaps, rangeLabels],
+  );
+  const totalHands = reportStats.reduce((acc, stat) => acc + stat.count, 0);
+  const totalNet = reportStats.reduce((acc, stat) => acc + stat.net_bb, 0);
+  const selectedRange = rangeReports.find(report => report.rangeKey === selectedRangeKey) ?? null;
+  const mappedHands = rangeReports.reduce((sum, report) => sum + report.total, 0);
+  const deviationHands = rangeReports.reduce((sum, report) => sum + report.errors, 0);
 
   const updateMapping = (key: string, value: string) => {
     const next = { ...mappings };
@@ -202,8 +207,8 @@ export function TrackerView() {
       </div>
 
       {rangeOptions.length > 0 && (
-        <div className="mt-8 bg-bg2 border border-border rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-border">
+        <details className="mt-8 bg-bg2 border border-border rounded-xl overflow-hidden">
+          <summary className="px-5 py-4 cursor-pointer select-none">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-bold uppercase tracking-wider">Mapping en amont</h3>
@@ -218,7 +223,7 @@ export function TrackerView() {
                 </button>
               )}
             </div>
-          </div>
+          </summary>
           <div className="divide-y divide-border max-h-[360px] overflow-y-auto">
             {spotKeys.map(key => (
               <div key={key} className="px-5 py-3 flex items-center gap-3">
@@ -244,10 +249,10 @@ export function TrackerView() {
               </div>
             ))}
           </div>
-        </div>
+        </details>
       )}
 
-      {trackerSessions.length > 0 && (
+      {sessionDays.length > 0 && (
         <div className="mt-8 bg-bg2 border border-border rounded-xl p-4">
           <div className="flex items-center gap-2 mb-3">
             <button
@@ -264,19 +269,21 @@ export function TrackerView() {
             </button>
             {reportMode === 'session' && (
               <select
-                value={selectedSession?.id ?? ''}
-                onChange={e => setSelectedSessionId(e.target.value)}
+                value={activeDay ?? ''}
+                onChange={e => { setSelectedDay(e.target.value); setSelectedRangeKey(null); }}
                 className="ml-auto max-w-[280px] bg-bg3 border border-border rounded px-2.5 py-1.5 text-xs text-text outline-none focus:border-accent"
               >
-                {trackerSessions.slice().reverse().map(s => (
-                  <option key={s.id} value={s.id}>{s.name} · {s.handCount} mains</option>
+                {sessionDays.map(day => (
+                  <option key={day} value={day}>
+                    {new Date(`${day}T12:00:00`).toLocaleDateString('fr-FR')} · {stats.filter(stat => stat.day === day).reduce((sum, stat) => sum + stat.count, 0)} mains
+                  </option>
                 ))}
               </select>
             )}
           </div>
           <div className="text-[11px] text-muted">
-            {reportMode === 'session' && selectedSession
-              ? `${selectedSession.fileCount} fichier(s), ${selectedSession.handCount} main(s) importées`
+            {reportMode === 'session' && activeDay
+              ? `Session du ${new Date(`${activeDay}T12:00:00`).toLocaleDateString('fr-FR')} · ${reportStats.reduce((sum, stat) => sum + stat.count, 0)} main(s)`
               : `${totalHands} main(s) agrégées au global`}
           </div>
         </div>
@@ -295,36 +302,32 @@ export function TrackerView() {
         </div>
       )}
 
-      {report.missing.length > 0 && (
+      {rangeReports.length > 0 && (
         <div className="mt-8 bg-bg2 border border-border rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-border">
-            <h3 className="text-sm font-bold uppercase tracking-wider">Missing combos</h3>
-            <p className="text-[11px] text-muted mt-1">Mains foldées alors que la range attend une action.</p>
+            <h3 className="text-sm font-bold uppercase tracking-wider">Erreurs par range</h3>
+            <p className="text-[11px] text-muted mt-1">Cliquez sur une range pour comparer visuellement votre jeu à la stratégie originale.</p>
           </div>
-          <DeviationTable deviations={report.missing.slice(0, 40)} />
+          <RangeReportTable reports={rangeReports} selectedKey={selectedRangeKey} onSelect={key => {
+            setSelectedRangeKey(key);
+            setSelectedHand(null);
+            setErrorFilter('all');
+          }} />
         </div>
       )}
 
-      {report.extra.length > 0 && (
-        <div className="mt-8 bg-bg2 border border-border rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-border">
-            <h3 className="text-sm font-bold uppercase tracking-wider">Combos hors range</h3>
-            <p className="text-[11px] text-muted mt-1">Mains jouées alors que la range attend Fold.</p>
-          </div>
-          <DeviationTable deviations={report.extra.slice(0, 40)} />
-        </div>
+      {selectedRange && rangeMaps[selectedRange.rangeKey] && (
+        <RangeErrorDetail
+          report={selectedRange}
+          rangeMap={rangeMaps[selectedRange.rangeKey]}
+          filter={errorFilter}
+          onFilter={setErrorFilter}
+          selectedHand={selectedHand}
+          onSelectHand={setSelectedHand}
+        />
       )}
 
-      {report.deviations.filter(d => d.type === 'different').length > 0 && (
-        <div className="mt-8 bg-bg2 border border-border rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-border">
-            <h3 className="text-sm font-bold uppercase tracking-wider">Actions différentes</h3>
-          </div>
-          <DeviationTable deviations={report.deviations.filter(d => d.type === 'different').slice(0, 40)} />
-        </div>
-      )}
-
-      {stats.length > 0 && (
+      {reportStats.length > 0 && (
         <div className="mt-8 bg-bg2 border border-border rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-border">
             <h3 className="text-sm font-bold uppercase tracking-wider">Résumé par Position</h3>
@@ -340,7 +343,7 @@ export function TrackerView() {
             </thead>
             <tbody className="divide-y divide-border">
               {['HJ', 'CO', 'BTN', 'SB', 'BB'].map(pos => {
-                const posStats = stats.filter(s => s.position === pos);
+                const posStats = reportStats.filter(s => s.position === pos);
                 const count = posStats.reduce((acc, s) => acc + s.count, 0);
                 if (count === 0) return null;
                 const vpipCount = posStats.filter(s => s.action !== 'Fold' && s.action !== 'Check').reduce((acc, s) => acc + s.count, 0);
@@ -364,35 +367,172 @@ export function TrackerView() {
   );
 }
 
-function DeviationTable({ deviations }: { deviations: TrackerDeviation[] }) {
+function RangeReportTable({ reports, selectedKey, onSelect }: {
+  reports: TrackerRangeReport[];
+  selectedKey: string | null;
+  onSelect: (key: string) => void;
+}) {
   return (
     <table className="w-full text-left text-xs">
       <thead>
         <tr className="bg-bg3/50 text-muted uppercase tracking-widest text-[9px]">
-          <th className="px-5 py-3 font-bold">Spot</th>
-          <th className="px-5 py-3 font-bold">Main</th>
-          <th className="px-5 py-3 font-bold">Joué</th>
           <th className="px-5 py-3 font-bold">Range</th>
-          <th className="px-5 py-3 font-bold text-center">Nb</th>
-          <th className="px-5 py-3 font-bold text-right">Net BB</th>
+          <th className="px-3 py-3 font-bold text-center">Mains</th>
+          <th className="px-3 py-3 font-bold text-center">Erreurs</th>
+          <th className="px-3 py-3 font-bold text-center">Taux</th>
+          <th className="px-3 py-3 font-bold text-center">Manquées</th>
+          <th className="px-3 py-3 font-bold text-center">Hors range</th>
+          <th className="px-3 py-3 font-bold text-center">Action</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-border">
-        {deviations.map(d => (
-          <tr key={d.key} className="hover:bg-bg3/30 transition-colors">
-            <td className="px-5 py-3 text-muted">{d.spot}</td>
-            <td className="px-5 py-3 font-bold">{d.hand}</td>
-            <td className="px-5 py-3">{d.action}</td>
-            <td className="px-5 py-3">{d.expected}</td>
-            <td className="px-5 py-3 text-center">{d.count}</td>
-            <td className={`px-5 py-3 text-right font-mono ${d.net_bb >= 0 ? 'text-green' : 'text-red'}`}>
-              {d.net_bb > 0 ? '+' : ''}{d.net_bb.toFixed(1)}
+        {reports.map(report => (
+          <tr key={report.rangeKey} onClick={() => onSelect(report.rangeKey)}
+            className={`cursor-pointer transition-colors ${selectedKey === report.rangeKey ? 'bg-accent/10' : 'hover:bg-bg3/30'}`}>
+            <td className="px-5 py-3">
+              <div className="font-bold">{report.label}</div>
+              <div className="text-[9px] text-muted mt-0.5 truncate max-w-[360px]">{report.spots.join(' · ')}</div>
             </td>
+            <td className="px-3 py-3 text-center">{report.total}</td>
+            <td className="px-3 py-3 text-center font-bold text-orange">{report.errors}</td>
+            <td className="px-3 py-3 text-center">{report.total ? Math.round(report.errors / report.total * 100) : 0}%</td>
+            <td className="px-3 py-3 text-center text-red">{report.missed}</td>
+            <td className="px-3 py-3 text-center text-orange">{report.extra}</td>
+            <td className="px-3 py-3 text-center text-blue">{report.different}</td>
           </tr>
         ))}
       </tbody>
     </table>
   );
+}
+
+function RangeErrorDetail({ report, rangeMap, filter, onFilter, selectedHand, onSelectHand }: {
+  report: TrackerRangeReport;
+  rangeMap: ReturnType<typeof buildRangeMap>;
+  filter: 'all' | 'missed' | 'extra' | 'different';
+  onFilter: (filter: 'all' | 'missed' | 'extra' | 'different') => void;
+  selectedHand: string | null;
+  onSelectHand: (hand: string) => void;
+}) {
+  const handReport = selectedHand ? report.hands[selectedHand] : null;
+  const filters: Array<{ key: typeof filter; label: string; count: number }> = [
+    { key: 'all', label: 'Toutes', count: report.errors },
+    { key: 'missed', label: 'Manquées', count: report.missed },
+    { key: 'extra', label: 'Hors range', count: report.extra },
+    { key: 'different', label: 'Mauvaise action', count: report.different },
+  ];
+
+  return (
+    <div className="mt-4 bg-bg2 border border-border rounded-xl p-4">
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <h3 className="text-sm font-bold">{report.label}</h3>
+          <p className="text-[10px] text-muted mt-0.5">{report.total} décisions · {report.errors} erreurs · {report.spots.length} spot(s)</p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-1">
+          {filters.map(item => (
+            <button key={item.key} onClick={() => onFilter(item.key)}
+              className={`px-2 py-1 rounded border text-[10px] ${filter === item.key ? 'bg-accent border-accent text-white' : 'border-border text-muted hover:text-text'}`}>
+              {item.label} {item.count}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <TrackerGrid title="Range originale" rangeMap={rangeMap} report={report} mode="original" filter={filter} selectedHand={selectedHand} onSelectHand={onSelectHand} />
+        <TrackerGrid title="Votre jeu / erreurs" rangeMap={rangeMap} report={report} mode="errors" filter={filter} selectedHand={selectedHand} onSelectHand={onSelectHand} />
+      </div>
+
+      <div className="flex flex-wrap gap-3 text-[9px] text-muted mt-3">
+        <Legend color="#e05555" label="Main manquée" />
+        <Legend color="#e09540" label="Hors range" />
+        <Legend color="#6c63ff" label="Mauvaise action" />
+        <Legend color="#2ecc8a" label="Correct" />
+        <Legend color="#3a3a46" label="Non observée" />
+      </div>
+
+      {handReport && <HandReportDetail report={handReport} />}
+    </div>
+  );
+}
+
+function TrackerGrid({ title, rangeMap, report, mode, filter, selectedHand, onSelectHand }: {
+  title: string;
+  rangeMap: ReturnType<typeof buildRangeMap>;
+  report: TrackerRangeReport;
+  mode: 'original' | 'errors';
+  filter: 'all' | 'missed' | 'extra' | 'different';
+  selectedHand: string | null;
+  onSelectHand: (hand: string) => void;
+}) {
+  return (
+    <div>
+      <div className="text-[9px] text-muted uppercase tracking-wider mb-1.5 text-center">{title}</div>
+      <div className="grid gap-px bg-bg3 p-1 rounded-lg" style={{ gridTemplateColumns: 'repeat(13, minmax(0, 1fr))' }}>
+        {allHands().map(({ hand }) => {
+          const observed = report.hands[hand];
+          const visible = filter === 'all' || Boolean(observed?.[filter]);
+          const style = mode === 'original' ? originalCellStyle(hand, rangeMap) : errorCellStyle(observed);
+          return (
+            <button key={hand} onClick={() => onSelectHand(hand)} title={hand}
+              className={`aspect-square min-w-0 rounded-sm flex items-center justify-center font-bold text-[7px] border transition-all ${selectedHand === hand ? 'ring-2 ring-white z-10' : ''}`}
+              style={{ ...style, opacity: mode === 'errors' && !visible ? 0.18 : 1 }}>
+              {hand}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function originalCellStyle(hand: string, rangeMap: ReturnType<typeof buildRangeMap>): CSSProperties {
+  const decisions = getDecisionActions(hand, rangeMap).filter(action => !isFoldAction(action.action));
+  if (decisions.length === 0) return { background: '#25252d', borderColor: '#353540', color: '#777789' };
+  if (decisions.length === 1) return { background: `${decisions[0].color}88`, borderColor: decisions[0].color, color: '#fff' };
+  let position = 0;
+  const total = decisions.reduce((sum, action) => sum + action.freq, 0);
+  const stops: string[] = [];
+  for (const action of decisions) {
+    const end = position + action.freq / total * 100;
+    stops.push(`${action.color}aa ${position}%`, `${action.color}aa ${end}%`);
+    position = end;
+  }
+  return { background: `linear-gradient(90deg, ${stops.join(',')})`, borderColor: decisions[0].color, color: '#fff' };
+}
+
+function errorCellStyle(report?: TrackerHandReport): CSSProperties {
+  if (!report) return { background: '#25252d', borderColor: '#353540', color: '#777789' };
+  if (report.different > 0) return { background: '#6c63ff99', borderColor: '#6c63ff', color: '#fff' };
+  if (report.extra > 0) return { background: '#e0954099', borderColor: '#e09540', color: '#fff' };
+  if (report.missed > 0) return { background: '#e0555599', borderColor: '#e05555', color: '#fff' };
+  return { background: '#2ecc8a66', borderColor: '#2ecc8a', color: '#fff' };
+}
+
+function HandReportDetail({ report }: { report: TrackerHandReport }) {
+  return (
+    <div className="mt-4 bg-bg3 border border-border rounded-lg p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-lg font-bold">{report.hand}</div>
+        <div className="text-[10px] text-muted">{report.total} occurrence(s) · {report.errors} erreur(s) · {report.net_bb.toFixed(1)} BB</div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2 text-[11px]">
+        <div>
+          <div className="text-[9px] uppercase tracking-wider text-muted mb-1">Range attendue</div>
+          {report.expected.map(action => <div key={action.action}>{action.action} · {Math.round(action.freq * 100)}%</div>)}
+        </div>
+        <div>
+          <div className="text-[9px] uppercase tracking-wider text-muted mb-1">Actions observées</div>
+          {Object.entries(report.actual).map(([action, count]) => <div key={action}>{action} · {count}</div>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Legend({ color, label }: { color: string; label: string }) {
+  return <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: color }} />{label}</span>;
 }
 
 function buildRangeOptions(rmData: RmData | null): RangeOption[] {
