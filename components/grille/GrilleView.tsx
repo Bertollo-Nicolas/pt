@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react';
 import clsx from 'clsx';
 import { useAppStore, getCfg } from '@/store/appStore';
-import { allHands, getNonFoldActions, getHandActions, isMixed, cellType } from '@/lib/poker';
+import { allHands, getNonFoldActions, getHandActions, getRangeActionDefs, isFoldAction, isMixed, cellType } from '@/lib/poker';
 import { hexRgba, todayStr } from '@/lib/utils';
 import { scoreGrille, type GrilleCheckResult, type GrilleCheckState } from '@/lib/grille-score';
 import type { HandItem, SelectedTab } from '@/lib/types';
@@ -48,7 +48,7 @@ function redistributeFreqs(
     for (const n of others) next[n] = 0;
   } else if (othersTotal === 0) {
     // Others were all 0 → put remainder in Fold
-    const foldKey = others.find(n => n.toUpperCase().includes('FOLD')) ?? others[0];
+    const foldKey = others.find(isFoldAction) ?? others[0];
     for (const n of others) next[n] = 0;
     if (foldKey) next[foldKey] = remaining;
   } else {
@@ -231,25 +231,11 @@ export function GrilleView() {
   const pointerDownRef = useRef<string | null>(null);
   const dragMovedRef   = useRef(false);
 
-  // Build action buttons: non-fold from file + Fold last
-  const rawActionButtons = useMemo((): [string, string][] => selectedTab
-    ? [...new Map(
-      selectedTab.rangeList
-        .filter(rl => rl.hands.length > 0)
-        .map(rl => {
-          const r = store.rangeColors[rl.id];
-          return r && !r.name.toUpperCase().includes('FOLD')
-            ? [r.name, colorOverrides[r.name] ?? r.color] as [string, string]
-            : null;
-        })
-        .filter(Boolean) as [string, string][]
-    )]
-    : [], [selectedTab, store.rangeColors, colorOverrides]);
-
-  const allActionButtons = useMemo((): [string, string][] => [
-    ...rawActionButtons,
-    ['Fold', colorOverrides['Fold'] ?? FOLD_COLOR]
-  ], [rawActionButtons, colorOverrides]);
+  // Build actions from the decisions actually present in this range.
+  const allActionButtons = useMemo((): [string, string][] => selectedTab
+    ? getRangeActionDefs(selectedTab.rangeMap)
+      .map(([name, color]) => [name, colorOverrides[name] ?? color])
+    : [['Fold', colorOverrides['Fold'] ?? FOLD_COLOR]], [selectedTab, colorOverrides]);
 
   const allActionNames = useMemo(() => allActionButtons.map(([n]) => n), [allActionButtons]);
 

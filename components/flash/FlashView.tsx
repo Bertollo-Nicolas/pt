@@ -2,8 +2,9 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import clsx from 'clsx';
 import { useAppStore, getCfg } from '@/store/appStore';
-import { allHands, getHandActions, getNonFoldActions, getDominant } from '@/lib/poker';
+import { allHands, getDecisionActions, getHandActions, getNonFoldActions, getDominant, getRangeActionDefs, getRangeMixedActionSets } from '@/lib/poker';
 import { todayStr, hexRgba } from '@/lib/utils';
+import { SRS_DRILL_HANDS, srsDrillProgress, srsNeedsDrill, srsRequiresDrill } from '@/lib/srs';
 import type { HandItem, SelectedTab, HandAction } from '@/lib/types';
 
 // ── Types ─────────────────────────────────────────────────────
@@ -24,21 +25,19 @@ function pickSuits(type: HandItem['type']): [Suit, Suit] {
   return [s1, others[Math.floor(Math.random() * 3)]];
 }
 
-function buildAllButtons(actionButtons: [string, string][]): ButtonDef[] {
-  const result: ButtonDef[] = [];
-  for (const [name, color] of actionButtons) {
-    result.push({ label: name, color, actions: [name] });
+function buildAllButtons(actionButtons: [string, string][], mixedActionSets: string[][]): ButtonDef[] {
+  const colors = new Map(actionButtons);
+  const result: ButtonDef[] = actionButtons.map(([name, color]) => ({ label: name, color, actions: [name] }));
+
+  for (const actions of mixedActionSets) {
+    result.push({
+      label: actions.join(' / '),
+      color: colors.get(actions[0]) ?? '#888',
+      color2: colors.get(actions[1]),
+      actions,
+    });
   }
-  for (let i = 0; i < actionButtons.length; i++) {
-    for (let j = i + 1; j < actionButtons.length; j++) {
-      result.push({
-        label: `${actionButtons[i][0]} / ${actionButtons[j][0]}`,
-        color: actionButtons[i][1],
-        color2: actionButtons[j][1],
-        actions: [actionButtons[i][0], actionButtons[j][0]],
-      });
-    }
-  }
+
   return result;
 }
 
@@ -47,15 +46,7 @@ function evaluateAnswer(
   hand: string,
   rangeMap: Record<string, HandAction[]>,
 ): { correct: boolean; partial: boolean; text: string; expected: string } {
-  const acts = getHandActions(hand, rangeMap);
-
-  if (!acts) {
-    const isFold = btn.actions.some(a => a.toUpperCase().includes('FOLD'));
-    return { correct: isFold, partial: false, expected: 'Fold',
-      text: isFold ? '✓ Correct — pas dans la range' : '✗ Erreur — cette main se fold' };
-  }
-
-  const sigActs = acts.filter(a => a.freq >= 0.15).sort((a, b) => b.freq - a.freq);
+  const sigActs = getDecisionActions(hand, rangeMap);
   const dominant = getDominant(sigActs);
   const detail = sigActs
     .map(a => `${a.action}${a.freq < 1 ? ' (' + Math.round(a.freq * 100) + '%)' : ''}`)
@@ -120,7 +111,7 @@ function pickNextHand(
 // ── FlashView (orchestrator) ───────────────────────────────────
 export function FlashView() {
   const store = useAppStore();
-  const { selectedTab, selectedTabKey, srs, addSession, setPendingSrsKey, pendingSrsKey, saveConfig } = store;
+  const { selectedTab, selectedTabKey, srs, addSession, setPendingSrsKey, pendingSrsKey, saveConfig, progressSrsDrill, startSrsReview } = store;
   const cfg = getCfg(store);
 
   const [tableCount,   setTableCount]   = useState<TableCount>(1);
@@ -163,10 +154,14 @@ export function FlashView() {
     addSession({ key: `flash_${selectedTabKey}`, date: todayStr(),
       name: selectedTab.name, catName: selectedTab.catName,
       mode: 'flash', correct: next.correct, wrong: next.wrong, imprecision: next.imprecision, bestStreak: next.bestStreak });
+    const drillEntry = srs[selectedTabKey];
+    if (drillEntry && srsNeedsDrill(drillEntry)) {
+      progressSrsDrill(selectedTabKey);
+    }
     if (!srs[selectedTabKey] && pendingSrsKey !== selectedTabKey && tot >= cfg.minHands) {
       if (Math.round(next.correct / tot * 100) >= cfg.threshold) setPendingSrsKey(selectedTabKey);
     }
-  }, [selectedTab, selectedTabKey, addSession, srs, pendingSrsKey, cfg, setPendingSrsKey]);
+  }, [selectedTab, selectedTabKey, addSession, srs, pendingSrsKey, cfg, setPendingSrsKey, progressSrsDrill]);
 
   const handleNewSession = useCallback(() => {
     totalStatsRef.current = { correct: 0, wrong: 0, imprecision: 0, streak: 0, bestStreak: 0 };
@@ -183,26 +178,35 @@ export function FlashView() {
   if (!selectedTab) return null;
 
   const colorOverrides = store.colorOverrides ?? {};
-  const rawButtons: [string, string][] = [...new Map(
-    selectedTab.rangeList
-      .filter(rl => rl.hands.length > 0)
-      .map(rl => {
-        const r = store.rangeColors[rl.id];
-        return r ? [r.name, colorOverrides[r.name] ?? r.color] as [string, string] : null;
-      })
-      .filter(Boolean) as [string, string][]
-  )];
-  const hasExplicitFold = rawButtons.some(([n]) => n.toUpperCase().includes('FOLD'));
-  const actionButtons: [string, string][] = hasExplicitFold ? rawButtons : [...rawButtons, ['Fold', colorOverrides['Fold'] ?? '#6b7280']];
-  const allButtons = buildAllButtons(actionButtons);
+  const actionButtons: [string, string][] = getRangeActionDefs(selectedTab.rangeMap)
+    .map(([name, color]) => [name, colorOverrides[name] ?? color]);
+  const allButtons = buildAllButtons(actionButtons, getRangeMixedActionSets(selectedTab.rangeMap));
 
   const tot = totalStats.correct + totalStats.wrong + totalStats.imprecision;
   const acc = tot > 0 ? Math.round(totalStats.correct / tot * 100) : null;
   const resetKey = `${selectedTabKey ?? 'none'}-${tableCount}`;
   const filterActive = handFilter !== null && handFilter.size > 0;
+  const drillEntry = selectedTabKey ? srs[selectedTabKey] : undefined;
+  const drillProgress = drillEntry ? srsDrillProgress(drillEntry) : 0;
+  const isSrsDrill = Boolean(drillEntry && srsRequiresDrill(drillEntry));
+  const drillComplete = isSrsDrill && drillProgress >= SRS_DRILL_HANDS;
 
   return (
     <div className="flex-1 flex flex-col relative overflow-hidden">
+
+      {isSrsDrill && (
+        <div className="flex items-center justify-between gap-3 px-3 py-2 bg-orange/10 border-b border-orange/30 flex-shrink-0">
+          <div className="min-w-0">
+            <div className="text-[11px] font-bold text-orange">Drill SRS obligatoire — {drillProgress}/{SRS_DRILL_HANDS}</div>
+            <div className="text-[9px] text-muted">Chaque réponse compte, sans score minimum.</div>
+          </div>
+          {drillComplete && selectedTabKey && (
+            <button onClick={() => startSrsReview(selectedTabKey)} className="px-2.5 py-1 text-[10px] font-semibold rounded bg-accent text-white flex-shrink-0">
+              Faire la Grille →
+            </button>
+          )}
+        </div>
+      )}
 
       {/* ── Row 1: Stats + Session Controls ──────────────────── */}
       <div className="flex items-center gap-2 px-3 py-2 bg-bg2 border-b border-border flex-shrink-0 overflow-x-auto no-scrollbar">
