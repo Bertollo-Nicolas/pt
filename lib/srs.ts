@@ -11,8 +11,18 @@ export function srsDrillProgress(entry: SrsEntry): number {
   return Math.min(SRS_DRILL_HANDS, Math.max(0, entry.drillProgress ?? 0));
 }
 
+export function srsConsecutiveFailures(entry: SrsEntry): number {
+  // Legacy entries only persisted `lapses`. Treat that value as the initial
+  // failure streak until the first review writes `consecutiveFailures`.
+  return Math.max(0, entry.consecutiveFailures ?? entry.lapses ?? 0);
+}
+
+export function srsRequiresDrill(entry: SrsEntry): boolean {
+  return entry.drillRequired ?? srsConsecutiveFailures(entry) >= SRS_FAILURES_BEFORE_DRILL;
+}
+
 export function srsNeedsDrill(entry: SrsEntry): boolean {
-  return Boolean(entry.drillRequired) && srsDrillProgress(entry) < SRS_DRILL_HANDS;
+  return srsRequiresDrill(entry) && srsDrillProgress(entry) < SRS_DRILL_HANDS;
 }
 
 export function srsIntervalDays(entry: SrsEntry, cfg: AppConfig): number {
@@ -40,7 +50,7 @@ export function scheduleSrsReview(
     const nextIdx = Math.max(0, entry.interval - (severeMiss ? 2 : 1));
     const nextEase = clamp(ease - (severeMiss ? 0.25 : 0.15), MIN_EASE, MAX_EASE);
 
-    const consecutiveFailures = (entry.consecutiveFailures ?? 0) + 1;
+    const consecutiveFailures = srsConsecutiveFailures(entry) + 1;
     const drillRequired = consecutiveFailures >= SRS_FAILURES_BEFORE_DRILL;
 
     return {

@@ -413,6 +413,8 @@ export const useAppStore = create<AppStore>()(
             ...s.srs,
             [key]: {
               ...entry,
+              consecutiveFailures: entry.consecutiveFailures ?? entry.lapses ?? 0,
+              drillRequired: true,
               drillProgress,
               drillCompletedAt: drillProgress === SRS_DRILL_HANDS ? new Date().toISOString() : entry.drillCompletedAt,
             },

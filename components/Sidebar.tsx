@@ -5,6 +5,7 @@ import { useAppStore } from '@/store/appStore';
 import { countCombos, tabKey } from '@/lib/poker';
 import { todayStr, diffDays } from '@/lib/utils';
 import type { Category, SrsEntry } from '@/lib/types';
+import { srsRequiresDrill } from '@/lib/srs';
 
 import { Modal, ModalTitle, ModalBody, ModalActions } from './ui/Modal';
 
@@ -85,7 +86,7 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
   };
 
   const today = todayStr();
-  const dueCount = Object.values(srs).filter((e: SrsEntry) => e.nextReview <= today || e.drillRequired).length;
+  const dueCount = Object.values(srs).filter((e: SrsEntry) => e.nextReview <= today || srsRequiresDrill(e)).length;
 
   return (
     <aside className="bg-bg2 border-r border-border flex flex-col overflow-hidden h-full">

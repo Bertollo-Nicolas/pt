@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import { useAppStore, getCfg } from '@/store/appStore';
 import { allHands, getHandActions, getNonFoldActions, getDominant } from '@/lib/poker';
 import { todayStr, hexRgba } from '@/lib/utils';
-import { SRS_DRILL_HANDS, srsDrillProgress } from '@/lib/srs';
+import { SRS_DRILL_HANDS, srsDrillProgress, srsNeedsDrill, srsRequiresDrill } from '@/lib/srs';
 import type { HandItem, SelectedTab, HandAction } from '@/lib/types';
 
 // ── Types ─────────────────────────────────────────────────────
@@ -165,7 +165,7 @@ export function FlashView() {
       name: selectedTab.name, catName: selectedTab.catName,
       mode: 'flash', correct: next.correct, wrong: next.wrong, imprecision: next.imprecision, bestStreak: next.bestStreak });
     const drillEntry = srs[selectedTabKey];
-    if (drillEntry?.drillRequired && (drillEntry.drillProgress ?? 0) < SRS_DRILL_HANDS) {
+    if (drillEntry && srsNeedsDrill(drillEntry)) {
       progressSrsDrill(selectedTabKey);
     }
     if (!srs[selectedTabKey] && pendingSrsKey !== selectedTabKey && tot >= cfg.minHands) {
@@ -207,7 +207,7 @@ export function FlashView() {
   const filterActive = handFilter !== null && handFilter.size > 0;
   const drillEntry = selectedTabKey ? srs[selectedTabKey] : undefined;
   const drillProgress = drillEntry ? srsDrillProgress(drillEntry) : 0;
-  const isSrsDrill = Boolean(drillEntry?.drillRequired);
+  const isSrsDrill = Boolean(drillEntry && srsRequiresDrill(drillEntry));
   const drillComplete = isSrsDrill && drillProgress >= SRS_DRILL_HANDS;
 
   return (

@@ -2,7 +2,7 @@
 import clsx from 'clsx';
 import { useAppStore, getCfg } from '@/store/appStore';
 import { todayStr, diffDays } from '@/lib/utils';
-import { SRS_DRILL_HANDS, srsDrillProgress, srsIntervalDays, srsNeedsDrill } from '@/lib/srs';
+import { SRS_DRILL_HANDS, srsConsecutiveFailures, srsDrillProgress, srsIntervalDays, srsNeedsDrill, srsRequiresDrill } from '@/lib/srs';
 import { LearningInsights } from '@/components/learning/LearningInsights';
 import type { SrsEntry } from '@/lib/types';
 
@@ -16,8 +16,8 @@ export function SrsView() {
     .filter(e => e.interval >= 0) // skip any legacy interval: -1
     .sort((a, b) => a.nextReview.localeCompare(b.nextReview));
 
-  const due      = entries.filter(e => e.nextReview <= today || e.drillRequired);
-  const upcoming = entries.filter(e => e.nextReview > today && !e.drillRequired);
+  const due      = entries.filter(e => e.nextReview <= today || srsRequiresDrill(e));
+  const upcoming = entries.filter(e => e.nextReview > today && !srsRequiresDrill(e));
 
   // Build reviewMap for calendar
   const reviewMap: Record<string, SrsEntry[]> = {};
@@ -126,10 +126,11 @@ function SrsCard({ entry, today, cfg, onReview, onDrill, onRemove }: {
   const ease = entry.ease ?? 2.3;
   const reviews = entry.reviews ?? 0;
   const lapses = entry.lapses ?? 0;
-  const consecutiveFailures = entry.consecutiveFailures ?? 0;
+  const consecutiveFailures = srsConsecutiveFailures(entry);
   const drillProgress = srsDrillProgress(entry);
   const needsDrill = srsNeedsDrill(entry);
-  const drillComplete = Boolean(entry.drillRequired) && !needsDrill;
+  const requiresDrill = srsRequiresDrill(entry);
+  const drillComplete = requiresDrill && !needsDrill;
 
   return (
     <div className={clsx(
@@ -151,7 +152,7 @@ function SrsCard({ entry, today, cfg, onReview, onDrill, onRemove }: {
           {consecutiveFailures > 0 && (
             <><span>·</span><span className="text-red">{consecutiveFailures} échec{consecutiveFailures > 1 ? 's' : ''} de suite</span></>
           )}
-          {entry.drillRequired && (
+          {requiresDrill && (
             <><span>·</span><span className={needsDrill ? 'text-orange' : 'text-green'}>Flash {drillProgress}/{SRS_DRILL_HANDS}</span></>
           )}
           {reviews > 0 && (
@@ -164,7 +165,7 @@ function SrsCard({ entry, today, cfg, onReview, onDrill, onRemove }: {
       </div>
 
       <div className="flex items-center gap-1.5 flex-shrink-0">
-        {isDue || entry.drillRequired ? (
+        {isDue || requiresDrill ? (
           needsDrill && onDrill ? (
             <button
               onClick={onDrill}
