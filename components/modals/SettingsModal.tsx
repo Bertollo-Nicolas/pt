@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useAppStore, getCfg } from '@/store/appStore';
+import { isFoldAction } from '@/lib/poker';
 import { Modal, ModalTitle, ModalActions } from '../ui/Modal';
 
 const FOLD_DEFAULT = '#6b7280';
@@ -137,7 +138,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
           const actionDefs: Array<{ name: string; defaultColor: string }> = rmData
             ? [...new Map(
                 Object.values(rmData.ranges)
-                  .filter(r => r.name && r.color && !r.name.toUpperCase().includes('FOLD'))
+                  .filter(r => r.name && r.color && !isFoldAction(r.name))
                   .map(r => [r.name, r.color] as [string, string])
               )].map(([name, color]) => ({ name, defaultColor: color }))
             : [];

@@ -1,4 +1,4 @@
-import { allHands, getNonFoldActions } from './poker';
+import { allHands, getNonFoldActions, isFoldAction } from './poker';
 import type { HandAction } from './types';
 
 export type GrilleCheckState = 'correct' | 'missed' | 'extra' | 'wrong-action';
@@ -40,7 +40,7 @@ export function scoreGrille(
     const played = cellIsPlayed(selection[hand] ?? {});
 
     if (inRange && played) {
-      const userNonFoldEntries = Object.entries(selection[hand] ?? {}).filter(([k]) => !k.toUpperCase().includes('FOLD'));
+      const userNonFoldEntries = Object.entries(selection[hand] ?? {}).filter(([k]) => !isFoldAction(k));
       let isAllCorrect = userNonFoldEntries.length === nonFoldActs.length;
 
       if (isAllCorrect) {
@@ -86,12 +86,12 @@ export function scoreGrille(
 }
 
 function cellIsPlayed(freqs: Record<string, number>): boolean {
-  return Object.entries(freqs).some(([k, v]) => !k.toUpperCase().includes('FOLD') && v > 0);
+  return Object.entries(freqs).some(([k, v]) => !isFoldAction(k) && v > 0);
 }
 
 function formatSelection(freqs: Record<string, number>): string {
   return Object.entries(freqs)
-    .filter(([k, v]) => !k.toUpperCase().includes('FOLD') && v > 0)
+    .filter(([k, v]) => !isFoldAction(k) && v > 0)
     .map(([k, v]) => `${k} ${v}%`)
     .join(' / ');
 }

@@ -44,6 +44,10 @@ export function getHandActions(
   return null;
 }
 
+export function isFoldAction(action: string): boolean {
+  return action.trim().toUpperCase() === 'FOLD';
+}
+
 export function getNonFoldActions(
   hand: string,
   rangeMap: Record<string, HandAction[]>,
@@ -51,8 +55,59 @@ export function getNonFoldActions(
   const acts = getHandActions(hand, rangeMap);
   if (!acts) return [];
   return acts
-    .filter(a => !a.action.toUpperCase().includes('FOLD'))
+    .filter(a => !isFoldAction(a.action))
     .sort((a, b) => b.freq - a.freq);
+}
+
+export function getDecisionActions(
+  hand: string,
+  rangeMap: Record<string, HandAction[]>,
+): HandAction[] {
+  const raw = (getHandActions(hand, rangeMap) ?? []).filter(a => a.freq > 0);
+  if (raw.length === 0) {
+    return [{ action: 'Fold', color: '#6b7280', freq: 1, id: '__fold__' }];
+  }
+
+  const actions = raw.map(a => isFoldAction(a.action) ? { ...a, action: 'Fold' } : a);
+  const total = actions.reduce((sum, action) => sum + action.freq, 0);
+  const hasFold = actions.some(action => isFoldAction(action.action));
+
+  if (!hasFold && total < 0.999) {
+    actions.push({ action: 'Fold', color: '#6b7280', freq: 1 - total, id: '__fold__' });
+  }
+
+  return actions.sort((a, b) => b.freq - a.freq);
+}
+
+export function getRangeActionDefs(
+  rangeMap: Record<string, HandAction[]>,
+): [string, string][] {
+  const defs = new Map<string, string>();
+  let foldColor = '#6b7280';
+
+  for (const actions of Object.values(rangeMap)) {
+    for (const action of actions) {
+      if (isFoldAction(action.action)) foldColor = action.color;
+      else if (!defs.has(action.action)) defs.set(action.action, action.color);
+    }
+  }
+
+  return [...defs.entries(), ['Fold', foldColor]];
+}
+
+export function getRangeMixedActionSets(
+  rangeMap: Record<string, HandAction[]>,
+): string[][] {
+  const sets = new Map<string, string[]>();
+
+  for (const hand of Object.keys(rangeMap)) {
+    const names = [...new Set(getDecisionActions(hand, rangeMap).map(action => action.action))];
+    if (names.length < 2) continue;
+    const key = [...names].sort().join('\u0000');
+    if (!sets.has(key)) sets.set(key, names);
+  }
+
+  return [...sets.values()];
 }
 
 export function getDominant(acts: HandAction[]): HandAction | null {

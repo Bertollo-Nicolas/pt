@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import clsx from 'clsx';
 import { useAppStore, getCfg } from '@/store/appStore';
-import { allHands, getHandActions, getNonFoldActions, getDominant } from '@/lib/poker';
+import { allHands, getDecisionActions, getHandActions, getNonFoldActions, getDominant, getRangeActionDefs, getRangeMixedActionSets } from '@/lib/poker';
 import { todayStr, hexRgba } from '@/lib/utils';
 import { SRS_DRILL_HANDS, srsDrillProgress, srsNeedsDrill, srsRequiresDrill } from '@/lib/srs';
 import type { HandItem, SelectedTab, HandAction } from '@/lib/types';
@@ -25,21 +25,19 @@ function pickSuits(type: HandItem['type']): [Suit, Suit] {
   return [s1, others[Math.floor(Math.random() * 3)]];
 }
 
-function buildAllButtons(actionButtons: [string, string][]): ButtonDef[] {
-  const result: ButtonDef[] = [];
-  for (const [name, color] of actionButtons) {
-    result.push({ label: name, color, actions: [name] });
+function buildAllButtons(actionButtons: [string, string][], mixedActionSets: string[][]): ButtonDef[] {
+  const colors = new Map(actionButtons);
+  const result: ButtonDef[] = actionButtons.map(([name, color]) => ({ label: name, color, actions: [name] }));
+
+  for (const actions of mixedActionSets) {
+    result.push({
+      label: actions.join(' / '),
+      color: colors.get(actions[0]) ?? '#888',
+      color2: colors.get(actions[1]),
+      actions,
+    });
   }
-  for (let i = 0; i < actionButtons.length; i++) {
-    for (let j = i + 1; j < actionButtons.length; j++) {
-      result.push({
-        label: `${actionButtons[i][0]} / ${actionButtons[j][0]}`,
-        color: actionButtons[i][1],
-        color2: actionButtons[j][1],
-        actions: [actionButtons[i][0], actionButtons[j][0]],
-      });
-    }
-  }
+
   return result;
 }
 
@@ -48,15 +46,7 @@ function evaluateAnswer(
   hand: string,
   rangeMap: Record<string, HandAction[]>,
 ): { correct: boolean; partial: boolean; text: string; expected: string } {
-  const acts = getHandActions(hand, rangeMap);
-
-  if (!acts) {
-    const isFold = btn.actions.some(a => a.toUpperCase().includes('FOLD'));
-    return { correct: isFold, partial: false, expected: 'Fold',
-      text: isFold ? '✓ Correct — pas dans la range' : '✗ Erreur — cette main se fold' };
-  }
-
-  const sigActs = acts.filter(a => a.freq >= 0.15).sort((a, b) => b.freq - a.freq);
+  const sigActs = getDecisionActions(hand, rangeMap);
   const dominant = getDominant(sigActs);
   const detail = sigActs
     .map(a => `${a.action}${a.freq < 1 ? ' (' + Math.round(a.freq * 100) + '%)' : ''}`)
@@ -188,18 +178,9 @@ export function FlashView() {
   if (!selectedTab) return null;
 
   const colorOverrides = store.colorOverrides ?? {};
-  const rawButtons: [string, string][] = [...new Map(
-    selectedTab.rangeList
-      .filter(rl => rl.hands.length > 0)
-      .map(rl => {
-        const r = store.rangeColors[rl.id];
-        return r ? [r.name, colorOverrides[r.name] ?? r.color] as [string, string] : null;
-      })
-      .filter(Boolean) as [string, string][]
-  )];
-  const hasExplicitFold = rawButtons.some(([n]) => n.toUpperCase().includes('FOLD'));
-  const actionButtons: [string, string][] = hasExplicitFold ? rawButtons : [...rawButtons, ['Fold', colorOverrides['Fold'] ?? '#6b7280']];
-  const allButtons = buildAllButtons(actionButtons);
+  const actionButtons: [string, string][] = getRangeActionDefs(selectedTab.rangeMap)
+    .map(([name, color]) => [name, colorOverrides[name] ?? color]);
+  const allButtons = buildAllButtons(actionButtons, getRangeMixedActionSets(selectedTab.rangeMap));
 
   const tot = totalStats.correct + totalStats.wrong + totalStats.imprecision;
   const acc = tot > 0 ? Math.round(totalStats.correct / tot * 100) : null;
