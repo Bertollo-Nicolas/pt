@@ -6,6 +6,7 @@ import { upsertPreflopStats, loadPreflopStats } from '@/lib/db';
 import { createClient } from '@/lib/supabase';
 import { buildRangeMap } from '@/lib/poker';
 import { aggregateStats, buildTrackerReport, commonTrackerSpots, type TrackerDeviation } from '@/lib/tracker-analysis';
+import { suggestTrackerMappings } from '@/lib/tracker-mapping';
 import type { Category, PreflopStat, RmData } from '@/lib/types';
 
 interface RangeOption {
@@ -107,6 +108,19 @@ export function TrackerView() {
     return keys.sort((a, b) => a.localeCompare(b));
   }, [stats]);
 
+  const mappingSuggestions = useMemo(
+    () => suggestTrackerMappings(spotKeys, rangeOptions),
+    [spotKeys, rangeOptions],
+  );
+  const suggestionBySpot = useMemo(
+    () => new Map(mappingSuggestions.map(suggestion => [suggestion.spot, suggestion])),
+    [mappingSuggestions],
+  );
+  const pendingSuggestions = useMemo(
+    () => mappingSuggestions.filter(suggestion => !mappings[suggestion.spot]),
+    [mappingSuggestions, mappings],
+  );
+
   const selectedSession = trackerSessions.find(s => s.id === selectedSessionId) ?? trackerSessions[trackerSessions.length - 1] ?? null;
   const reportStats = reportMode === 'session' && selectedSession ? selectedSession.stats : stats;
   const report = useMemo(() => buildTrackerReport(reportStats, mappings, rangeMaps), [reportStats, mappings, rangeMaps]);
@@ -118,6 +132,15 @@ export function TrackerView() {
     const next = { ...mappings };
     if (value) next[key] = value;
     else delete next[key];
+    saveConfig({ trackerMappings: next });
+  };
+
+  const applyMappingSuggestions = () => {
+    if (pendingSuggestions.length === 0) return;
+    const next = { ...mappings };
+    for (const suggestion of pendingSuggestions) {
+      if (!next[suggestion.spot]) next[suggestion.spot] = suggestion.rangeKey;
+    }
     saveConfig({ trackerMappings: next });
   };
 
@@ -181,15 +204,32 @@ export function TrackerView() {
       {rangeOptions.length > 0 && (
         <div className="mt-8 bg-bg2 border border-border rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-border">
-            <h3 className="text-sm font-bold uppercase tracking-wider">Mapping en amont</h3>
-            <p className="text-[11px] text-muted mt-1">Configurez ces spots une fois. Les prochains imports utiliseront directement ces mappings.</p>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-wider">Mapping en amont</h3>
+                <p className="text-[11px] text-muted mt-1">Les pré-liens utilisent la position, l&apos;adversaire, la famille du spot et le sizing.</p>
+              </div>
+              {pendingSuggestions.length > 0 && (
+                <button
+                  onClick={applyMappingSuggestions}
+                  className="flex-shrink-0 px-3 py-1.5 text-[11px] font-semibold rounded border bg-accent border-accent text-white hover:opacity-90 transition-opacity"
+                >
+                  Pré-lier {pendingSuggestions.length} spots
+                </button>
+              )}
+            </div>
           </div>
           <div className="divide-y divide-border max-h-[360px] overflow-y-auto">
             {spotKeys.map(key => (
               <div key={key} className="px-5 py-3 flex items-center gap-3">
                 <div className="w-44 flex-shrink-0">
                   <div className="text-xs font-bold">{key}</div>
-                  <div className="text-[9px] text-muted uppercase">{key.includes(' ') ? 'spot' : 'position'}</div>
+                  <div className="text-[9px] text-muted uppercase flex items-center gap-1.5">
+                    <span>{key.includes(' ') ? 'spot' : 'position'}</span>
+                    {!mappings[key] && suggestionBySpot.has(key) && (
+                      <span className="text-green normal-case">pré-lien trouvé</span>
+                    )}
+                  </div>
                 </div>
                 <select
                   value={mappings[key] ?? ''}
