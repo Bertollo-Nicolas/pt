@@ -44,15 +44,15 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
   return (
     <Modal open={open} onClose={onClose} className="!max-w-[400px]">
-      <ModalTitle>⚙️ Paramètres</ModalTitle>
+      <ModalTitle>Paramètres</ModalTitle>
 
       <div className="mt-4 space-y-4">
         {/* Flash accuracy threshold */}
         <div>
-          <label className="text-[10px] font-bold uppercase tracking-widest text-muted block mb-1.5">
+          <label className="section-label block mb-1.5">
             Seuil précision Flash (%)
           </label>
-          <p className="text-[10px] text-muted mb-1.5">Précision minimale pour proposer l&apos;ajout au SRS depuis Flash.</p>
+          <p className="text-[11px] text-muted mb-1.5">Précision minimale pour proposer l&apos;ajout au SRS depuis Flash.</p>
           <input
             type="number" min="50" max="100"
             value={threshold}

@@ -162,13 +162,13 @@ export function FlashView() {
   const drillComplete = isSrsDrill && drillProgress >= SRS_DRILL_HANDS;
 
   return (
-    <div className="flex-1 flex flex-col relative overflow-hidden">
+    <div className="flex-1 flex flex-col relative overflow-hidden bg-gradient-to-b from-bg3/20 to-bg">
 
       {isSrsDrill && (
         <div className="flex items-center justify-between gap-3 px-3 py-2 bg-orange/10 border-b border-orange/30 flex-shrink-0">
           <div className="min-w-0">
-            <div className="text-[11px] font-bold text-orange">Drill SRS obligatoire — {drillProgress}/{SRS_DRILL_HANDS}</div>
-            <div className="text-[9px] text-muted">Chaque réponse compte, sans score minimum.</div>
+            <div className="text-xs font-bold text-orange">Drill SRS obligatoire — {drillProgress}/{SRS_DRILL_HANDS}</div>
+            <div className="text-[11px] text-muted">Chaque réponse compte, sans score minimum.</div>
           </div>
           {drillComplete && selectedTabKey && (
             <button onClick={() => startSrsReview(selectedTabKey)} className="px-2.5 py-1 text-[10px] font-semibold rounded bg-accent text-white flex-shrink-0">
@@ -179,7 +179,7 @@ export function FlashView() {
       )}
 
       {/* ── Row 1: Stats + Session Controls ──────────────────── */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-bg2 border-b border-border flex-shrink-0 overflow-x-auto no-scrollbar">
+      <div className="flex items-center gap-2 px-3 py-2.5 bg-bg2/95 border-b border-border flex-shrink-0 overflow-x-auto no-scrollbar">
         <span className="text-xs font-bold text-green flex-shrink-0">✓{totalStats.correct}</span>
         {totalStats.imprecision > 0 && <span className="text-xs font-bold text-orange flex-shrink-0">≈{totalStats.imprecision}</span>}
         <span className="text-xs font-bold text-red flex-shrink-0">✗{totalStats.wrong}</span>
@@ -190,57 +190,63 @@ export function FlashView() {
         <div className="flex items-center gap-1 flex-shrink-0">
           <button
             onClick={() => setShowFilter(v => !v)}
-            className={clsx('text-[10px] px-2 py-1 rounded border transition-all',
+            aria-pressed={showFilter}
+            aria-label="Filtrer les mains"
+            className={clsx('text-[11px] min-h-8 px-2.5 py-1 rounded border transition-all',
               filterActive
                 ? 'bg-accent/20 border-accent text-accent'
                 : showFilter
                   ? 'bg-bg3 border-border text-text'
                   : 'border-border text-muted hover:text-text',
             )}>
-            {filterActive ? `🎯 ${handFilter!.size}` : '🎯'}
+            {filterActive ? `Filtre ${handFilter!.size}` : 'Filtrer'}
           </button>
           <button onClick={() => setFocusMode(v => !v)}
-            className={clsx('text-[10px] px-2 py-1 rounded border transition-all',
+            aria-pressed={focusMode}
+            className={clsx('text-[11px] min-h-8 px-2.5 py-1 rounded border transition-all',
               focusMode ? 'bg-orange/20 border-orange text-orange' : 'border-border text-muted hover:text-text'
             )}
             title="Mode Focus : ne révise que vos erreurs">
-            Focus🎯
+            Focus
           </button>
           <button onClick={() => setAutoNext(v => !v)}
-            className={clsx('text-[10px] px-2 py-1 rounded border transition-all',
+            aria-pressed={autoNext}
+            className={clsx('text-[11px] min-h-8 px-2.5 py-1 rounded border transition-all',
               autoNext ? 'bg-accent/20 border-accent text-accent' : 'border-border text-muted hover:text-text'
             )}>
-            Auto▶
+            Auto
           </button>
           <button onClick={() => { if (!sessionEnded) setPaused(v => !v); }}
-            className={clsx('text-[10px] px-2 py-1 rounded border transition-all',
+            aria-label={paused ? 'Reprendre la session' : 'Mettre la session en pause'}
+            className={clsx('text-[11px] min-h-8 px-2.5 py-1 rounded border transition-all',
               paused ? 'bg-green/10 border-green text-green' : 'border-border text-muted hover:text-text'
             )}>
-            {paused ? '▶' : '⏸'}
+            {paused ? 'Reprendre' : 'Pause'}
           </button>
           <button onClick={() => { setPaused(true); setSessionEnded(true); }}
-            className="text-[10px] px-2 py-1 rounded border border-border text-muted hover:border-red hover:text-red transition-all">
-            ⏹
+            aria-label="Terminer la session"
+            className="text-[11px] min-h-8 px-2.5 py-1 rounded border border-border text-muted hover:border-red hover:text-red transition-all">
+            Terminer
           </button>
         </div>
       </div>
 
       {/* ── Row 2: Timer + Tables ─────────────────────────────── */}
-      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-bg3 border-b border-border flex-shrink-0 overflow-x-auto no-scrollbar">
-        <span className="text-[9px] text-muted uppercase tracking-wider flex-shrink-0">Timer</span>
+      <div className="flex items-center gap-1.5 px-3 py-2 bg-bg3 border-b border-border flex-shrink-0 overflow-x-auto no-scrollbar">
+        <span className="section-label flex-shrink-0">Timer</span>
         {([0, 5000, 8000, 12000, 15000, 20000] as TimerMs[]).map(ms => (
           <button key={ms} onClick={() => setTimerMs(ms)}
-            className={clsx('text-[10px] px-1.5 py-0.5 rounded border transition-all flex-shrink-0',
+            className={clsx('text-[11px] min-h-7 px-2 py-0.5 rounded border transition-all flex-shrink-0',
               timerMs === ms ? 'bg-accent border-accent text-white' : 'border-border text-muted hover:text-text'
             )}>
             {ms === 0 ? 'Off' : `${ms / 1000}s`}
           </button>
         ))}
         <div className="w-px h-3 bg-border mx-1 flex-shrink-0" />
-        <span className="text-[9px] text-muted uppercase tracking-wider flex-shrink-0">Tables</span>
+        <span className="section-label flex-shrink-0">Tables</span>
         {([1, 2, 4] as TableCount[]).map(n => (
           <button key={n} onClick={() => setTableCount(n)}
-            className={clsx('text-[10px] px-1.5 py-0.5 rounded border transition-all flex-shrink-0',
+            className={clsx('text-[11px] min-h-7 px-2 py-0.5 rounded border transition-all flex-shrink-0',
               tableCount === n ? 'bg-accent border-accent text-white' : 'border-border text-muted hover:text-text'
             )}>
             {n}
@@ -250,7 +256,7 @@ export function FlashView() {
 
       {/* ── Panels ─────────────────────────────────────────────── */}
       {tableCount === 1 ? (
-        <div className="flex-1 min-h-0 overflow-y-auto p-2 md:p-3 flex items-start md:items-center justify-center">
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 md:p-5 flex items-start md:items-center justify-center">
           <FlashPanel key={resetKey}
             selectedTab={selectedTab} allButtons={allButtons} actionButtons={actionButtons}
             timerMs={timerMs} autoNext={autoNext} paused={paused || sessionEnded}
@@ -621,18 +627,18 @@ function FlashPanel({
 
   const btnClass = clsx(
     'rounded border font-semibold transition-all hover:-translate-y-px active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed',
-    compact ? 'px-2 py-1 text-[9px]' : 'px-3 py-2 text-[11px]',
+    compact ? 'px-2 py-1 text-[10px]' : 'min-h-10 px-4 py-2 text-xs',
   );
 
   return (
     <div ref={panelRef} className={clsx(
-      'relative flex flex-col items-center bg-bg2 border border-border rounded-lg overflow-hidden',
+      'relative flex flex-col items-center bg-bg2 border border-border rounded-xl overflow-hidden shadow-[0_18px_60px_rgba(0,0,0,0.2)]',
       compact
         ? 'h-full gap-1.5 p-2 justify-center'
         : 'gap-2 md:gap-3 p-3 md:p-5 w-full max-w-[420px]',
     )}>
       {!compact && (
-        <div className="text-[10px] text-muted uppercase tracking-widest text-center">
+        <div className="section-label text-center">
           {selectedTab.catName} — {selectedTab.name}
         </div>
       )}

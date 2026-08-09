@@ -4,6 +4,8 @@ import { useAppStore } from '@/store/appStore';
 import { useSync } from '@/hooks/useSync';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { MODES } from './Header';
+import { Icon } from './ui/Icon';
 import { FlashView } from './flash/FlashView';
 import { GrilleView } from './grille/GrilleView';
 import { SrsView } from './srs/SrsView';
@@ -12,7 +14,7 @@ import { SrsToast } from './ui/SrsToast';
 import { SettingsModal } from './modals/SettingsModal';
 
 export default function RangeTrainer() {
-  const { rehydrateRmData, selectedTab, currentMode, lastSpot, selectTab } = useAppStore();
+  const { rehydrateRmData, selectedTab, currentMode, lastSpot, selectTab, setMode } = useAppStore();
   const { logout } = useSync();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -66,9 +68,18 @@ export default function RangeTrainer() {
       {/* ── Main content ── */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
         <Header onOpenSidebar={() => setSidebarOpen(true)} />
-        <main className="flex-1 overflow-hidden flex flex-col min-h-0">
+        <main className="flex-1 overflow-hidden flex flex-col min-h-0 pb-[68px] sm:pb-0">
           {renderMain()}
         </main>
+        <nav aria-label="Navigation principale" className="sm:hidden fixed inset-x-0 bottom-0 z-30 h-[68px] border-t border-border bg-bg2/95 backdrop-blur-md grid grid-cols-4 px-2 pb-[env(safe-area-inset-bottom)]">
+          {MODES.map(mode => (
+            <button key={mode.id} onClick={() => setMode(mode.id)} aria-current={currentMode === mode.id ? 'page' : undefined}
+              className={`flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors ${currentMode === mode.id ? 'text-accent' : 'text-muted hover:text-text'}`}>
+              <Icon name={mode.icon} size={20} />
+              {mode.label}
+            </button>
+          ))}
+        </nav>
       </div>
 
       <SrsToast />
@@ -80,7 +91,7 @@ export default function RangeTrainer() {
 function EmptyView() {
   return (
     <div className="flex-1 flex flex-col items-center justify-center text-muted px-6 text-center">
-      <div aria-hidden="true" className="text-[48px] mb-3">🎯</div>
+      <div className="w-14 h-14 rounded-2xl bg-accent/15 text-accent flex items-center justify-center mb-4"><Icon name="target" size={28} /></div>
       <h3 className="text-base font-semibold text-text">Commence ton entraînement</h3>
       <p className="text-sm mt-2 max-w-md leading-relaxed">
         Ouvre un dossier dans le menu, puis sélectionne une position pour lancer un exercice.

@@ -8,6 +8,8 @@ import { allHands, buildRangeMap, getDecisionActions, isFoldAction } from '@/lib
 import { buildTrackerRangeReports, commonTrackerSpots, type TrackerHandReport, type TrackerRangeReport } from '@/lib/tracker-analysis';
 import { suggestTrackerMappings } from '@/lib/tracker-mapping';
 import type { Category, PreflopStat, RmData } from '@/lib/types';
+import { Icon } from '@/components/ui/Icon';
+import { SectionHeading, StatCard, Surface } from '@/components/ui/Surface';
 
 interface RangeOption {
   key: string;
@@ -150,20 +152,18 @@ export function TrackerView() {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto overflow-y-auto">
-      <div className="bg-bg2 border border-border rounded-xl p-6 shadow-sm">
-        <h2 className="text-xl font-bold mb-2">📊 Poker Tracker (Winamax)</h2>
-        <p className="text-muted text-sm mb-6">
-          Mappez vos spots 5-max vers vos ranges, importez une session, puis consultez les écarts de la session et le global.
-        </p>
+    <div className="flex-1 overflow-y-auto bg-gradient-to-b from-bg3/30 to-bg px-3 py-4 sm:p-6">
+      <div className="max-w-6xl mx-auto pb-8">
+      <Surface className="p-4 sm:p-6">
+        <SectionHeading eyebrow="Analyse" title="Poker Tracker" description="Reliez vos spots Winamax à vos ranges, importez une session puis identifiez rapidement les écarts prioritaires." action={<div className="w-10 h-10 rounded-xl bg-accent/15 text-accent flex items-center justify-center"><Icon name="chart" size={20}/></div>} />
 
         {!cfg.trackerHeroName ? (
-          <div className="bg-orange/10 border border-orange/30 p-4 rounded-lg text-orange text-sm mb-6">
+          <div className="bg-orange/10 border border-orange/30 p-4 rounded-lg text-orange text-sm mt-6">
             ⚠️ Vous devez configurer votre <strong>Pseudo Winamax</strong> dans les paramètres pour commencer.
           </div>
         ) : (
-          <div className="space-y-6">
-            <div className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl p-10 hover:border-accent/50 hover:bg-accent/5 transition-all cursor-pointer relative">
+          <div className="space-y-4 mt-6">
+            <div className="flex flex-col items-center justify-center border border-dashed border-border2 rounded-xl p-6 sm:p-8 hover:border-accent/60 hover:bg-accent/5 transition-all cursor-pointer relative">
               <input
                 type="file"
                 multiple
@@ -172,7 +172,7 @@ export function TrackerView() {
                 disabled={importing}
                 className="absolute inset-0 opacity-0 cursor-pointer"
               />
-              <div className="text-4xl mb-3">📁</div>
+              <div className="w-11 h-11 rounded-xl bg-accent/15 text-accent flex items-center justify-center mb-3"><Icon name="upload" size={22}/></div>
               <div className="text-sm font-semibold">Importer les mains de votre session</div>
               <div className="text-xs text-muted mt-1">Un import = une session analysable, en plus des stats globales</div>
             </div>
@@ -185,29 +185,16 @@ export function TrackerView() {
             )}
           </div>
         )}
-      </div>
+      </Surface>
 
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-bg2 border border-border rounded-xl p-5">
-          <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Mains Total</h3>
-          <div className="text-2xl font-bold">{totalHands}</div>
-        </div>
-        <div className="bg-bg2 border border-border rounded-xl p-5">
-          <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Net (BB)</h3>
-          <div className={`text-2xl font-bold ${totalNet >= 0 ? 'text-green' : 'text-red'}`}>
-            {totalNet > 0 ? '+' : ''}{totalNet.toFixed(1)}
-          </div>
-        </div>
-        <div className="bg-bg2 border border-border rounded-xl p-5">
-          <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Winrate</h3>
-          <div className="text-2xl font-bold">
-            {totalHands > 0 ? ((totalNet / totalHands) * 100).toFixed(1) : 0} <span className="text-xs text-muted font-normal">bb/100</span>
-          </div>
-        </div>
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <StatCard label="Mains analysées" value={totalHands} detail={reportMode === 'session' ? 'Session sélectionnée' : 'Toutes les sessions'} />
+        <StatCard label="Résultat net" value={`${totalNet > 0 ? '+' : ''}${totalNet.toFixed(1)} BB`} tone={totalNet >= 0 ? 'positive' : 'negative'} />
+        <StatCard label="Winrate" value={`${totalHands > 0 ? ((totalNet / totalHands) * 100).toFixed(1) : 0}`} detail="bb / 100 mains" tone={totalNet >= 0 ? 'positive' : 'negative'} />
       </div>
 
       {rangeOptions.length > 0 && (
-        <details className="mt-8 bg-bg2 border border-border rounded-xl overflow-hidden">
+        <details className="mt-4 bg-bg2 border border-border rounded-xl overflow-hidden">
           <summary className="px-5 py-4 cursor-pointer select-none">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -253,7 +240,7 @@ export function TrackerView() {
       )}
 
       {sessionDays.length > 0 && (
-        <div className="mt-8 bg-bg2 border border-border rounded-xl p-4">
+        <div className="mt-4 bg-bg2 border border-border rounded-xl p-4">
           <div className="flex items-center gap-2 mb-3">
             <button
               onClick={() => setReportMode('session')}
@@ -290,7 +277,7 @@ export function TrackerView() {
       )}
 
       {mappedHands > 0 && (
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="bg-bg2 border border-border rounded-xl p-5">
             <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Mains mappées</h3>
             <div className="text-2xl font-bold">{mappedHands}</div>
@@ -303,7 +290,7 @@ export function TrackerView() {
       )}
 
       {rangeReports.length > 0 && (
-        <div className="mt-8 bg-bg2 border border-border rounded-xl overflow-hidden">
+        <div className="mt-4 bg-bg2 border border-border rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-border">
             <h3 className="text-sm font-bold uppercase tracking-wider">Erreurs par range</h3>
             <p className="text-[11px] text-muted mt-1">Cliquez sur une range pour comparer visuellement votre jeu à la stratégie originale.</p>
@@ -328,11 +315,11 @@ export function TrackerView() {
       )}
 
       {reportStats.length > 0 && (
-        <div className="mt-8 bg-bg2 border border-border rounded-xl overflow-hidden">
+        <div className="mt-4 bg-bg2 border border-border rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-border">
             <h3 className="text-sm font-bold uppercase tracking-wider">Résumé par Position</h3>
           </div>
-          <table className="w-full text-left text-xs">
+          <div className="overflow-x-auto"><table className="w-full min-w-[520px] text-left text-xs">
             <thead>
               <tr className="bg-bg3/50 text-muted uppercase tracking-widest text-[9px]">
                 <th className="px-5 py-3 font-bold">Pos</th>
@@ -360,9 +347,10 @@ export function TrackerView() {
                 );
               })}
             </tbody>
-          </table>
+          </table></div>
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -373,7 +361,7 @@ function RangeReportTable({ reports, selectedKey, onSelect }: {
   onSelect: (key: string) => void;
 }) {
   return (
-    <table className="w-full text-left text-xs">
+    <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-xs">
       <thead>
         <tr className="bg-bg3/50 text-muted uppercase tracking-widest text-[9px]">
           <th className="px-5 py-3 font-bold">Range</th>
@@ -402,7 +390,7 @@ function RangeReportTable({ reports, selectedKey, onSelect }: {
           </tr>
         ))}
       </tbody>
-    </table>
+    </table></div>
   );
 }
 

@@ -374,16 +374,16 @@ export function GrilleView() {
   const isSrsReview = srsReviewKey === selectedTabKey;
 
   return (
-    <div ref={containerRef} className="flex-1 flex flex-col overflow-hidden min-h-0 px-2 md:px-4 py-2">
+    <div ref={containerRef} className="flex-1 flex flex-col overflow-hidden min-h-0 px-2 sm:px-3 md:px-5 py-3 bg-gradient-to-b from-bg3/20 to-bg">
 
       {/* SRS banner */}
       {isSrsReview && (
         <div className="flex-shrink-0 mb-1.5 px-3 py-2 bg-accent/10 border border-accent/30 rounded-lg flex items-center justify-between gap-2">
           <div>
-            <span className="text-[11px] font-bold text-accent">📅 Révision SRS</span>
-            <span className="text-[10px] text-muted ml-2">Reconstituez la range de mémoire, puis vérifiez</span>
+            <span className="text-xs font-bold text-accent">Révision SRS</span>
+            <span className="text-[11px] text-muted ml-2">Reconstituez la range de mémoire, puis vérifiez</span>
           </div>
-          <button onClick={() => store.setMode('srs')} className="text-[10px] text-muted hover:text-text transition-colors flex-shrink-0">✕ Annuler</button>
+          <button onClick={() => store.setMode('srs')} className="min-h-8 px-2 text-[11px] text-muted hover:text-text transition-colors flex-shrink-0">Annuler</button>
         </div>
       )}
 
@@ -394,7 +394,7 @@ export function GrilleView() {
           {/* Range info */}
           {selectedTab && (
             <div className="flex items-center gap-2 mb-2 overflow-x-auto no-scrollbar">
-              <span className="text-[10px] text-muted flex-shrink-0">{inRangeCount} mains ({Math.round(inRangeCount / 169 * 100)}%)</span>
+              <span className="text-xs text-muted flex-shrink-0">{inRangeCount} mains · {Math.round(inRangeCount / 169 * 100)}% de la grille</span>
             </div>
           )}
 
