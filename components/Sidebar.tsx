@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { useAppStore } from '@/store/appStore';
 import { countCombos, tabKey } from '@/lib/poker';
@@ -13,12 +13,20 @@ import { Icon } from './ui/Icon';
 export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings: () => void; onClose?: () => void; onLogout?: () => void }) {
   const { rmData, rmFiles, srs, importRmFile, deleteRmFile, renameRmFile, selectTab, setMode, selectedTabKey } = useAppStore();
   const [search, setSearch] = useState('');
-  const [openCats, setOpenCats] = useState<Set<string>>(new Set());
+  const [openCats, setOpenCats] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set();
+    try { return new Set(JSON.parse(localStorage.getItem('range-trainer-open-categories') ?? '[]')); }
+    catch { return new Set(); }
+  });
   const [showFiles, setShowFiles] = useState(false);
   const [pendingFile, setPendingFile] = useState<{ name: string; content: string } | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
   const dropRef = useRef<HTMLButtonElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    localStorage.setItem('range-trainer-open-categories', JSON.stringify([...openCats]));
+  }, [openCats]);
 
   const handleFile = useCallback(
     (f: File) => {

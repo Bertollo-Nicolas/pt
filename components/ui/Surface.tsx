@@ -37,3 +37,7 @@ export function StatCard({ label, value, detail, tone = 'default' }: {
     </Surface>
   );
 }
+
+export function Skeleton({ className }: { className?: string }) {
+  return <div aria-hidden="true" className={clsx('animate-pulse rounded-lg bg-gradient-to-r from-bg3 via-bg4 to-bg3 bg-[length:200%_100%]', className)} />;
+}

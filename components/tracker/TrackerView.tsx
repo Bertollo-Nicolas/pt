@@ -9,7 +9,7 @@ import { buildTrackerRangeReports, commonTrackerSpots, type TrackerHandReport, t
 import { suggestTrackerMappings } from '@/lib/tracker-mapping';
 import type { Category, PreflopStat, RmData } from '@/lib/types';
 import { Icon } from '@/components/ui/Icon';
-import { SectionHeading, StatCard, Surface } from '@/components/ui/Surface';
+import { SectionHeading, Skeleton, StatCard, Surface } from '@/components/ui/Surface';
 
 interface RangeOption {
   key: string;
@@ -25,6 +25,7 @@ export function TrackerView() {
   const [importing, setImporting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [stats, setStats] = useState<PreflopStat[]>([]);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [reportMode, setReportMode] = useState<'session' | 'global'>('session');
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [selectedRangeKey, setSelectedRangeKey] = useState<string | null>(null);
@@ -33,8 +34,12 @@ export function TrackerView() {
   const supabase = createClient();
 
   const refreshStats = useCallback(async () => {
-    const data = await loadPreflopStats(supabase);
-    setStats(data);
+    try {
+      const data = await loadPreflopStats(supabase);
+      setStats(data);
+    } finally {
+      setStatsLoading(false);
+    }
   }, [supabase]);
 
   useEffect(() => {
@@ -134,6 +139,7 @@ export function TrackerView() {
   const selectedRange = rangeReports.find(report => report.rangeKey === selectedRangeKey) ?? null;
   const mappedHands = rangeReports.reduce((sum, report) => sum + report.total, 0);
   const deviationHands = rangeReports.reduce((sum, report) => sum + report.errors, 0);
+  const priorityReports = [...rangeReports].filter(report => report.errors > 0).sort((a, b) => b.errors - a.errors).slice(0, 3);
 
   const updateMapping = (key: string, value: string) => {
     const next = { ...mappings };
@@ -187,11 +193,13 @@ export function TrackerView() {
         )}
       </Surface>
 
-      <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {statsLoading ? <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3" aria-label="Chargement des statistiques"><Skeleton className="h-32"/><Skeleton className="h-32"/><Skeleton className="h-32"/></div> : <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatCard label="Mains analysées" value={totalHands} detail={reportMode === 'session' ? 'Session sélectionnée' : 'Toutes les sessions'} />
         <StatCard label="Résultat net" value={`${totalNet > 0 ? '+' : ''}${totalNet.toFixed(1)} BB`} tone={totalNet >= 0 ? 'positive' : 'negative'} />
         <StatCard label="Winrate" value={`${totalHands > 0 ? ((totalNet / totalHands) * 100).toFixed(1) : 0}`} detail="bb / 100 mains" tone={totalNet >= 0 ? 'positive' : 'negative'} />
-      </div>
+      </div>}
+
+      {sessionDays.length > 1 && <WinrateTrend stats={stats} days={[...sessionDays].reverse()} />}
 
       {rangeOptions.length > 0 && (
         <details className="mt-4 bg-bg2 border border-border rounded-xl overflow-hidden">
@@ -240,7 +248,7 @@ export function TrackerView() {
       )}
 
       {sessionDays.length > 0 && (
-        <div className="mt-4 bg-bg2 border border-border rounded-xl p-4">
+        <div className="mt-4 bg-bg2/95 backdrop-blur border border-border rounded-xl p-4 sticky top-2 z-10 shadow-lg">
           <div className="flex items-center gap-2 mb-3">
             <button
               onClick={() => setReportMode('session')}
@@ -287,6 +295,21 @@ export function TrackerView() {
             <div className={`text-2xl font-bold ${deviationHands > 0 ? 'text-orange' : 'text-green'}`}>{deviationHands}</div>
           </div>
         </div>
+      )}
+
+      {priorityReports.length > 0 && (
+        <section className="mt-4">
+          <div className="section-label mb-2">Priorités de travail</div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {priorityReports.map((report, index) => (
+              <button key={report.rangeKey} onClick={() => { setSelectedRangeKey(report.rangeKey); setSelectedHand(null); setErrorFilter('all'); }} className="text-left bg-bg2 border border-border rounded-xl p-4 hover:border-accent/60 hover:bg-accent/5 transition-colors">
+                <div className="flex items-center justify-between gap-3"><span className="text-[11px] font-bold text-accent">#{index + 1}</span><span className="text-xs font-bold text-orange">{report.errors} erreurs</span></div>
+                <div className="text-sm font-semibold mt-2 line-clamp-2">{report.label}</div>
+                <div className="text-[11px] text-muted mt-1">{report.total ? Math.round(report.errors / report.total * 100) : 0}% de déviation</div>
+              </button>
+            ))}
+          </div>
+        </section>
       )}
 
       {rangeReports.length > 0 && (
@@ -361,7 +384,17 @@ function RangeReportTable({ reports, selectedKey, onSelect }: {
   onSelect: (key: string) => void;
 }) {
   return (
-    <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-xs">
+    <><div className="sm:hidden divide-y divide-border">
+      {reports.map(report => (
+        <button key={report.rangeKey} onClick={() => onSelect(report.rangeKey)} className={`w-full text-left p-4 transition-colors ${selectedKey === report.rangeKey ? 'bg-accent/10' : 'hover:bg-bg3/40'}`}>
+          <div className="flex items-start justify-between gap-3"><div className="font-semibold text-sm line-clamp-2">{report.label}</div><span className="text-xs font-bold text-orange flex-shrink-0">{report.errors} erreurs</span></div>
+          <div className="text-[11px] text-muted mt-1 truncate">{report.spots.join(' · ')}</div>
+          <div className="grid grid-cols-4 gap-2 mt-3 text-center">
+            <Metric label="Mains" value={report.total}/><Metric label="Taux" value={`${report.total ? Math.round(report.errors / report.total * 100) : 0}%`}/><Metric label="Manquées" value={report.missed}/><Metric label="Hors range" value={report.extra}/>
+          </div>
+        </button>
+      ))}
+    </div><div className="hidden sm:block overflow-x-auto"><table className="w-full min-w-[760px] text-left text-xs">
       <thead>
         <tr className="bg-bg3/50 text-muted uppercase tracking-widest text-[9px]">
           <th className="px-5 py-3 font-bold">Range</th>
@@ -390,8 +423,26 @@ function RangeReportTable({ reports, selectedKey, onSelect }: {
           </tr>
         ))}
       </tbody>
-    </table></div>
+    </table></div></>
   );
+}
+
+function Metric({ label, value }: { label: string; value: React.ReactNode }) {
+  return <div className="bg-bg3 rounded-lg px-2 py-2"><div className="text-xs font-bold">{value}</div><div className="text-[9px] text-muted uppercase mt-0.5">{label}</div></div>;
+}
+
+function WinrateTrend({ stats, days }: { stats: PreflopStat[]; days: string[] }) {
+  const points = days.map(day => {
+    const rows = stats.filter(stat => stat.day === day);
+    const hands = rows.reduce((sum, row) => sum + row.count, 0);
+    const net = rows.reduce((sum, row) => sum + row.net_bb, 0);
+    return { day, value: hands ? net / hands * 100 : 0 };
+  });
+  const min = Math.min(...points.map(point => point.value));
+  const max = Math.max(...points.map(point => point.value));
+  const span = Math.max(1, max - min);
+  const polyline = points.map((point, index) => `${points.length === 1 ? 50 : index / (points.length - 1) * 100},${90 - (point.value - min) / span * 75}`).join(' ');
+  return <Surface className="mt-4 p-4 sm:p-5"><div className="flex items-end justify-between gap-3 mb-3"><div><div className="section-label">Évolution</div><h3 className="text-sm font-semibold mt-1">Winrate par session</h3></div><div className="text-xs text-muted">{points.length} sessions</div></div><svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-28 overflow-visible"><path d="M0 90H100" stroke="#2e2e38" strokeWidth="1"/><polyline points={polyline} fill="none" stroke="#6c63ff" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round"/></svg><div className="flex justify-between text-[10px] text-muted mt-1"><span>{new Date(`${points[0].day}T12:00:00`).toLocaleDateString('fr-FR')}</span><span>{new Date(`${points[points.length - 1].day}T12:00:00`).toLocaleDateString('fr-FR')}</span></div></Surface>;
 }
 
 function RangeErrorDetail({ report, rangeMap, filter, onFilter, selectedHand, onSelectHand }: {
@@ -464,7 +515,7 @@ function TrackerGrid({ title, rangeMap, report, mode, filter, selectedHand, onSe
           const style = mode === 'original' ? originalCellStyle(hand, rangeMap) : errorCellStyle(observed);
           return (
             <button key={hand} onClick={() => onSelectHand(hand)} title={hand}
-              className={`aspect-square min-w-0 rounded-sm flex items-center justify-center font-bold text-[7px] border transition-all ${selectedHand === hand ? 'ring-2 ring-white z-10' : ''}`}
+              className={`aspect-square min-w-0 rounded-sm flex items-center justify-center font-bold text-[clamp(6px,1.4vw,9px)] border transition-all ${selectedHand === hand ? 'ring-2 ring-white z-10' : ''}`}
               style={{ ...style, opacity: mode === 'errors' && !visible ? 0.18 : 1 }}>
               {hand}
             </button>

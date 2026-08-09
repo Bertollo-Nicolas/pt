@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react';
 import clsx from 'clsx';
+import { Icon } from '@/components/ui/Icon';
 import { useAppStore, getCfg } from '@/store/appStore';
 import { allHands, getNonFoldActions, getHandActions, getRangeActionDefs, isFoldAction, isMixed, cellType } from '@/lib/poker';
 import { hexRgba, todayStr } from '@/lib/utils';
@@ -121,7 +122,7 @@ function ResultGrid({ hands, selection, actionButtons, selectedTab, label, hover
 
   return (
     <div className="flex flex-col items-center">
-      <div className="text-[8px] text-muted text-center mb-0.5 uppercase tracking-wider">{label}</div>
+      <div className="text-[10px] text-muted text-center mb-1 uppercase tracking-wider">{label}</div>
       <div className="bg-bg3 rounded-lg p-0.5">
         <div
           style={{ 
@@ -224,6 +225,7 @@ export function GrilleView() {
   const [freqPerAction, setFreqPerAction] = useState<Record<string, number>>({});
   const [hoveredHand,   setHoveredHand]   = useState<string | null>(null);
   const [hoveredState,  setHoveredState]  = useState<CheckState | null>(null);
+  const [isFullscreen,  setIsFullscreen]  = useState(false);
 
   const containerRef   = useRef<HTMLDivElement>(null);
   const midRef         = useRef<HTMLDivElement>(null);
@@ -263,6 +265,18 @@ export function GrilleView() {
     if (containerRef.current) obs.observe(containerRef.current);
     return () => obs.disconnect();
   }, [updateSizes]);
+
+  useEffect(() => {
+    const onFullscreen = () => setIsFullscreen(document.fullscreenElement === containerRef.current);
+    document.addEventListener('fullscreenchange', onFullscreen);
+    return () => document.removeEventListener('fullscreenchange', onFullscreen);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    if (!containerRef.current) return;
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else await containerRef.current.requestFullscreen();
+  };
 
   // Reset on tab change — init freqPerAction to Fold=100%, others=0%
   useEffect(() => {
@@ -393,8 +407,9 @@ export function GrilleView() {
 
           {/* Range info */}
           {selectedTab && (
-            <div className="flex items-center gap-2 mb-2 overflow-x-auto no-scrollbar">
+            <div className="flex items-center justify-between gap-2 mb-2">
               <span className="text-xs text-muted flex-shrink-0">{inRangeCount} mains · {Math.round(inRangeCount / 169 * 100)}% de la grille</span>
+              <button onClick={toggleFullscreen} className="min-h-8 px-2.5 rounded-lg border border-border text-[11px] text-muted hover:text-text hover:border-border2 inline-flex items-center gap-1.5" title="Agrandir la grille"><Icon name="maximize" size={14}/>{isFullscreen ? 'Réduire' : 'Plein écran'}</button>
             </div>
           )}
 
@@ -438,7 +453,7 @@ export function GrilleView() {
                       <div className="flex gap-0.5 justify-center">
                         {[0, 25, 50, 75, 100].map(f => (
                           <button key={f}
-                            className="px-1 py-0.5 text-[8px] rounded cursor-pointer text-white select-none"
+                            className="px-1.5 py-0.5 text-[10px] rounded cursor-pointer text-white select-none"
                             style={{ background: freq === f ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)' }}
                             onClick={() => adjustFreq(name, f)}>{f}</button>
                         ))}
@@ -505,7 +520,7 @@ export function GrilleView() {
                 onMouseLeave={() => setHoveredState(null)}
               >
                 <div className="text-lg font-bold leading-none" style={{ color }}>{val}</div>
-                <div className="text-[7px] text-muted mt-0.5 uppercase tracking-wider leading-none">{label}</div>
+                <div className="text-[9px] text-muted mt-0.5 uppercase tracking-wider leading-none">{label}</div>
               </div>
             ))}
           </div>
@@ -522,7 +537,7 @@ export function GrilleView() {
                 <div className={clsx('text-[10px] font-bold', checkResult.score >= cfg.grilleThreshold ? 'text-green' : 'text-red')}>
                   {checkResult.score >= cfg.grilleThreshold ? `✅ Révision réussie (${checkResult.score}%)` : `❌ Score insuffisant (${checkResult.score}% < ${cfg.grilleThreshold}%)`}
                 </div>
-                <div className="text-[8px] text-muted mt-0.5">
+                <div className="text-[10px] text-muted mt-0.5">
                   {checkResult.score >= cfg.grilleThreshold ? 'Prochaine date adaptée au score' : 'Révision rapprochée — réessayer demain'}
                 </div>
               </div>
