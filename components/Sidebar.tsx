@@ -16,7 +16,7 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
   const [showFiles, setShowFiles] = useState(false);
   const [pendingFile, setPendingFile] = useState<{ name: string; content: string } | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
-  const dropRef = useRef<HTMLDivElement>(null);
+  const dropRef = useRef<HTMLButtonElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback(
@@ -120,17 +120,18 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
       </div>
 
       {/* Upload zone */}
-      <div
+      <button
+        type="button"
         ref={dropRef}
         onClick={() => fileInputRef.current?.click()}
         onDragOver={(e) => { e.preventDefault(); dropRef.current?.classList.add('border-accent'); }}
         onDragLeave={() => dropRef.current?.classList.remove('border-accent')}
         onDrop={(e) => { e.preventDefault(); dropRef.current?.classList.remove('border-accent'); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); }}
-        className="mx-2.5 my-2 border border-dashed border-border2 rounded p-2.5 text-center cursor-pointer transition-all hover:border-accent hover:bg-accent/5 flex-shrink-0"
+        className="mx-2.5 my-2 min-h-14 border border-dashed border-border2 rounded p-2.5 text-center cursor-pointer transition-all hover:border-accent hover:bg-accent/5 flex-shrink-0"
       >
-        <strong className="text-[11px] block mb-0.5">📂 Importer un fichier .rm</strong>
-        <p className="text-[10px] text-muted">Cliquer ou glisser-déposer</p>
-      </div>
+        <strong className="text-xs block mb-0.5">📂 Importer un fichier .rm</strong>
+        <span className="text-[11px] text-muted">Cliquer ou glisser-déposer</span>
+      </button>
       <input
         ref={fileInputRef}
         type="file"
@@ -151,13 +152,14 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
 
       {/* SRS banner */}
       {dueCount > 0 && (
-        <div
+        <button
+          type="button"
           onClick={() => setMode('srs')}
-          className="mx-2.5 my-1.5 bg-red/5 border border-red/25 rounded p-2 cursor-pointer hover:bg-red/10 flex-shrink-0"
+          className="mx-2.5 my-1.5 text-left bg-red/5 border border-red/25 rounded p-2.5 cursor-pointer hover:bg-red/10 flex-shrink-0"
         >
-          <div className="text-[11px] font-bold text-red">🔴 {dueCount} range{dueCount > 1 ? 's' : ''} à réviser aujourd&apos;hui</div>
-          <div className="text-[10px] text-muted mt-0.5">Cliquer pour voir</div>
-        </div>
+          <span className="text-xs font-bold text-red block">🔴 {dueCount} range{dueCount > 1 ? 's' : ''} à réviser aujourd&apos;hui</span>
+          <span className="text-[11px] text-muted mt-0.5 block">Voir les révisions</span>
+        </button>
       )}
 
       {/* Tree */}
@@ -313,13 +315,15 @@ function TreeNode({
   if (cat.children) {
     return (
       <div className="mb-0.5">
-        <div
+        <button
+          type="button"
+          aria-expanded={isOpen}
           onClick={() => onToggle(id)}
-          className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-muted cursor-pointer rounded hover:bg-bg3 hover:text-text transition-colors"
+          className="w-full min-h-8 flex items-center gap-1.5 px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-muted cursor-pointer rounded hover:bg-bg3 hover:text-text transition-colors"
         >
           <span className={clsx('text-[8px] transition-transform duration-150', isOpen && 'rotate-90')}>▶</span>
           {cat.name}
-        </div>
+        </button>
         {isOpen && (
           <div className="pl-1.5">
             {cat.children.map((cid) => (
@@ -335,13 +339,15 @@ function TreeNode({
   if (cat.tabList && cat.tabs) {
     return (
       <div className="mb-0.5">
-        <div
+        <button
+          type="button"
+          aria-expanded={isOpen}
           onClick={() => onToggle(id)}
-          className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-muted cursor-pointer rounded hover:bg-bg3 hover:text-text transition-colors"
+          className="w-full min-h-8 flex items-center gap-1.5 px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-muted cursor-pointer rounded hover:bg-bg3 hover:text-text transition-colors"
         >
           <span className={clsx('text-[8px] transition-transform duration-150', isOpen && 'rotate-90')}>▶</span>
           {cat.name}
-        </div>
+        </button>
         {isOpen && (
           <div className="pl-1.5">
             {cat.tabList.map((tid) => {
@@ -356,11 +362,12 @@ function TreeNode({
               const isSelected = selectedTabKey === key;
 
               return (
-                <div
+                <button
+                  type="button"
                   key={tid}
                   onClick={() => onSelectTab(id, tid)}
                   className={clsx(
-                    'flex items-center justify-between px-2 py-1 text-xs cursor-pointer rounded mb-px transition-all duration-150 gap-1',
+                    'w-full min-h-9 flex items-center justify-between px-2 py-1 text-xs cursor-pointer rounded mb-px transition-all duration-150 gap-1 text-left',
                     isSelected ? 'bg-accent/15 text-accent' : 'text-muted hover:bg-bg3 hover:text-text',
                   )}
                 >
@@ -375,7 +382,7 @@ function TreeNode({
                       </span>
                     )}
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>

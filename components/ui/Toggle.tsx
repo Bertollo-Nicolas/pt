@@ -9,17 +9,21 @@ interface ToggleProps {
 
 export function Toggle({ on, onToggle, label }: ToggleProps) {
   return (
-    <label className="flex items-center gap-1.5 text-xs text-muted cursor-pointer select-none">
+    <div className="flex items-center gap-2 text-xs text-muted select-none">
       <span>{label}</span>
-      <div
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-label={label}
         onClick={onToggle}
         className={clsx(
-          'relative w-[30px] h-[17px] rounded-full border transition-colors duration-200',
+          'relative w-[34px] h-5 rounded-full border transition-colors duration-200 cursor-pointer',
           on ? 'bg-accent border-accent toggle-on' : 'bg-bg3 border-border2',
         )}
       >
         <div className="toggle-knob" />
-      </div>
-    </label>
+      </button>
+    </div>
   );
 }

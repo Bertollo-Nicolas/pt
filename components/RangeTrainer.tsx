@@ -43,7 +43,9 @@ export default function RangeTrainer() {
 
       {/* ── Mobile sidebar overlay ── */}
       <div className={`md:hidden fixed inset-0 z-40 transition-all duration-300 ${sidebarOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
-        <div
+        <button
+          type="button"
+          aria-label="Fermer le menu"
           className={`absolute inset-0 bg-black/60 transition-opacity duration-300 ${sidebarOpen ? 'opacity-100' : 'opacity-0'}`}
           onClick={() => setSidebarOpen(false)}
         />
@@ -77,10 +79,20 @@ export default function RangeTrainer() {
 
 function EmptyView() {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-2.5 text-muted px-6 text-center">
-      <div className="text-[44px]">🎯</div>
-      <p className="text-[13px]">Importe un fichier <strong className="text-text">.rm</strong> depuis Range Manager</p>
-      <p className="text-[11px]">File → Export dans Range Manager</p>
+    <div className="flex-1 flex flex-col items-center justify-center text-muted px-6 text-center">
+      <div aria-hidden="true" className="text-[48px] mb-3">🎯</div>
+      <h3 className="text-base font-semibold text-text">Commence ton entraînement</h3>
+      <p className="text-sm mt-2 max-w-md leading-relaxed">
+        Ouvre un dossier dans le menu, puis sélectionne une position pour lancer un exercice.
+      </p>
+      <div className="mt-5 flex items-center gap-2 text-xs" aria-label="Parcours de démarrage">
+        <span className="rounded-full bg-accent/15 text-accent px-2.5 py-1">1. Dossier</span>
+        <span aria-hidden="true">→</span>
+        <span className="rounded-full bg-bg3 text-muted px-2.5 py-1">2. Spot</span>
+        <span aria-hidden="true">→</span>
+        <span className="rounded-full bg-bg3 text-muted px-2.5 py-1">3. Mode</span>
+      </div>
+      <p className="text-xs mt-5">Pas encore de ranges ? Importe un fichier <strong className="text-text">.rm</strong> depuis Range Manager.</p>
     </div>
   );
 }

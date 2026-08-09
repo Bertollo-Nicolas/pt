@@ -16,15 +16,15 @@ const variantClasses: Record<Variant, string> = {
 };
 
 const sizeClasses = {
-  sm: 'px-2.5 py-1 text-[10px]',
-  md: 'px-3 py-1.5 text-xs',
+  sm: 'min-h-8 px-2.5 py-1 text-[11px]',
+  md: 'min-h-9 px-3 py-1.5 text-xs',
 };
 
 export function Button({ variant = 'secondary', size = 'md', className, children, ...props }: ButtonProps) {
   return (
     <button
       className={clsx(
-        'rounded border font-semibold cursor-pointer transition-all duration-150 disabled:opacity-35 disabled:cursor-not-allowed',
+        'rounded border font-semibold cursor-pointer transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-35 disabled:cursor-not-allowed',
         variantClasses[variant],
         sizeClasses[size],
         className,

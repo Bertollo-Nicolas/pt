@@ -5,6 +5,7 @@ import { useAppStore, getCfg } from '@/store/appStore';
 import { allHands, getDecisionActions, getHandActions, getNonFoldActions, getDominant, getRangeActionDefs, getRangeMixedActionSets } from '@/lib/poker';
 import { todayStr, hexRgba } from '@/lib/utils';
 import { SRS_DRILL_HANDS, srsDrillProgress, srsNeedsDrill, srsRequiresDrill } from '@/lib/srs';
+import { createFlashSchedulerState, drawSmartFlashHand, recordFlashOutcome, type FlashSchedulerState } from '@/lib/flash-scheduler';
 import type { HandItem, SelectedTab, HandAction } from '@/lib/types';
 
 // ── Types ─────────────────────────────────────────────────────
@@ -75,39 +76,6 @@ function evaluateAnswer(
   return { correct: false, partial: false, expected, text: `✗ Erreur — ${detail}` };
 }
 
-function pickNextHand(
-  rangeMap: Record<string, HandAction[]>,
-  retryQueue: string[],
-  handFilter?: Set<string> | null,
-  focusMode?: boolean,
-): HandItem {
-  const baseAll = allHands();
-  const all = handFilter && handFilter.size > 0
-    ? baseAll.filter(h => handFilter.has(h.hand))
-    : baseAll;
-  const safeAll = all.length > 0 ? all : baseAll;
-
-  const filteredRetry = handFilter && handFilter.size > 0
-    ? retryQueue.filter(h => handFilter.has(h))
-    : retryQueue;
-
-  // Mode Focus: 100% pick from errors if available
-  if (focusMode && filteredRetry.length > 0) {
-    const idx = Math.floor(Math.random() * filteredRetry.length);
-    const found = safeAll.find(h => h.hand === filteredRetry[idx]);
-    if (found) return found;
-  }
-
-  if (filteredRetry.length > 0 && Math.random() < 0.35) {
-    const idx = Math.floor(Math.random() * filteredRetry.length);
-    const found = safeAll.find(h => h.hand === filteredRetry[idx]);
-    if (found) return found;
-  }
-  const ir = safeAll.filter(h => getHandActions(h.hand, rangeMap) !== null);
-  const pool = ir.length > 0 && Math.random() < 0.65 ? ir : safeAll;
-  return pool[Math.floor(Math.random() * pool.length)];
-}
-
 // ── FlashView (orchestrator) ───────────────────────────────────
 export function FlashView() {
   const store = useAppStore();
@@ -135,6 +103,7 @@ export function FlashView() {
   const totalStatsRef    = useRef<FlashStats>({ correct: 0, wrong: 0, imprecision: 0, streak: 0, bestStreak: 0 });
   const sessionErrorsRef = useRef<Map<string, number>>(new Map());
   const retryQueueRef    = useRef<string[]>([]);
+  const schedulerRef     = useRef<FlashSchedulerState>(createFlashSchedulerState());
 
   const onRetryCountChange = useCallback(() => {
     setRetryCount(retryQueueRef.current.length);
@@ -168,6 +137,7 @@ export function FlashView() {
     setTotalStats({ correct: 0, wrong: 0, imprecision: 0, streak: 0, bestStreak: 0 });
     sessionErrorsRef.current = new Map();
     retryQueueRef.current = [];
+    schedulerRef.current = createFlashSchedulerState();
     setRetryCount(0);
     setPaused(false);
     setSessionEnded(false);
@@ -286,6 +256,7 @@ export function FlashView() {
             timerMs={timerMs} autoNext={autoNext} paused={paused || sessionEnded}
             focusMode={focusMode}
             compact={false} sessionErrorsRef={sessionErrorsRef} retryQueueRef={retryQueueRef}
+            schedulerRef={schedulerRef}
             handFilter={handFilter}
             spotKey={selectedTabKey}
             onAnswer={onAnswer} onRetryCountChange={onRetryCountChange}
@@ -302,6 +273,7 @@ export function FlashView() {
               timerMs={timerMs} autoNext={autoNext} paused={paused || sessionEnded}
               focusMode={focusMode}
               compact sessionErrorsRef={sessionErrorsRef} retryQueueRef={retryQueueRef}
+              schedulerRef={schedulerRef}
               handFilter={handFilter}
               spotKey={selectedTabKey}
               onAnswer={onAnswer} onRetryCountChange={onRetryCountChange}
@@ -474,6 +446,7 @@ interface FlashPanelProps {
   compact: boolean;
   sessionErrorsRef: MutableRefObject<Map<string, number>>;
   retryQueueRef: MutableRefObject<string[]>;
+  schedulerRef: MutableRefObject<FlashSchedulerState>;
   handFilter?: Set<string> | null;
   spotKey: string | null;
   onAnswer: (correct: boolean, partial: boolean) => void;
@@ -482,7 +455,7 @@ interface FlashPanelProps {
 
 function FlashPanel({
   selectedTab, allButtons, actionButtons, timerMs, autoNext, paused, focusMode, compact,
-  sessionErrorsRef, retryQueueRef, handFilter, spotKey, onAnswer, onRetryCountChange,
+  sessionErrorsRef, retryQueueRef, schedulerRef, handFilter, spotKey, onAnswer, onRetryCountChange,
 }: FlashPanelProps) {
   const { recordError } = useAppStore();
 
@@ -573,9 +546,17 @@ function FlashPanel({
         ? acts.map(a => `${a.action}${a.freq < 1 ? ' (' + Math.round(a.freq * 100) + '%)' : ''}`).join(' / ')
         : 'Fold';
       setFeedback({ type: 'wrong', text: `⏱ Temps écoulé — ${detail}` });
+      recordFlashOutcome(schedulerRef.current, hand.hand, 'timeout');
+      recordError(hand.hand, 'Timeout', detail, spotKey ?? undefined);
+      const previousErrors = sessionErrorsRef.current.get(hand.hand) ?? 0;
+      sessionErrorsRef.current.set(hand.hand, previousErrors + 1);
+      if (!retryQueueRef.current.includes(hand.hand)) {
+        retryQueueRef.current.push(hand.hand);
+        onRetryCountChange();
+      }
       onAnswer(false, false);
     };
-  }, [hand, selectedTab.rangeMap, onAnswer]);
+  }, [hand, selectedTab.rangeMap, schedulerRef, sessionErrorsRef, retryQueueRef, spotKey, recordError, onRetryCountChange, onAnswer]);
 
   const draw = useCallback(() => {
     clearTimer();
@@ -583,12 +564,12 @@ function FlashPanel({
     setFeedback(null);
     setCardAnim(null);
     setTimerPct(100);
-    const h = pickNextHand(selectedTab.rangeMap, retryQueueRef.current, handFilter, focusMode);
+    const h = drawSmartFlashHand(selectedTab.rangeMap, schedulerRef.current, retryQueueRef.current, handFilter, focusMode);
     setHand(h); setSuits(pickSuits(h.type));
     intervalStartRef.current = Date.now();
     pausedAtRef.current = pausedRef.current ? Date.now() : null;
     if (timerMsRef.current > 0 && !pausedRef.current) startTimer();
-  }, [selectedTab.rangeMap, retryQueueRef, handFilter, focusMode, clearTimer, startTimer]);
+  }, [selectedTab.rangeMap, schedulerRef, retryQueueRef, handFilter, focusMode, clearTimer, startTimer]);
 
   useEffect(() => { draw(); }, []); // eslint-disable-line
 
@@ -610,6 +591,7 @@ function FlashPanel({
     setFeedback({ type: result.correct ? 'correct' : result.partial ? 'partial' : 'wrong', text: result.text });
     setCardAnim((result.correct || result.partial) ? 'pop' : 'shake');
     setAnimKey(k => k + 1);
+    recordFlashOutcome(schedulerRef.current, hand.hand, result.correct ? 'correct' : result.partial ? 'partial' : 'wrong');
 
     if (!result.correct && !result.partial) recordError(hand.hand, btn.label, result.expected, spotKey ?? undefined);
 
@@ -625,7 +607,7 @@ function FlashPanel({
       if (idx !== -1) { retryQueueRef.current.splice(idx, 1); onRetryCountChange(); }
     }
     onAnswer(result.correct, result.partial);
-  }, [hand, clearTimer, selectedTab.rangeMap, sessionErrorsRef, retryQueueRef, spotKey, onAnswer, onRetryCountChange, recordError]);
+  }, [hand, clearTimer, selectedTab.rangeMap, schedulerRef, sessionErrorsRef, retryQueueRef, spotKey, onAnswer, onRetryCountChange, recordError]);
 
   if (!hand) return null;
 

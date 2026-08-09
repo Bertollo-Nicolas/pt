@@ -1,4 +1,4 @@
-import { getNonFoldActions } from './poker';
+import { getDecisionActions, getNonFoldActions, isFoldAction } from './poker';
 import type { HandAction, PreflopStat } from './types';
 
 export type TrackerDeviationType = 'extra' | 'missed' | 'different';
@@ -20,6 +20,110 @@ export interface TrackerReport {
   deviations: TrackerDeviation[];
   missing: TrackerDeviation[];
   extra: TrackerDeviation[];
+}
+
+export interface TrackerHandReport {
+  hand: string;
+  total: number;
+  correct: number;
+  errors: number;
+  missed: number;
+  extra: number;
+  different: number;
+  net_bb: number;
+  expected: { action: string; freq: number }[];
+  actual: Record<string, number>;
+}
+
+export interface TrackerRangeReport {
+  rangeKey: string;
+  label: string;
+  spots: string[];
+  total: number;
+  correct: number;
+  errors: number;
+  missed: number;
+  extra: number;
+  different: number;
+  net_bb: number;
+  hands: Record<string, TrackerHandReport>;
+}
+
+export function buildTrackerRangeReports(
+  stats: PreflopStat[],
+  mappings: Record<string, string>,
+  rangeMaps: Record<string, Record<string, HandAction[]>>,
+  rangeLabels: Record<string, string>,
+): TrackerRangeReport[] {
+  const reports: Record<string, TrackerRangeReport> = {};
+
+  for (const stat of stats) {
+    const rangeKey = mappings[stat.spot] ?? mappings[stat.position];
+    const rangeMap = rangeKey ? rangeMaps[rangeKey] : null;
+    if (!rangeKey || !rangeMap) continue;
+
+    const report = reports[rangeKey] ??= {
+      rangeKey,
+      label: rangeLabels[rangeKey] ?? stat.spot,
+      spots: [],
+      total: 0,
+      correct: 0,
+      errors: 0,
+      missed: 0,
+      extra: 0,
+      different: 0,
+      net_bb: 0,
+      hands: {},
+    };
+    if (!report.spots.includes(stat.spot)) report.spots.push(stat.spot);
+
+    const expected = getDecisionActions(stat.hand, rangeMap);
+    const allowed = expected.map(action => action.action);
+    const actualIsFold = isFoldAction(stat.action) || stat.action === 'Check';
+    const foldAllowed = allowed.some(isFoldAction);
+    const nonFoldAllowed = allowed.some(action => !isFoldAction(action));
+    const valid = allowed.some(action => matchesExpectedTrackerAction(stat.action, action));
+
+    let type: TrackerDeviationType | null = null;
+    if (!valid) {
+      if (actualIsFold && nonFoldAllowed && !foldAllowed) type = 'missed';
+      else if (!actualIsFold && !nonFoldAllowed) type = 'extra';
+      else type = 'different';
+    }
+
+    const hand = report.hands[stat.hand] ??= {
+      hand: stat.hand,
+      total: 0,
+      correct: 0,
+      errors: 0,
+      missed: 0,
+      extra: 0,
+      different: 0,
+      net_bb: 0,
+      expected: expected.map(action => ({ action: action.action, freq: action.freq })),
+      actual: {},
+    };
+
+    report.total += stat.count;
+    report.net_bb += stat.net_bb;
+    hand.total += stat.count;
+    hand.net_bb += stat.net_bb;
+    hand.actual[stat.action] = (hand.actual[stat.action] ?? 0) + stat.count;
+
+    if (type) {
+      report.errors += stat.count;
+      report[type] += stat.count;
+      hand.errors += stat.count;
+      hand[type] += stat.count;
+    } else {
+      report.correct += stat.count;
+      hand.correct += stat.count;
+    }
+  }
+
+  return Object.values(reports)
+    .map(report => ({ ...report, spots: report.spots.sort() }))
+    .sort((a, b) => b.errors - a.errors || b.total - a.total);
 }
 
 const POSITIONS = ['HJ', 'CO', 'BTN', 'SB', 'BB'];
@@ -72,7 +176,7 @@ export function buildTrackerReport(
     let type: TrackerDeviationType | null = null;
     if (expectedActs.length === 0 && played) type = 'extra';
     else if (expectedActs.length > 0 && !played) type = 'missed';
-    else if (expectedActs.length > 0 && played && !matchesExpectedTrackerAction(s.action, expectedActs.map(a => a.action))) type = 'different';
+    else if (expectedActs.length > 0 && played && !expectedActs.some(a => matchesExpectedTrackerAction(s.action, a.action))) type = 'different';
 
     if (type) {
       deviations.push({
@@ -115,15 +219,13 @@ function isPlayedTrackerAction(action: string): boolean {
   return !['Fold', 'Check'].includes(action);
 }
 
-function matchesExpectedTrackerAction(action: string, expectedActions: string[]): boolean {
+function matchesExpectedTrackerAction(action: string, expectedAction: string): boolean {
   const actionNorm = normalizeAction(action);
-  return expectedActions.some(expected => {
-    const expectedNorm = normalizeAction(expected);
-    if (actionNorm === expectedNorm) return true;
-    if (['raise', '3bet', '4bet'].includes(actionNorm) && ['raise', 'open', 'bet', '3bet', '4bet'].includes(expectedNorm)) return true;
-    if (actionNorm === 'call' && ['call', 'coldcall', 'defend'].includes(expectedNorm)) return true;
-    return false;
-  });
+  const expectedNorm = normalizeAction(expectedAction);
+  if (actionNorm === expectedNorm) return true;
+  if (['raise', '3bet', '4bet'].includes(actionNorm) && ['raise', 'open', 'bet', '3bet', '4bet'].includes(expectedNorm)) return true;
+  if (actionNorm === 'call' && ['call', 'coldcall', 'defend'].includes(expectedNorm)) return true;
+  return false;
 }
 
 function normalizeAction(action: string): string {
