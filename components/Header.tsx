@@ -2,12 +2,13 @@
 import clsx from 'clsx';
 import { useAppStore } from '@/store/appStore';
 import type { Mode } from '@/lib/types';
+import { Icon, type IconName } from './ui/Icon';
 
-const MODES: { id: Mode; label: string; icon: string }[] = [
-  { id: 'flash',  label: 'Flash',  icon: '⚡' },
-  { id: 'grille', label: 'Grille', icon: '⊞' },
-  { id: 'srs',    label: 'SRS',    icon: '📅' },
-  { id: 'tracker', label: 'Tracker', icon: '📊' },
+export const MODES: { id: Mode; label: string; icon: IconName }[] = [
+  { id: 'flash',  label: 'Flash',  icon: 'flash' },
+  { id: 'grille', label: 'Grille', icon: 'grid' },
+  { id: 'srs',    label: 'SRS',    icon: 'calendar' },
+  { id: 'tracker', label: 'Tracker', icon: 'chart' },
 ];
 
 export function Header({ onOpenSidebar }: { onOpenSidebar: () => void }) {
@@ -22,7 +23,7 @@ export function Header({ onOpenSidebar }: { onOpenSidebar: () => void }) {
         title="Menu"
         aria-label="Ouvrir le menu"
       >
-        ☰
+        <Icon name="menu" />
       </button>
 
       {/* Spot name */}
@@ -36,7 +37,7 @@ export function Header({ onOpenSidebar }: { onOpenSidebar: () => void }) {
       </div>
 
       {/* Mode tabs */}
-      <nav aria-label="Modes d'entraînement" className="flex gap-1 overflow-x-auto no-scrollbar flex-shrink-0">
+      <nav aria-label="Modes d'entraînement" className="hidden sm:flex gap-1 overflow-x-auto no-scrollbar flex-shrink-0">
         {MODES.map((m) => (
           <button
             key={m.id}
@@ -52,8 +53,8 @@ export function Header({ onOpenSidebar }: { onOpenSidebar: () => void }) {
             aria-label={m.label}
             aria-pressed={currentMode === m.id}
           >
-            <span aria-hidden="true" className="sm:hidden">{m.icon}</span>
-            <span className="hidden sm:inline">{m.icon} {m.label}</span>
+            <Icon name={m.icon} size={15} className="inline-block mr-1.5 align-[-2px]" />
+            <span>{m.label}</span>
           </button>
         ))}
       </nav>

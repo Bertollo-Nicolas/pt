@@ -13,6 +13,28 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+::selection { background: rgba(108, 99, 255, 0.35); color: #fff; }
+
+.control {
+  min-height: 36px;
+  border: 1px solid #2e2e38;
+  border-radius: 8px;
+  background: #1f1f25;
+  color: #e8e8f0;
+  padding: 0.45rem 0.7rem;
+}
+
+.control:hover { border-color: #3e3e4e; }
+.control:focus { border-color: #6c63ff; }
+
+.section-label {
+  color: #9696aa;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 button, input, select, textarea { font: inherit; }
 
 :focus-visible {

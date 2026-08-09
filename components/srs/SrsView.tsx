@@ -5,6 +5,8 @@ import { todayStr, diffDays } from '@/lib/utils';
 import { SRS_DRILL_HANDS, srsConsecutiveFailures, srsDrillProgress, srsIntervalDays, srsNeedsDrill, srsRequiresDrill } from '@/lib/srs';
 import { LearningInsights } from '@/components/learning/LearningInsights';
 import type { SrsEntry } from '@/lib/types';
+import { Icon } from '@/components/ui/Icon';
+import { SectionHeading } from '@/components/ui/Surface';
 
 export function SrsView() {
   const store = useAppStore();
@@ -25,27 +27,23 @@ export function SrsView() {
     if (!reviewMap[e.nextReview]) reviewMap[e.nextReview] = [];
     reviewMap[e.nextReview].push(e);
   }
+  const summary = due.length > 0
+    ? `${due.length} range${due.length > 1 ? 's' : ''} à réviser aujourd’hui`
+    : entries.length === 0 ? 'Aucune range suivie' : 'Tout est à jour ✓';
 
   return (
-    <div className="flex-1 overflow-y-auto px-3 md:px-5 py-3 min-h-0">
+    <div className="flex-1 overflow-y-auto px-3 py-4 sm:p-6 min-h-0 bg-gradient-to-b from-bg3/30 to-bg">
+      <div className="max-w-5xl mx-auto">
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <h3 className="text-sm font-bold">Révisions SRS</h3>
-          <p className="text-[10px] text-muted mt-0.5">
-            {due.length > 0
-              ? `${due.length} range${due.length > 1 ? 's' : ''} à réviser aujourd&apos;hui`
-              : entries.length === 0 ? 'Aucune range suivie' : 'Tout est à jour ✓'
-            }
-          </p>
-        </div>
+      <div className="flex items-start justify-between mb-5">
+        <SectionHeading eyebrow="Apprentissage" title="Révisions SRS" description={summary} />
         {entries.length > 0 && (
           <button
             onClick={() => { if (confirm('Réinitialiser tout le SRS ?')) clearSrs(); }}
-            className="text-[10px] text-muted hover:text-red transition-colors cursor-pointer"
+            className="min-h-8 px-2 text-[11px] text-muted hover:text-red transition-colors cursor-pointer"
           >
-            🗑 Reset
+            Réinitialiser
           </button>
         )}
       </div>
@@ -53,9 +51,9 @@ export function SrsView() {
       {/* Empty state */}
       {entries.length === 0 && (
         <div className="text-center py-8 text-muted">
-          <div className="text-3xl mb-3">📅</div>
-          <p className="text-xs">Aucune range dans le SRS.</p>
-          <p className="text-[10px] mt-1.5 leading-relaxed">
+          <div className="mx-auto w-12 h-12 rounded-xl bg-accent/15 text-accent flex items-center justify-center mb-3"><Icon name="calendar" size={24}/></div>
+          <p className="text-sm font-medium text-text">Aucune range dans le SRS.</p>
+          <p className="text-xs mt-1.5 leading-relaxed">
             Atteins le seuil de précision en <strong className="text-text">Flash</strong> ou en <strong className="text-text">Grille</strong> pour être proposé.
           </p>
         </div>
@@ -66,8 +64,8 @@ export function SrsView() {
       {/* Due today */}
       {due.length > 0 && (
         <section className="mb-4">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-red mb-2">
-            🔴 À réviser aujourd&apos;hui — {due.length}
+          <div className="section-label text-red mb-2">
+            À réviser aujourd&apos;hui — {due.length}
           </div>
           <div className="flex flex-col gap-1.5">
             {due.map(e => (
@@ -94,8 +92,8 @@ export function SrsView() {
       {/* Upcoming */}
       {upcoming.length > 0 && (
         <section className="mb-4">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-muted mb-2">
-            📅 À venir — {upcoming.length}
+          <div className="section-label mb-2">
+            À venir — {upcoming.length}
           </div>
           <div className="flex flex-col gap-1.5">
             {upcoming.map(e => (
@@ -107,6 +105,7 @@ export function SrsView() {
           </div>
         </section>
       )}
+      </div>
     </div>
   );
 }
@@ -134,12 +133,12 @@ function SrsCard({ entry, today, cfg, onReview, onDrill, onRemove }: {
 
   return (
     <div className={clsx(
-      'flex items-center gap-2 px-3 py-2.5 bg-bg2 border rounded-lg',
+      'flex flex-col sm:flex-row sm:items-center gap-3 px-3.5 py-3 bg-bg2 border rounded-xl',
       isDue ? 'border-red/30 bg-red/5' : 'border-border'
     )}>
       <div className="flex-1 min-w-0">
-        <div className="text-xs font-medium truncate">{entry.name}</div>
-        <div className="text-[10px] text-muted mt-0.5 flex items-center gap-1.5 flex-wrap">
+        <div className="text-sm font-semibold truncate">{entry.name}</div>
+        <div className="text-[11px] text-muted mt-1 flex items-center gap-1.5 flex-wrap">
           <span>{entry.catName}</span>
           <span>·</span>
           <span>Intervalle: {intervalLabel}</span>
@@ -164,19 +163,19 @@ function SrsCard({ entry, today, cfg, onReview, onDrill, onRemove }: {
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 flex-shrink-0">
+      <div className="flex items-center gap-1.5 flex-shrink-0 self-end sm:self-auto">
         {isDue || requiresDrill ? (
           needsDrill && onDrill ? (
             <button
               onClick={onDrill}
-              className="px-2.5 py-1 text-[11px] font-semibold rounded border bg-orange/15 border-orange/40 text-orange hover:bg-orange/20 transition-colors cursor-pointer"
+              className="min-h-9 px-3 py-1 text-xs font-semibold rounded border bg-orange/15 border-orange/40 text-orange hover:bg-orange/20 transition-colors cursor-pointer"
             >
               Drill {drillProgress}/{SRS_DRILL_HANDS}
             </button>
           ) : onReview && (
             <button
               onClick={onReview}
-              className="px-2.5 py-1 text-[11px] font-semibold rounded border bg-accent border-accent text-white hover:opacity-90 transition-opacity cursor-pointer"
+              className="min-h-9 px-3 py-1 text-xs font-semibold rounded border bg-accent border-accent text-white hover:opacity-90 transition-opacity cursor-pointer"
             >
               {drillComplete ? 'Grille débloquée' : 'Réviser'}
             </button>
@@ -222,11 +221,11 @@ function Calendar({ reviewMap, today, year, month, onPrev, onNext }: {
   }
 
   return (
-    <div className="bg-bg2 border border-border rounded-lg p-3 mb-4">
+    <div className="bg-bg2 border border-border rounded-xl p-3 sm:p-4 mb-4">
       <div className="flex items-center justify-between mb-2.5">
-        <button onClick={onPrev} className="w-7 h-7 flex items-center justify-center rounded border border-border text-muted hover:text-text hover:border-border2 transition-colors text-lg">‹</button>
+        <button aria-label="Mois précédent" onClick={onPrev} className="w-9 h-9 flex items-center justify-center rounded border border-border text-muted hover:text-text hover:border-border2 transition-colors text-lg">‹</button>
         <span className="text-[12px] font-bold capitalize">{monthLabel}</span>
-        <button onClick={onNext} className="w-7 h-7 flex items-center justify-center rounded border border-border text-muted hover:text-text hover:border-border2 transition-colors text-lg">›</button>
+        <button aria-label="Mois suivant" onClick={onNext} className="w-9 h-9 flex items-center justify-center rounded border border-border text-muted hover:text-text hover:border-border2 transition-colors text-lg">›</button>
       </div>
       <div className="grid grid-cols-7 gap-px">
         {['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di'].map(d => (

@@ -8,6 +8,7 @@ import type { Category, SrsEntry } from '@/lib/types';
 import { srsRequiresDrill } from '@/lib/srs';
 
 import { Modal, ModalTitle, ModalBody, ModalActions } from './ui/Modal';
+import { Icon } from './ui/Icon';
 
 export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings: () => void; onClose?: () => void; onLogout?: () => void }) {
   const { rmData, rmFiles, srs, importRmFile, deleteRmFile, renameRmFile, selectTab, setMode, selectedTabKey } = useAppStore();
@@ -105,7 +106,7 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
             className="bg-transparent border border-border rounded px-2 py-1 text-muted cursor-pointer text-sm hover:text-text hover:border-border2 transition-colors"
             title="Paramètres"
           >
-            ⚙️
+            <Icon name="settings" size={17} />
           </button>
           {onClose && (
             <button
@@ -113,7 +114,7 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
               className="md:hidden bg-transparent border border-border rounded px-2 py-1 text-muted cursor-pointer text-sm hover:text-text hover:border-border2 transition-colors"
               title="Fermer"
             >
-              ✕
+              <Icon name="close" size={16} />
             </button>
           )}
         </div>
@@ -129,7 +130,7 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
         onDrop={(e) => { e.preventDefault(); dropRef.current?.classList.remove('border-accent'); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); }}
         className="mx-2.5 my-2 min-h-14 border border-dashed border-border2 rounded p-2.5 text-center cursor-pointer transition-all hover:border-accent hover:bg-accent/5 flex-shrink-0"
       >
-        <strong className="text-xs block mb-0.5">📂 Importer un fichier .rm</strong>
+        <strong className="text-xs flex items-center justify-center gap-2 mb-0.5"><Icon name="upload" size={16} />Importer un fichier .rm</strong>
         <span className="text-[11px] text-muted">Cliquer ou glisser-déposer</span>
       </button>
       <input
@@ -145,8 +146,9 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="🔍  Rechercher un spot…"
-          className="w-full bg-bg3 border border-border rounded px-2 py-1 text-xs text-text placeholder-muted outline-none focus:border-border2"
+          placeholder="Rechercher un spot…"
+          aria-label="Rechercher un spot"
+          className="w-full min-h-9 bg-bg3 border border-border rounded-lg px-3 py-2 text-xs text-text placeholder-muted focus:border-accent"
         />
       </div>
 
@@ -157,7 +159,7 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
           onClick={() => setMode('srs')}
           className="mx-2.5 my-1.5 text-left bg-red/5 border border-red/25 rounded p-2.5 cursor-pointer hover:bg-red/10 flex-shrink-0"
         >
-          <span className="text-xs font-bold text-red block">🔴 {dueCount} range{dueCount > 1 ? 's' : ''} à réviser aujourd&apos;hui</span>
+          <span className="text-xs font-bold text-red flex items-center gap-2"><Icon name="calendar" size={15} />{dueCount} range{dueCount > 1 ? 's' : ''} à réviser aujourd&apos;hui</span>
           <span className="text-[11px] text-muted mt-0.5 block">Voir les révisions</span>
         </button>
       )}
@@ -190,7 +192,7 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
           onClick={() => setShowFiles(!showFiles)}
           className="w-full text-[10px] text-muted hover:text-text flex items-center justify-between uppercase tracking-wider font-bold transition-colors cursor-pointer"
         >
-          <span>📁 Gérer les dossiers ({Object.keys(rmFiles).length})</span>
+          <span className="flex items-center gap-1.5"><Icon name="folder" size={14} />Gérer les dossiers ({Object.keys(rmFiles).length})</span>
           <span>{showFiles ? '▾' : '▸'}</span>
         </button>
         {showFiles && (
@@ -227,7 +229,7 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
             onClick={onLogout}
             className="w-full text-left text-[10px] text-muted hover:text-red transition-colors cursor-pointer py-1"
           >
-            ⎋ Déconnexion
+            <span className="flex items-center gap-2"><Icon name="logout" size={14} />Déconnexion</span>
           </button>
         </div>
       )}
