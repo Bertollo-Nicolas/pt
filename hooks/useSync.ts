@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { useAppStore } from '@/store/appStore';
 import { createClient } from '@/lib/supabase';
 
@@ -10,6 +10,7 @@ export function useSync() {
   const supabase  = createClient();
   const timerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadedRef = useRef(false);
+  const [syncState, setSyncState] = useState<'loading' | 'saving' | 'synced' | 'offline'>('loading');
 
   // ── Load from DB on mount ──────────────────────────────────
   useEffect(() => {
@@ -18,7 +19,7 @@ export function useSync() {
 
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) { setSyncState('offline'); return; }
 
       // Load user data (srs, config, sessions…)
       const res = await fetch('/api/sync');
@@ -62,25 +63,23 @@ export function useSync() {
           }
         }
       }
+      setSyncState('synced');
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Debounced save to DB on state change ───────────────────
   const scheduleSave = useCallback(() => {
+    setSyncState('saving');
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(async () => {
       const s = useAppStore.getState();
-      await fetch('/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          srs:      s.srs,
-          config:   s.config,
-          sessions: s.sessions,
-          errors:   s.errors,
-          heatmap:  s.heatmap,
-        }),
-      });
+      try {
+        const response = await fetch('/api/sync', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ srs: s.srs, config: s.config, sessions: s.sessions, errors: s.errors, heatmap: s.heatmap }),
+        });
+        setSyncState(response.ok ? 'synced' : 'offline');
+      } catch { setSyncState('offline'); }
     }, DEBOUNCE_MS);
   }, []);
 
@@ -106,5 +105,5 @@ export function useSync() {
     window.location.href = '/login';
   }, [supabase]);
 
-  return { logout };
+  return { logout, syncState };
 }

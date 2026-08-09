@@ -21,7 +21,7 @@ export function LearningInsights() {
   return (
     <section className="mb-4">
       <div className="flex items-center justify-between mb-2">
-        <div className="text-[10px] font-bold uppercase tracking-widest text-muted">
+        <div className="section-label">
           Priorités d&apos;apprentissage
         </div>
         <div className="text-[10px] text-muted">{spots.length} spot{spots.length > 1 ? 's' : ''} suivis</div>
@@ -63,7 +63,7 @@ function Metric({ label, value, warn }: { label: string; value: string; warn?: b
   return (
     <div className="bg-bg3 rounded px-1.5 py-1">
       <div className={clsx('text-[11px] font-bold leading-none', warn ? 'text-orange' : 'text-text')}>{value}</div>
-      <div className="text-[7px] text-muted uppercase tracking-wider mt-0.5">{label}</div>
+      <div className="text-[9px] text-muted uppercase tracking-wider mt-0.5">{label}</div>
     </div>
   );
 }

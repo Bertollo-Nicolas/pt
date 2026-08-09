@@ -7,6 +7,8 @@ import { todayStr, hexRgba } from '@/lib/utils';
 import { SRS_DRILL_HANDS, srsDrillProgress, srsNeedsDrill, srsRequiresDrill } from '@/lib/srs';
 import { createFlashSchedulerState, drawSmartFlashHand, recordFlashOutcome, type FlashSchedulerState } from '@/lib/flash-scheduler';
 import type { HandItem, SelectedTab, HandAction } from '@/lib/types';
+import { Modal } from '@/components/ui/Modal';
+import { Icon } from '@/components/ui/Icon';
 
 // ── Types ─────────────────────────────────────────────────────
 type Suit = '♠' | '♥' | '♦' | '♣';
@@ -615,6 +617,25 @@ function FlashPanel({
     onAnswer(result.correct, result.partial);
   }, [hand, clearTimer, selectedTab.rangeMap, schedulerRef, sessionErrorsRef, retryQueueRef, spotKey, onAnswer, onRetryCountChange, recordError]);
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.matches('input, textarea, select, [contenteditable="true"]') || showRangeOverlay) return;
+      const index = Number(event.key) - 1;
+      if (index >= 0 && index < allButtons.length && !answered) {
+        event.preventDefault();
+        handleAnswer(allButtons[index]);
+      }
+      if ((event.key.toLowerCase() === 'n' || event.key === 'Enter') && answered) {
+        event.preventDefault();
+        draw();
+      }
+      if (event.key.toLowerCase() === 'r') setShowRangeOverlay(true);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [allButtons, answered, draw, handleAnswer, showRangeOverlay]);
+
   if (!hand) return null;
 
   const singleButtons = allButtons.filter(b => b.actions.length === 1);
@@ -662,19 +683,19 @@ function FlashPanel({
       {!answered && (
         <div className="flex flex-col gap-1.5 w-full flex-shrink-0">
           <div className="flex gap-1.5 flex-wrap justify-center">
-            {singleButtons.map(btn => (
+            {singleButtons.map((btn, index) => (
               <button key={btn.label} onClick={() => handleAnswer(btn)} disabled={paused}
                 className={btnClass} style={btnStyle(btn)}>
-                {btn.label}
+                <span>{btn.label}</span>{!compact && <kbd className="ml-2 text-[9px] opacity-55">{index + 1}</kbd>}
               </button>
             ))}
           </div>
           {mixedButtons.length > 0 && (
             <div className="flex gap-1.5 flex-wrap justify-center">
-              {mixedButtons.map(btn => (
+              {mixedButtons.map((btn, index) => (
                 <button key={btn.label} onClick={() => handleAnswer(btn)} disabled={paused}
                   className={btnClass} style={btnStyle(btn)}>
-                  {btn.label}
+                  <span>{btn.label}</span>{!compact && <kbd className="ml-2 text-[9px] opacity-55">{singleButtons.length + index + 1}</kbd>}
                 </button>
               ))}
             </div>
@@ -704,24 +725,27 @@ function FlashPanel({
         </button>
       )}
 
-      <button onClick={() => setShowRangeOverlay(v => !v)}
-        className={clsx('text-muted hover:text-text transition-colors flex-shrink-0',
-          compact ? 'text-[9px]' : 'text-[11px]'
+      <button onClick={() => setShowRangeOverlay(true)}
+        className={clsx('inline-flex items-center gap-1.5 text-muted hover:text-text transition-colors flex-shrink-0 rounded px-2 py-1 hover:bg-bg3',
+          compact ? 'text-[10px]' : 'text-xs'
         )}>
-        👁 Range
+        <Icon name="grid" size={13} /> Voir la range
       </button>
+      {!compact && <div className="hidden sm:flex items-center gap-2 text-[10px] text-muted"><Icon name="keyboard" size={13}/><span>1–9 répondre · N suivante · R range</span></div>}
 
-      {showRangeOverlay && (
-        <div className="absolute inset-0 z-10 bg-black/85 rounded-lg flex flex-col items-center justify-center p-2">
-          <button onClick={() => setShowRangeOverlay(false)}
-            className="absolute top-2 right-2 text-[10px] bg-bg2 text-muted hover:text-text rounded px-2 py-0.5 border border-border">
-            ✕
-          </button>
-          <div className="overflow-auto no-scrollbar w-full mt-4">
-            <MiniRange selectedTab={selectedTab} actionButtons={actionButtons} currentHand={hand.hand} />
+      <Modal open={showRangeOverlay} onClose={() => setShowRangeOverlay(false)} className="!max-w-[760px] !p-0 overflow-hidden">
+        <div className="flex items-start justify-between gap-4 px-4 sm:px-5 py-4 border-b border-border bg-bg3/50">
+          <div className="min-w-0">
+            <div className="section-label text-accent">Range complète</div>
+            <h3 className="text-base font-bold truncate mt-0.5">{selectedTab.catName} · {selectedTab.name}</h3>
+            <p className="text-[11px] text-muted mt-1">La main affichée est encadrée en jaune.</p>
           </div>
+          <button aria-label="Fermer la range" onClick={() => setShowRangeOverlay(false)} className="w-9 h-9 rounded-lg border border-border text-muted hover:text-text hover:bg-bg3 flex items-center justify-center flex-shrink-0">
+            <Icon name="close" size={17}/>
+          </button>
         </div>
-      )}
+        <MiniRange selectedTab={selectedTab} actionButtons={actionButtons} currentHand={hand.hand} />
+      </Modal>
     </div>
   );
 }
@@ -733,16 +757,22 @@ function MiniRange({ selectedTab, actionButtons, currentHand }: {
   currentHand?: string;
 }) {
   const hands = allHands();
-  const CELL = 28;
+  const inRange = hands.filter(({ hand }) => getNonFoldActions(hand, selectedTab.rangeMap).length > 0).length;
   return (
-    <div className="bg-bg2 border border-border rounded-lg p-2.5 shadow-2xl">
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(13, ${CELL}px)`, gridAutoRows: `${CELL}px`, gap: '1px' }}>
+    <div className="bg-bg2 p-3 sm:p-5 overflow-y-auto max-h-[calc(90vh-88px)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <div className="text-xs text-muted"><strong className="text-text">{inRange}</strong> mains · {Math.round(inRange / 169 * 100)}% de la grille</div>
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+          {actionButtons.map(([name, color]) => <span key={name} className="inline-flex items-center gap-1.5 text-[11px] text-muted"><span className="w-2 h-2 rounded-full" style={{background:color}}/>{name}</span>)}
+        </div>
+      </div>
+      <div className="grid grid-cols-13 gap-[2px] max-w-[640px] mx-auto" style={{ width: 'min(100%, calc(90vh - 190px))' }}>
         {hands.map(({ hand }) => {
           const acts = getNonFoldActions(hand, selectedTab.rangeMap);
           const isCurrent = hand === currentHand;
           if (acts.length === 0) {
-            return <div key={hand} className="rounded-sm"
-              style={{ background: 'rgba(107,114,128,0.18)', ...(isCurrent ? { boxShadow: 'inset 0 0 0 2px #f0b429' } : {}) }} title={hand} />;
+            return <div key={hand} className="aspect-square rounded-[3px] flex items-center justify-center text-[clamp(6px,1.35vw,9px)] font-semibold text-muted2"
+              style={{ background: 'rgba(107,114,128,0.18)', ...(isCurrent ? { boxShadow: 'inset 0 0 0 2px #f0b429' } : {}) }} title={hand}>{hand}</div>;
           }
           const color = actionButtons.find(([n]) => n === acts[0].action)?.[1] ?? '#888';
           let bg: string;
@@ -761,9 +791,9 @@ function MiniRange({ selectedTab, actionButtons, currentHand }: {
             bg = `linear-gradient(90deg, ${stops.join(', ')})`;
           }
           return (
-            <div key={hand} className="rounded-sm flex items-center justify-center"
+            <div key={hand} className="aspect-square rounded-[3px] flex items-center justify-center text-[clamp(6px,1.35vw,9px)] font-bold text-white"
               style={{ background: bg, boxShadow: isCurrent ? 'inset 0 0 0 2px #f0b429' : undefined,
-                fontSize: '6.5px', fontWeight: 700, color: '#fff', letterSpacing: '-0.3px' }}
+                letterSpacing: '-0.2px' }}
               title={hand}>
               {hand}
             </div>

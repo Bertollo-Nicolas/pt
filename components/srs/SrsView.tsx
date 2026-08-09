@@ -7,6 +7,7 @@ import { LearningInsights } from '@/components/learning/LearningInsights';
 import type { SrsEntry } from '@/lib/types';
 import { Icon } from '@/components/ui/Icon';
 import { SectionHeading } from '@/components/ui/Surface';
+import { EmptyState } from '@/components/ui/Primitives';
 
 export function SrsView() {
   const store = useAppStore();
@@ -50,13 +51,7 @@ export function SrsView() {
 
       {/* Empty state */}
       {entries.length === 0 && (
-        <div className="text-center py-8 text-muted">
-          <div className="mx-auto w-12 h-12 rounded-xl bg-accent/15 text-accent flex items-center justify-center mb-3"><Icon name="calendar" size={24}/></div>
-          <p className="text-sm font-medium text-text">Aucune range dans le SRS.</p>
-          <p className="text-xs mt-1.5 leading-relaxed">
-            Atteins le seuil de précision en <strong className="text-text">Flash</strong> ou en <strong className="text-text">Grille</strong> pour être proposé.
-          </p>
-        </div>
+        <EmptyState icon="calendar" title="Aucune range dans le SRS" description="Atteins le seuil de précision en Flash ou en Grille pour commencer ton programme de révision."/>
       )}
 
       <LearningInsights />
@@ -138,10 +133,11 @@ function SrsCard({ entry, today, cfg, onReview, onDrill, onRemove }: {
     )}>
       <div className="flex-1 min-w-0">
         <div className="text-sm font-semibold truncate">{entry.name}</div>
-        <div className="text-[11px] text-muted mt-1 flex items-center gap-1.5 flex-wrap">
-          <span>{entry.catName}</span>
-          <span>·</span>
-          <span>Intervalle: {intervalLabel}</span>
+        <div className="text-[11px] text-muted mt-1 flex items-center gap-1.5 flex-wrap"><span>{entry.catName}</span>{entry.lastScore != null && <><span>·</span><span>Dernier score : <strong className="text-text">{entry.lastScore}%</strong></span></>}</div>
+        <details className="mt-2 group">
+          <summary className="text-[10px] text-muted hover:text-text cursor-pointer select-none">Détails d’apprentissage</summary>
+          <div className="text-[11px] text-muted mt-2 flex items-center gap-1.5 flex-wrap pl-2 border-l border-border">
+          <span>Intervalle : {intervalLabel}</span>
           {reviews > 0 && (
             <><span>·</span><span>{reviews} revue{reviews > 1 ? 's' : ''}</span></>
           )}
@@ -157,10 +153,8 @@ function SrsCard({ entry, today, cfg, onReview, onDrill, onRemove }: {
           {reviews > 0 && (
             <><span>·</span><span>Facilité: {ease.toFixed(2)}</span></>
           )}
-          {entry.lastScore != null && (
-            <><span>·</span><span>Dernier: {entry.lastScore}%</span></>
-          )}
-        </div>
+          </div>
+        </details>
       </div>
 
       <div className="flex items-center gap-1.5 flex-shrink-0 self-end sm:self-auto">
@@ -244,7 +238,7 @@ function Calendar({ reviewMap, today, year, month, onPrev, onNext }: {
                 hasRev && isPast && 'bg-red/20 text-red font-bold',
               )}>
               <span>{d}</span>
-              {hasRev && <span className="text-[7px] font-bold leading-tight">{revs.length}</span>}
+              {hasRev && <span className="text-[9px] font-bold leading-tight">{revs.length}</span>}
             </div>
           );
         })}

@@ -15,7 +15,7 @@ import { SettingsModal } from './modals/SettingsModal';
 
 export default function RangeTrainer() {
   const { rehydrateRmData, selectedTab, currentMode, lastSpot, selectTab, setMode } = useAppStore();
-  const { logout } = useSync();
+  const { logout, syncState } = useSync();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -67,7 +67,7 @@ export default function RangeTrainer() {
 
       {/* ── Main content ── */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
-        <Header onOpenSidebar={() => setSidebarOpen(true)} />
+        <Header onOpenSidebar={() => setSidebarOpen(true)} syncState={syncState} />
         <main className="flex-1 overflow-hidden flex flex-col min-h-0 pb-[68px] sm:pb-0">
           {renderMain()}
         </main>

@@ -63,10 +63,10 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
         {/* Min hands */}
         <div>
-          <label className="text-[10px] font-bold uppercase tracking-widest text-muted block mb-1.5">
+          <label className="section-label block mb-1.5">
             Mains min. avant proposition SRS
           </label>
-          <p className="text-[10px] text-muted mb-1.5">Nombre de mains Flash minimum avant de proposer le SRS.</p>
+          <p className="text-[11px] text-muted mb-1.5">Nombre de mains Flash minimum avant de proposer le SRS.</p>
           <input
             type="number" min="5" max="100"
             value={minHands}
@@ -77,10 +77,10 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
         {/* Grille threshold */}
         <div>
-          <label className="text-[10px] font-bold uppercase tracking-widest text-muted block mb-1.5">
+          <label className="section-label block mb-1.5">
             Seuil score Grille (%)
           </label>
-          <p className="text-[10px] text-muted mb-1.5">Score minimum en Grille pour valider une révision SRS.</p>
+          <p className="text-[11px] text-muted mb-1.5">Score minimum en Grille pour valider une révision SRS.</p>
           <input
             type="number" min="50" max="100"
             value={grilleThreshold}
@@ -91,10 +91,10 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
         {/* Grille frequency tolerance */}
         <div>
-          <label className="text-[10px] font-bold uppercase tracking-widest text-muted block mb-1.5">
+          <label className="section-label block mb-1.5">
             Tolérance fréquences Grille (%)
           </label>
-          <p className="text-[10px] text-muted mb-1.5">Écart accepté entre votre fréquence et la fréquence attendue.</p>
+          <p className="text-[11px] text-muted mb-1.5">Écart accepté entre votre fréquence et la fréquence attendue.</p>
           <input
             type="number" min="0" max="25"
             value={grilleFreqTolerance}
@@ -105,10 +105,10 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
         {/* SRS intervals */}
         <div>
-          <label className="text-[10px] font-bold uppercase tracking-widest text-muted block mb-1.5">
+          <label className="section-label block mb-1.5">
             Intervalles SRS (jours)
           </label>
-          <p className="text-[10px] text-muted mb-1.5">Paliers minimum de révision, séparés par des virgules. Le SRS adapte ensuite la date selon le score.</p>
+          <p className="text-[11px] text-muted mb-1.5">Paliers minimum de révision, séparés par des virgules. Le SRS adapte ensuite la date selon le score.</p>
           <input
             type="text"
             value={intervals}
@@ -120,10 +120,10 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
         {/* Tracker Hero Name */}
         <div>
-          <label className="text-[10px] font-bold uppercase tracking-widest text-muted block mb-1.5">
+          <label className="section-label block mb-1.5">
             Pseudo Tracker (Winamax)
           </label>
-          <p className="text-[10px] text-muted mb-1.5">Utilisé pour identifier vos mains dans les fichiers d&apos;historique.</p>
+          <p className="text-[11px] text-muted mb-1.5">Utilisé pour identifier vos mains dans les fichiers d&apos;historique.</p>
           <input
             type="text"
             value={trackerHeroName}
@@ -146,7 +146,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
           if (actionDefs.length <= 1) return null;
           return (
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-muted block mb-1.5">
+              <label className="section-label block mb-1.5">
                 Couleurs des actions
               </label>
               <div className="space-y-2">

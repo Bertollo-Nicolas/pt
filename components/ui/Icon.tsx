@@ -1,6 +1,6 @@
 import type { SVGProps } from 'react';
 
-export type IconName = 'menu' | 'flash' | 'grid' | 'calendar' | 'chart' | 'settings' | 'upload' | 'target' | 'folder' | 'search' | 'logout' | 'close' | 'chevron';
+export type IconName = 'menu' | 'flash' | 'grid' | 'calendar' | 'chart' | 'settings' | 'upload' | 'target' | 'folder' | 'search' | 'logout' | 'close' | 'chevron' | 'maximize' | 'keyboard' | 'info';
 
 const paths: Record<IconName, React.ReactNode> = {
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
@@ -16,6 +16,9 @@ const paths: Record<IconName, React.ReactNode> = {
   logout: <><path d="M10 17l5-5-5-5M15 12H3"/><path d="M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5"/></>,
   close: <path d="m6 6 12 12M18 6 6 18"/>,
   chevron: <path d="m9 18 6-6-6-6"/>,
+  maximize: <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/>,
+  keyboard: <><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M10 13h.01M14 13h4M7 16h10"/></>,
+  info: <><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></>,
 };
 
 export function Icon({ name, size = 18, ...props }: { name: IconName; size?: number } & SVGProps<SVGSVGElement>) {

@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import { useAppStore } from '@/store/appStore';
 import type { Mode } from '@/lib/types';
 import { Icon, type IconName } from './ui/Icon';
+import { IconButton } from './ui/Primitives';
 
 export const MODES: { id: Mode; label: string; icon: IconName }[] = [
   { id: 'flash',  label: 'Flash',  icon: 'flash' },
@@ -11,8 +12,16 @@ export const MODES: { id: Mode; label: string; icon: IconName }[] = [
   { id: 'tracker', label: 'Tracker', icon: 'chart' },
 ];
 
-export function Header({ onOpenSidebar }: { onOpenSidebar: () => void }) {
-  const { selectedTab, currentMode, setMode } = useAppStore();
+export function Header({ onOpenSidebar, syncState }: { onOpenSidebar: () => void; syncState: 'loading' | 'saving' | 'synced' | 'offline' }) {
+  const { selectedTab, currentMode, setMode, rmData, lastSpot, selectTab } = useAppStore();
+  const spots = rmData ? Object.entries(rmData.categories).flatMap(([catId, cat]) =>
+    (cat.tabList ?? []).filter(tabId => cat.tabs?.[tabId]).map(tabId => ({ catId, tabId, name: cat.tabs![tabId].name }))) : [];
+  const currentIndex = lastSpot ? spots.findIndex(spot => spot.catId === lastSpot.catId && spot.tabId === lastSpot.tabId) : -1;
+  const moveSpot = (delta: number) => {
+    if (currentIndex < 0 || spots.length === 0) return;
+    const target = spots[(currentIndex + delta + spots.length) % spots.length];
+    selectTab(target.catId, target.tabId);
+  };
 
   return (
     <header className="flex items-center gap-2 px-3 md:px-5 py-2.5 border-b border-border flex-shrink-0 bg-bg/95">
@@ -31,9 +40,21 @@ export function Header({ onOpenSidebar }: { onOpenSidebar: () => void }) {
         <h2 className="text-sm font-semibold truncate leading-tight">
           {selectedTab?.name ?? 'Sélectionne un spot'}
         </h2>
-        <p className="text-[10px] text-muted truncate hidden sm:block leading-tight mt-0.5">
-          {selectedTab?.catName ?? 'Importe un .rm puis clique sur un spot'}
+        <p className="text-[11px] text-muted truncate hidden sm:block leading-tight mt-0.5">
+          {selectedTab ? `${selectedTab.catName} / ${selectedTab.name}` : 'Importe un .rm puis clique sur un spot'}
         </p>
+      </div>
+
+      {selectedTab && spots.length > 1 && (
+        <div className="hidden md:flex items-center gap-1" aria-label="Parcourir les spots">
+          <IconButton icon="chevron" label="Spot précédent" onClick={() => moveSpot(-1)} className="!w-8 !h-8 [&>svg]:rotate-180"/>
+          <IconButton icon="chevron" label="Spot suivant" onClick={() => moveSpot(1)} className="!w-8 !h-8"/>
+        </div>
+      )}
+
+      <div className="hidden lg:flex items-center gap-1.5 text-[10px] text-muted" title={syncState === 'synced' ? 'Données synchronisées' : syncState === 'saving' ? 'Synchronisation en cours' : syncState === 'offline' ? 'Mode hors ligne' : 'Chargement des données'}>
+        <span className={`w-1.5 h-1.5 rounded-full ${syncState === 'synced' ? 'bg-green' : syncState === 'saving' || syncState === 'loading' ? 'bg-orange animate-pulse' : 'bg-red'}`}/>
+        {syncState === 'synced' ? 'Synchronisé' : syncState === 'saving' ? 'Enregistrement…' : syncState === 'offline' ? 'Hors ligne' : 'Chargement…'}
       </div>
 
       {/* Mode tabs */}
