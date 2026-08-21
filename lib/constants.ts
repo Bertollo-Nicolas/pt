@@ -9,6 +9,11 @@ export const DEFAULT_CFG: AppConfig = {
   grilleFreqTolerance: 5,
   intervals: [1, 3, 7, 14, 30, 90],
   flashHandFilter: null,
+  roadmapPath: 'essential',
+  roadmapDailyMinutes: 20,
+  roadmapPinned: [],
+  roadmapSnoozed: [],
+  roadmapKnown: [],
 };
 
 export const MAX_SESSIONS = 200;

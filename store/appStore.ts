@@ -35,6 +35,8 @@ interface Ephemeral {
   srsReviewKey: string | null;   // which entry is currently being reviewed
   calYear: number;
   calMonth: number;
+  roadmapQueue: Array<{ key: string; catId: string; tabId: string; name: string }>;
+  roadmapQueueIndex: number;
 }
 
 // ── Actions ───────────────────────────────────────────────
@@ -61,6 +63,9 @@ interface Actions {
   setCalendar: (year: number, month: number) => void;
   saveColorOverride: (name: string, color: string) => void;
   addTrackerSession: (session: TrackerImportSession) => void;
+  startRoadmapSession: (queue: Array<{ key: string; catId: string; tabId: string; name: string }>) => void;
+  advanceRoadmapSession: () => void;
+  cancelRoadmapSession: () => void;
 }
 
 export type AppStore = Persisted & Ephemeral & Actions;
@@ -161,6 +166,8 @@ export const useAppStore = create<AppStore>()(
       srsReviewKey: null,
       calYear: new Date().getFullYear(),
       calMonth: new Date().getMonth(),
+      roadmapQueue: [],
+      roadmapQueueIndex: 0,
 
       // ── Actions ───────────────────────────────────────
       importRmFile: (name, content) => {
@@ -441,6 +448,27 @@ export const useAppStore = create<AppStore>()(
 
       addTrackerSession: (session) =>
         set(s => ({ trackerSessions: [...s.trackerSessions, session].slice(-50) })),
+
+      startRoadmapSession: (queue) => {
+        const first = queue[0];
+        if (!first) return;
+        get().selectTab(first.catId, first.tabId);
+        set({ roadmapQueue: queue, roadmapQueueIndex: 0, currentMode: 'flash' });
+      },
+
+      advanceRoadmapSession: () => {
+        const { roadmapQueue, roadmapQueueIndex } = get();
+        const nextIndex = roadmapQueueIndex + 1;
+        const next = roadmapQueue[nextIndex];
+        if (!next) {
+          set({ roadmapQueue: [], roadmapQueueIndex: 0, currentMode: 'roadmap' });
+          return;
+        }
+        get().selectTab(next.catId, next.tabId);
+        set({ roadmapQueueIndex: nextIndex, currentMode: 'flash' });
+      },
+
+      cancelRoadmapSession: () => set({ roadmapQueue: [], roadmapQueueIndex: 0 }),
     }),
     {
       name: 'range-trainer-v5',

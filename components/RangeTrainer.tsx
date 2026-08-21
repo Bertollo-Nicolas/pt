@@ -10,6 +10,7 @@ import { FlashView } from './flash/FlashView';
 import { GrilleView } from './grille/GrilleView';
 import { SrsView } from './srs/SrsView';
 import { TrackerView } from './tracker/TrackerView';
+import { RoadmapView } from './roadmap/RoadmapView';
 import { SrsToast } from './ui/SrsToast';
 import { SettingsModal } from './modals/SettingsModal';
 
@@ -30,6 +31,7 @@ export default function RangeTrainer() {
   }, [lastSpot]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const renderMain = () => {
+    if (currentMode === 'roadmap') return <RoadmapView />;
     if (currentMode === 'srs') return <SrsView />;
     if (currentMode === 'tracker') return <TrackerView />;
     if (!selectedTab) return <EmptyView />;
@@ -71,7 +73,7 @@ export default function RangeTrainer() {
         <main className="flex-1 overflow-hidden flex flex-col min-h-0 pb-[68px] sm:pb-0">
           {renderMain()}
         </main>
-        <nav aria-label="Navigation principale" className="sm:hidden fixed inset-x-0 bottom-0 z-30 h-[68px] border-t border-border bg-bg2/95 backdrop-blur-md grid grid-cols-4 px-2 pb-[env(safe-area-inset-bottom)]">
+        <nav aria-label="Navigation principale" className="sm:hidden fixed inset-x-0 bottom-0 z-30 h-[68px] border-t border-border bg-bg2/95 backdrop-blur-md grid grid-cols-5 px-1 pb-[env(safe-area-inset-bottom)]">
           {MODES.map(mode => (
             <button key={mode.id} onClick={() => setMode(mode.id)} aria-current={currentMode === mode.id ? 'page' : undefined}
               className={`flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors ${currentMode === mode.id ? 'text-accent' : 'text-muted hover:text-text'}`}>

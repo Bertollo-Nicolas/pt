@@ -54,7 +54,7 @@ export interface HandItem {
 }
 
 // ── App modes ─────────────────────────────────────────────
-export type Mode = 'flash' | 'grille' | 'srs' | 'tracker';
+export type Mode = 'roadmap' | 'flash' | 'grille' | 'srs' | 'tracker';
 
 // ── Session / Stats ───────────────────────────────────────
 export interface Session {
@@ -116,6 +116,11 @@ export interface AppConfig {
   flashHandFilter: string[] | null;
   trackerHeroName?: string;
   trackerMappings?: Record<string, string>; // position -> tabKey (folderId__catId__tabId)
+  roadmapPath: 'essential' | 'complete' | 'blinds' | 'aggression';
+  roadmapDailyMinutes: 10 | 20 | 30;
+  roadmapPinned: string[];
+  roadmapSnoozed: string[];
+  roadmapKnown: string[];
 }
 
 // ── Tracker ───────────────────────────────────────────────
