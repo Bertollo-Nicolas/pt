@@ -145,21 +145,21 @@ export function RoadmapView() {
               </details>
             </div>
           </div>
-          <div className="grid lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="p-4 sm:p-6 lg:border-r border-border bg-[radial-gradient(circle_at_50%_0%,rgba(108,99,255,0.08),transparent_42%)]">
+          <div className="grid 2xl:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="p-3 sm:p-6 2xl:border-r border-border bg-[radial-gradient(circle_at_50%_0%,rgba(108,99,255,0.08),transparent_42%)]">
               {view === 'list' ? (
                 <RoadmapList stages={visibleStages} selectedKey={selectedSpot?.key} onSelect={selectSkill}/>
               ) : <SkillTree stages={visibleStages} selectedKey={selectedSpot?.key} recommendedKey={recommended?.key} onSelect={selectSkill}/>}
             </div>
 
-            <aside className="hidden lg:block p-4 sm:p-5 bg-bg2/70">
+            <aside className="hidden 2xl:block p-4 sm:p-5 bg-bg2/70">
               {selectedSpot ? <SkillDetail spot={selectedSpot} onStart={() => startFromDetail(selectedSpot)} onToggle={togglePreference}/> : <p className="text-xs text-muted">Sélectionne une compétence dans l’arbre.</p>}
             </aside>
           </div>
         </Surface>
 
         {detailOpen && selectedSpot && (
-          <div className="lg:hidden fixed inset-0 z-50 flex items-end">
+          <div className="2xl:hidden fixed inset-0 z-50 flex items-end">
             <button aria-label="Fermer le détail" className="absolute inset-0 bg-black/65" onClick={() => setDetailOpen(false)}/>
             <div className="relative w-full max-h-[78vh] overflow-y-auto rounded-t-2xl border-t border-border2 bg-bg2 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] animate-slide-up">
               <div className="w-10 h-1 rounded-full bg-border2 mx-auto mb-4"/>
@@ -187,19 +187,19 @@ function SkillTree({ stages, selectedKey, recommendedKey, onSelect }: { stages: 
   const mobileProgress = mobileSpots.length ? Math.round(mobileSpots.reduce((sum, spot) => sum + spot.mastery, 0) / mobileSpots.length) : 0;
 
   return <>
-    <div className="lg:hidden">
-      <div className="rounded-xl border border-border bg-bg2/80 p-3">
+    <div className="2xl:hidden">
+      <div className="px-1 pb-4">
         <div className="flex items-center justify-between gap-3">
           <div><div className="text-xs font-bold">Choisis une branche</div><div className="text-[9px] text-muted mt-0.5">Progression par position Hero</div></div>
           <div className="text-right"><div className="text-lg font-black">{mobileProgress}%</div><div className="text-[8px] text-muted">{mobileMastered}/{mobileSpots.length} maîtrisées</div></div>
         </div>
-        <div className="mt-3 -mx-1 px-1 flex gap-2 overflow-x-auto pb-1 snap-x">
+        <div className="mt-3 grid grid-cols-3 gap-2">
           {TREE_POSITIONS.map(position => {
             const spots = allSpots.filter(spot => spot.heroPosition === position);
             const mastered = spots.filter(spot => spot.status === 'mastered').length;
             const hasNext = spots.some(spot => spot.key === recommendedKey);
             const active = position === mobilePosition;
-            return <button key={position} type="button" onClick={() => setMobilePosition(position)} className={clsx('relative flex-shrink-0 snap-start w-[70px] rounded-lg border px-2 py-2.5 text-center transition-colors', active ? 'border-accent bg-accent/15 text-text' : 'border-border bg-bg3 text-muted', !spots.length && 'opacity-45')}>
+            return <button key={position} type="button" onClick={() => setMobilePosition(position)} className={clsx('relative min-w-0 rounded-lg border px-2 py-2 text-center transition-colors', active ? 'border-accent bg-accent/15 text-text shadow-[0_3px_0_rgba(45,39,125,.45)]' : 'border-border bg-bg3/70 text-muted', !spots.length && 'opacity-45')}>
               {hasNext && <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-orange"/>}
               <span className="block text-sm font-black">{position}</span>
               <span className="block text-[8px] mt-0.5">{mastered}/{spots.length}</span>
@@ -208,20 +208,21 @@ function SkillTree({ stages, selectedKey, recommendedKey, onSelect }: { stages: 
         </div>
       </div>
 
-      <div className="mt-4 rounded-xl border border-border bg-bg2/45 px-3 pb-5">
-        <div className="sticky top-0 z-10 -mx-3 flex items-center gap-3 border-b border-border bg-bg2/95 px-4 py-3 backdrop-blur">
+      <div className="border-t border-border pt-1">
+        <div className="sticky top-0 z-10 flex items-center gap-3 bg-bg2/95 px-1 py-3 backdrop-blur">
           <div className="w-9 h-9 rounded-lg border border-accent/40 bg-accent/15 flex items-center justify-center font-black text-accent">{mobilePosition}</div>
           <div className="min-w-0 flex-1"><div className="text-xs font-bold">Branche {mobilePosition}</div><div className="text-[9px] text-muted">Du premier Open jusqu’à la rétention</div></div>
           {recommendedPosition === mobilePosition && <span className="rounded-full border border-orange/30 bg-orange/10 px-2 py-1 text-[8px] font-bold text-orange">Prioritaire</span>}
         </div>
-        <div className="relative pl-7 pt-2 before:absolute before:left-[13px] before:top-2 before:bottom-4 before:w-px before:bg-gradient-to-b before:from-accent before:via-border2 before:to-border">
+        <div className="relative pt-1 pb-3 before:absolute before:left-1/2 before:top-1 before:bottom-3 before:w-px before:-translate-x-1/2 before:bg-gradient-to-b before:from-accent before:via-border2 before:to-border">
           {stages.map(stage => {
             const spots = stage.spots.filter(spot => spot.heroPosition === mobilePosition);
             if (!spots.length) return null;
-            return <section key={stage.id} className="relative pt-5">
-              <span className="absolute -left-[20px] top-[25px] z-[1] h-3 w-3 rounded-full border-2 border-bg bg-accent"/>
-              <div className="mb-2 flex items-center justify-between"><div className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted">{stage.title}</div><div className="text-[8px] text-muted">{spots.filter(spot => spot.status === 'mastered').length}/{spots.length}</div></div>
-              <div className="space-y-3">{spots.map(spot => <SkillNode key={spot.key} spot={spot} selected={selectedKey === spot.key} recommended={recommendedKey === spot.key} onSelect={() => onSelect(spot)}/>)}</div>
+            return <section key={stage.id} className="relative pt-6 pb-3">
+              <div className="relative z-[1] mx-auto mb-3 flex w-fit items-center gap-2 rounded-full border border-border2 bg-bg px-3 py-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-accent"/><span className="text-[8px] font-bold uppercase tracking-[0.16em] text-muted">{stage.title}</span><span className="text-[8px] text-muted2">{spots.filter(spot => spot.status === 'mastered').length}/{spots.length}</span>
+              </div>
+              <div className="relative z-[1] space-y-3">{spots.map(spot => <MobileSkillNode key={spot.key} spot={spot} selected={selectedKey === spot.key} recommended={recommendedKey === spot.key} onSelect={() => onSelect(spot)}/>)}</div>
             </section>;
           })}
           {!mobileSpots.length && <div className="mt-5 rounded-xl border border-dashed border-border p-8 text-center text-[10px] text-muted">Aucune compétence disponible pour cette position.</div>}
@@ -229,7 +230,7 @@ function SkillTree({ stages, selectedKey, recommendedKey, onSelect }: { stages: 
       </div>
     </div>
 
-    <div className="hidden lg:block overflow-x-auto pb-4 -mx-1 px-1">
+    <div className="hidden 2xl:block overflow-x-auto pb-4 -mx-1 px-1">
       <div className="min-w-[1040px]">
       <div className="mb-5 flex items-center justify-between gap-4 rounded-xl border border-border bg-bg2/80 px-4 py-3">
         <div><div className="text-xs font-bold">Arbre de compétences préflop</div><div className="text-[10px] text-muted mt-1">Chaque branche descend de l’Open de la position Hero.</div></div>
@@ -292,6 +293,29 @@ function SkillNode({ spot, selected, recommended, onSelect }: { spot: RoadmapSpo
   );
 }
 
+function MobileSkillNode({ spot, selected, recommended, onSelect }: { spot: RoadmapSpot; selected: boolean; recommended: boolean; onSelect: () => void }) {
+  const locked = spot.status === 'locked';
+  const tone = spot.status === 'mastered'
+    ? 'border-green/60 bg-green/10 shadow-[0_4px_0_rgba(16,80,58,.4)]'
+    : spot.status === 'due'
+      ? 'border-orange/60 bg-orange/10 shadow-[0_4px_0_rgba(90,55,20,.45)]'
+      : locked
+        ? 'border-border bg-[repeating-linear-gradient(135deg,rgba(37,37,48,.97),rgba(37,37,48,.97)_7px,rgba(31,31,37,.97)_7px,rgba(31,31,37,.97)_14px)] shadow-[0_4px_0_rgba(0,0,0,.28)]'
+        : 'border-accent/60 bg-gradient-to-br from-accent/20 to-bg2 shadow-[0_4px_0_rgba(45,39,125,.45)]';
+  return <button type="button" onClick={onSelect} aria-pressed={selected} className={clsx('relative mx-auto flex w-full max-w-[300px] items-center gap-3 rounded-xl border p-3 text-left transition-transform active:translate-y-0.5', tone, selected && 'ring-2 ring-accent ring-offset-2 ring-offset-bg', recommended && 'ring-1 ring-orange/70')}>
+    <span className={clsx('flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border text-[10px] font-black', locked ? 'border-border2 bg-black/15 text-muted' : spot.status === 'mastered' ? 'border-green/40 bg-green/15 text-green' : 'border-accent/40 bg-accent/15 text-accent')}>
+      {spot.status === 'mastered' ? '✓' : locked ? <Icon name="lock" size={16}/> : `${spot.mastery}%`}
+    </span>
+    <span className="min-w-0 flex-1">
+      <span className={clsx('block text-[11px] font-bold leading-tight', locked ? 'text-muted' : 'text-text')}>{spot.displayName}</span>
+      <span className="mt-1 flex items-center gap-1 text-[8px] leading-tight text-muted2">
+        {locked && <Icon name="lock" size={9} className="flex-shrink-0"/>}<span className="line-clamp-2">{locked ? spot.lockReason : spot.level}</span>
+      </span>
+    </span>
+    <span className={clsx('self-start rounded-full border px-1.5 py-0.5 text-[7px] font-bold uppercase', recommended ? 'border-orange/30 bg-orange/10 text-orange' : locked ? 'border-border2 bg-bg3 text-muted' : 'border-accent/30 bg-accent/10 text-accent')}>{recommended ? 'Next' : locked ? 'Bloqué' : spot.status === 'mastered' ? 'OK' : 'Go'}</span>
+  </button>;
+}
+
 function RoadmapList({ stages, selectedKey, onSelect }: { stages: RoadmapStage[]; selectedKey?: string; onSelect: (spot: RoadmapSpot) => void }) {
   const spots = stages.flatMap(stage => stage.spots.map(spot => ({ stage, spot })));
   if (spots.length === 0) return <div className="py-12 text-center text-xs text-muted">Aucune compétence ne correspond aux filtres.</div>;
@@ -322,7 +346,7 @@ function SkillDetail({ spot, onStart, onToggle }: { spot: RoadmapSpot; onStart: 
           ? { label: 'Reconstituer dans Grille', help: `Une reconstruction réussie à au moins 80% validera la range et activera automatiquement le SRS.`, run: onStart }
           : { label: spot.due ? 'Faire la révision SRS' : 'Range acquise', help: spot.due ? 'Une révision mémoire est disponible.' : 'Le SRS te la reproposera au bon moment.', run: onStart };
   return (
-    <div className="lg:sticky lg:top-0">
+    <div className="2xl:sticky 2xl:top-0">
       <div className="section-label">Compétence sélectionnée</div>
       <div className="mt-4 flex items-center gap-3">
         <div className="w-12 h-12 rounded-xl bg-accent/15 text-accent flex items-center justify-center"><Icon name="target" size={22}/></div>
