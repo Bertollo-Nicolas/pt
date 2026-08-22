@@ -9,6 +9,7 @@ import { createFlashSchedulerState, drawSmartFlashHand, recordFlashOutcome, type
 import type { HandItem, SelectedTab, HandAction } from '@/lib/types';
 import { Modal } from '@/components/ui/Modal';
 import { Icon } from '@/components/ui/Icon';
+import { RoadmapFlashSession } from '@/components/roadmap/RoadmapFlashSession';
 
 // ── Types ─────────────────────────────────────────────────────
 type Suit = '♠' | '♥' | '♦' | '♣';
@@ -80,6 +81,13 @@ function evaluateAnswer(
 
 // ── FlashView (orchestrator) ───────────────────────────────────
 export function FlashView() {
+  const store = useAppStore();
+  const progress = store.selectedTabKey ? store.config.roadmapProgress?.[store.selectedTabKey] : undefined;
+  if (store.selectedTab && store.selectedTabKey && progress?.flashSession) return <RoadmapFlashSession spotKey={store.selectedTabKey} selectedTab={store.selectedTab} progress={progress}/>;
+  return <StandardFlashView/>;
+}
+
+function StandardFlashView() {
   const store = useAppStore();
   const { selectedTab, selectedTabKey, srs, addSession, setPendingSrsKey, pendingSrsKey, saveConfig, progressSrsDrill, startSrsReview, roadmapQueue, roadmapQueueIndex, advanceRoadmapSession, cancelRoadmapSession, recordRoadmapFlash } = store;
   const cfg = getCfg(store);

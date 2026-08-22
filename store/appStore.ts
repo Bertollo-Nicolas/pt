@@ -68,6 +68,8 @@ interface Actions {
   cancelRoadmapSession: () => void;
   updateRoadmapProgress: (key: string, updates: Partial<RoadmapProgressEntry>) => void;
   recordRoadmapFlash: (key: string, score: number) => void;
+  finishRoadmapFlash: (key: string, session: NonNullable<RoadmapProgressEntry['flashSession']>, score: number) => void;
+  closeRoadmapFlash: (key: string, score: number) => void;
   recordRoadmapGrille: (key: string, score: number) => void;
   resetRoadmapProgress: () => void;
   clearErrors: () => void;
@@ -493,14 +495,41 @@ export const useAppStore = create<AppStore>()(
         get().updateRoadmapProgress(key, { flashScore: Math.max(entry.flashScore ?? 0, score), phase: score >= 80 ? 'validate' : 'practice' });
       },
 
+      finishRoadmapFlash: (key, session, score) => set(s => {
+        const current = s.config.roadmapProgress?.[key];
+        if (!current) return s;
+        const entry: RoadmapProgressEntry = {
+          ...current,
+          flashSession: session,
+          flashScore: Math.max(current.flashScore ?? 0, score),
+          phase: score >= 80 ? 'validate' : 'practice',
+          updatedAt: new Date().toISOString(),
+        };
+        return { config: { ...s.config, roadmapProgress: { ...(s.config.roadmapProgress ?? {}), [key]: entry } } };
+      }),
+
+      closeRoadmapFlash: (key, score) => set(s => {
+        const current = s.config.roadmapProgress?.[key];
+        if (!current) return s;
+        const entry: RoadmapProgressEntry = {
+          ...current,
+          flashSession: undefined,
+          flashScore: Math.max(current.flashScore ?? 0, score),
+          phase: score >= 80 ? 'validate' : 'practice',
+          updatedAt: new Date().toISOString(),
+        };
+        return { config: { ...s.config, roadmapProgress: { ...(s.config.roadmapProgress ?? {}), [key]: entry } } };
+      }),
+
       recordRoadmapGrille: (key, score) => {
         const entry = get().config.roadmapProgress?.[key];
-        if (!entry || entry.phase !== 'validate') return;
+        if (!entry || (entry.phase !== 'validate' && (entry.flashScore ?? 0) < 80)) return;
         const cfg = getCfg(get());
-        const days = score >= cfg.grilleThreshold ? [...new Set([...entry.validationDays, todayStr()])] : entry.validationDays;
-        const phase = days.length >= 2 ? 'retention' as const : 'validate' as const;
+        const passed = score >= cfg.grilleThreshold;
+        const days = passed ? [...new Set([...entry.validationDays, todayStr()])] : entry.validationDays;
+        const phase = passed ? 'retention' as const : 'validate' as const;
         get().updateRoadmapProgress(key, { grilleScore: Math.max(entry.grilleScore ?? 0, score), validationDays: days, phase });
-        if (phase === 'retention' && !get().srs[key]) {
+        if (passed && !get().srs[key]) {
           const tab = get().selectedTab;
           get().addSrs(key, { key, name: tab?.name ?? key, catName: tab?.catName ?? '', interval: cfg.intervals[0], nextReview: addDays(todayStr(), cfg.intervals[0]), added: todayStr(), lastScore: score, drillProgress: 0 });
         }

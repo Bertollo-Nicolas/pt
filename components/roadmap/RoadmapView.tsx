@@ -2,14 +2,14 @@
 import clsx from 'clsx';
 import { useMemo, useState } from 'react';
 import { getCfg, useAppStore } from '@/store/appStore';
-import { buildDailyRoadmapSession, buildRoadmap, nextRoadmapSpot, roadmapMilestones, weeklyRoadmapProgress, type RoadmapSpot, type RoadmapStage, type RoadmapStageId, type RoadmapStatus } from '@/lib/roadmap';
+import { buildDailyRoadmapSession, buildRoadmap, nextRoadmapSpot, roadmapMilestones, weeklyRoadmapProgress, type RoadmapSpot, type RoadmapStage, type RoadmapStatus } from '@/lib/roadmap';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState } from '@/components/ui/Primitives';
 import { SectionHeading, Surface } from '@/components/ui/Surface';
-import { allHands, getNonFoldActions, getRangeActionDefs } from '@/lib/poker';
-import { hexRgba } from '@/lib/utils';
-import type { SelectedTab } from '@/lib/types';
+import { buildRoadmapFlashHands } from '@/lib/roadmap-flash';
+import { RangeLearningWorkspace } from '@/components/roadmap/RangeLearningWorkspace';
+import { addDays, todayStr } from '@/lib/utils';
 
 const STATUS: Record<RoadmapStatus, { label: string; tone: string }> = {
   due: { label: 'À réviser', tone: 'text-orange bg-orange/10 border-orange/25' },
@@ -17,21 +17,21 @@ const STATUS: Record<RoadmapStatus, { label: string; tone: string }> = {
   consolidate: { label: 'À consolider', tone: 'text-blue bg-blue/10 border-blue/25' },
   learning: { label: 'En apprentissage', tone: 'text-accent bg-accent/10 border-accent/25' },
   new: { label: 'À découvrir', tone: 'text-text bg-bg3 border-border2' },
-  locked: { label: 'Plus tard', tone: 'text-muted bg-bg3 border-border' },
+  locked: { label: 'Verrouillée', tone: 'text-muted bg-bg3 border-border' },
 };
 
 export function RoadmapView() {
   const store = useAppStore();
-  const { rmData, sessions, errors, srs, selectedTab, selectedTabKey, selectTab, setMode, saveConfig, updateRoadmapProgress, resetRoadmapProgress, clearErrors, resetLearningData } = store;
+  const { rmData, sessions, errors, srs, selectedTab, selectedTabKey, selectTab, setMode, saveConfig, updateRoadmapProgress, resetRoadmapProgress, clearErrors, resetLearningData, addSrs } = store;
   const cfg = getCfg(store);
   const rawStages = useMemo(() => buildRoadmap(rmData, sessions, errors, srs, cfg), [rmData, sessions, errors, srs, cfg]);
-  const stages = useMemo(() => filterPath(rawStages, cfg.roadmapPath), [rawStages, cfg.roadmapPath]);
+  const stages = rawStages;
   const recommended = useMemo(() => nextRoadmapSpot(stages), [stages]);
   const allSpots = stages.flatMap(stage => stage.spots);
   const [selectedKey, setSelectedKey] = useState<string | null>(recommended?.key ?? null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [view, setView] = useState<'tree' | 'list'>('tree');
-  const [focusStage, setFocusStage] = useState<RoadmapStageId | null>(null);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'due' | 'learning' | 'mastered'>('all');
   const selectedSpot = allSpots.find(spot => spot.key === selectedKey) ?? recommended;
@@ -44,18 +44,29 @@ export function RoadmapView() {
   const remaining = allSpots.filter(spot => spot.essential && spot.mastery < 85 && !spot.known).length;
   const estimatedDays = Math.max(1, Math.ceil(remaining / Math.max(1, Math.floor(cfg.roadmapDailyMinutes / 5))));
   const visibleStages = useMemo(() => stages
-    .filter(stage => !focusStage || stage.id === focusStage)
-    .map(stage => ({ ...stage, spots: stage.spots.filter(spot => matchesFilters(spot, query, statusFilter)) })), [stages, focusStage, query, statusFilter]);
+    .map(stage => ({ ...stage, spots: stage.spots.filter(spot => matchesFilters(spot, query, statusFilter)) })), [stages, query, statusFilter]);
 
   const start = (spot: RoadmapSpot) => {
+    if (!spot.unlocked) return;
     selectTab(spot.catId, spot.tabId);
+    if (spot.phase === 'practice' && selectedTabKey === spot.key && selectedTab) {
+      updateRoadmapProgress(spot.key, { flashSession: spot.progress?.flashSession ?? { hands: buildRoadmapFlashHands(selectedTab.rangeMap), index: 0, answers: [], startedAt: new Date().toISOString() } });
+    }
     setMode(spot.phase === 'validate' ? 'grille' : spot.phase === 'retention' && spot.due ? 'srs' : 'flash');
   };
 
   const selectSkill = (spot: RoadmapSpot) => {
     selectTab(spot.catId, spot.tabId);
+    if (spot.phase === 'retention' && spot.progress?.phase !== 'retention') updateRoadmapProgress(spot.key, { phase: 'retention' });
+    if (spot.phase === 'retention' && !srs[spot.key]) addSrs(spot.key, { key: spot.key, name: spot.name, catName: spot.catName, interval: cfg.intervals[0], nextReview: addDays(todayStr(), cfg.intervals[0]), added: todayStr(), lastScore: spot.grilleScore });
     setSelectedKey(spot.key);
     setDetailOpen(true);
+    setWorkspaceOpen(false);
+  };
+
+  const startFromDetail = (spot: RoadmapSpot) => {
+    if (spot.phase === 'discover' || spot.phase === 'understand') setWorkspaceOpen(true);
+    else start(spot);
   };
 
   const togglePreference = (field: 'roadmapPinned' | 'roadmapSnoozed' | 'roadmapKnown', key: string) => {
@@ -67,9 +78,13 @@ export function RoadmapView() {
     return <div className="flex-1 overflow-y-auto p-4 sm:p-6"><EmptyState icon="roadmap" title="Roadmap indisponible" description="Importe des ranges Open, BB vs Open, 3-bet, Vs 3-bet ou Vs 4-bet pour générer ton parcours." /></div>;
   }
 
+  if (workspaceOpen && selectedSpot && selectedTabKey === selectedSpot.key && selectedTab) {
+    return <RangeLearningWorkspace selectedTab={selectedTab} phase={selectedSpot.phase} onBack={() => setWorkspaceOpen(false)} onAdvance={() => updateRoadmapProgress(selectedSpot.key, selectedSpot.phase === 'discover' ? { phase: 'understand', lessonCompleted: true } : { phase: 'practice', guidedCompleted: true })} onStartNext={() => start(selectedSpot)}/>;
+  }
+
   return (
     <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-      <div className="max-w-6xl mx-auto space-y-5">
+      <div className="max-w-[1600px] mx-auto space-y-5">
         <SectionHeading eyebrow="Parcours" title="Roadmap préflop" description="Suis simplement la mission proposée, puis avance dans le chemin." action={<div className="w-10 h-10 rounded-xl bg-accent/15 text-accent flex items-center justify-center"><Icon name="roadmap" size={21}/></div>} />
 
         <div className="flex items-center gap-3 text-xs">
@@ -97,9 +112,8 @@ export function RoadmapView() {
           <summary className="text-xs font-semibold cursor-pointer text-muted hover:text-text">Réglages et progression</summary>
           <div className="mt-4 grid lg:grid-cols-2 gap-4 border-t border-border pt-4">
             <div>
-              <div className="section-label">Parcours</div>
+              <div className="section-label">Rythme</div>
               <div className="flex flex-wrap gap-2 mt-2">
-                <select aria-label="Type de parcours" value={cfg.roadmapPath} onChange={event => saveConfig({ roadmapPath: event.target.value as typeof cfg.roadmapPath })} className="control text-xs"><option value="essential">Essentiel</option><option value="complete">Complet</option><option value="blinds">Défense des blindes</option><option value="aggression">Jeu agressif</option></select>
                 <select aria-label="Temps quotidien" value={cfg.roadmapDailyMinutes} onChange={event => saveConfig({ roadmapDailyMinutes: Number(event.target.value) as 10 | 20 | 30 })} className="control text-xs"><option value={10}>10 min / jour</option><option value={20}>20 min / jour</option><option value={30}>30 min / jour</option></select>
               </div>
               <p className="text-[11px] text-muted mt-3">Environ {estimatedDays} jours restants · {weekly.sessions} sessions cette semaine · {weekly.scoreDelta > 0 ? '+' : ''}{weekly.scoreDelta} pts.</p>
@@ -131,40 +145,15 @@ export function RoadmapView() {
               </details>
             </div>
           </div>
-          <div className="grid lg:grid-cols-[minmax(0,1fr)_300px]">
-            <div className="p-4 sm:p-7 lg:border-r border-border bg-[radial-gradient(circle_at_50%_0%,rgba(108,99,255,0.10),transparent_42%)]">
-              {focusStage && <button onClick={() => setFocusStage(null)} className="mb-4 text-[11px] text-accent hover:text-text">← Revenir au parcours complet</button>}
+          <div className="grid lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="p-4 sm:p-6 lg:border-r border-border bg-[radial-gradient(circle_at_50%_0%,rgba(108,99,255,0.08),transparent_42%)]">
               {view === 'list' ? (
                 <RoadmapList stages={visibleStages} selectedKey={selectedSpot?.key} onSelect={selectSkill}/>
-              ) : <div className="max-w-3xl mx-auto">
-                {visibleStages.map((stage, index) => (
-                  <div key={stage.id}>
-                    {index > 0 && <div className={clsx('w-0.5 h-12 mx-auto bg-gradient-to-b', stage.unlocked ? 'from-accent to-accent/35' : 'from-border2 to-border')} aria-hidden="true"/>}
-                    <section className="relative">
-                      <div className="flex justify-center">
-                        <button type="button" onClick={() => setFocusStage(stage.id)} title={`Ouvrir le chapitre ${stage.title}`} className={clsx('relative z-10 w-[92px] h-[92px] rounded-full border-2 flex flex-col items-center justify-center text-center shadow-[0_0_32px_rgba(108,99,255,0.12)] transition-transform hover:scale-105', stage.mastery >= 85 ? 'bg-green/15 border-green text-green' : stage.unlocked ? 'bg-bg2 border-accent text-text' : 'bg-bg3 border-border2 text-muted')}>
-                          <Icon name={stage.unlocked ? 'target' : 'roadmap'} size={18}/>
-                          <div className="text-xs font-bold mt-1">{stage.title}</div>
-                          <div className="text-[9px] opacity-75">{stage.mastery}% · {stage.completed}/{stage.spots.length}</div>
-                          {stage.unlocked && stage.mastery < 85 && <span className="absolute inset-[-5px] rounded-full border border-accent/20 animate-pulse"/>}
-                        </button>
-                      </div>
-
-                      {stage.spots.length > 0 && (focusStage === stage.id || (!focusStage && stage.id === selectedSpot?.stageId)) && (
-                        <div className="relative pt-8 mt-1">
-                          <div className="absolute top-0 left-1/2 w-px h-4 bg-accent/60" aria-hidden="true"/>
-                          <div className="absolute top-4 left-[8%] right-[8%] h-px bg-gradient-to-r from-transparent via-accent/50 to-transparent" aria-hidden="true"/>
-                          <PositionBranches stage={stage} selectedKey={selectedSpot?.key} onSelect={selectSkill}/>
-                        </div>
-                      )}
-                    </section>
-                  </div>
-                ))}
-              </div>}
+              ) : <SkillTree stages={visibleStages} selectedKey={selectedSpot?.key} recommendedKey={recommended?.key} onSelect={selectSkill}/>}
             </div>
 
             <aside className="hidden lg:block p-4 sm:p-5 bg-bg2/70">
-              {selectedSpot ? <SkillDetail spot={selectedSpot} selectedTab={selectedTabKey === selectedSpot.key ? selectedTab : null} onStart={() => start(selectedSpot)} onAdvance={(updates) => updateRoadmapProgress(selectedSpot.key, updates)} onToggle={togglePreference}/> : <p className="text-xs text-muted">Sélectionne une compétence dans l’arbre.</p>}
+              {selectedSpot ? <SkillDetail spot={selectedSpot} onStart={() => startFromDetail(selectedSpot)} onToggle={togglePreference}/> : <p className="text-xs text-muted">Sélectionne une compétence dans l’arbre.</p>}
             </aside>
           </div>
         </Surface>
@@ -175,7 +164,7 @@ export function RoadmapView() {
             <div className="relative w-full max-h-[78vh] overflow-y-auto rounded-t-2xl border-t border-border2 bg-bg2 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] animate-slide-up">
               <div className="w-10 h-1 rounded-full bg-border2 mx-auto mb-4"/>
               <button onClick={() => setDetailOpen(false)} className="absolute right-4 top-4 text-muted" aria-label="Fermer"><Icon name="close"/></button>
-              <SkillDetail spot={selectedSpot} selectedTab={selectedTabKey === selectedSpot.key ? selectedTab : null} onStart={() => start(selectedSpot)} onAdvance={(updates) => updateRoadmapProgress(selectedSpot.key, updates)} onToggle={togglePreference}/>
+              <SkillDetail spot={selectedSpot} onStart={() => startFromDetail(selectedSpot)} onToggle={togglePreference}/>
             </div>
           </div>
         )}
@@ -186,41 +175,69 @@ export function RoadmapView() {
   );
 }
 
-function SkillNode({ spot, selected, onSelect }: { spot: RoadmapSpot; selected: boolean; onSelect: () => void }) {
-  const status = STATUS[spot.status];
-  const nodeTone = spot.status === 'mastered'
-    ? 'border-green bg-green/15 text-green'
-    : spot.status === 'due'
-      ? 'border-orange bg-orange/15 text-orange shadow-[0_0_20px_rgba(224,149,64,0.22)]'
-      : spot.status === 'locked'
-        ? 'border-border bg-bg3 text-muted'
-        : 'border-accent/70 bg-accent/15 text-accent';
-  return (
-    <button type="button" onClick={onSelect} aria-pressed={selected} title={`${spot.name} · ${spot.level} · Importance ${spot.importance}/5`} className="relative min-w-0 flex flex-col items-center group">
-      <span className="absolute -top-4 left-1/2 w-px h-4 bg-border2" aria-hidden="true"/>
-      <span className={clsx('relative w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 flex items-center justify-center text-[11px] font-bold transition-all duration-200', nodeTone, selected && 'ring-2 ring-accent ring-offset-2 ring-offset-bg2 scale-110')}>
-        {spot.status === 'mastered' ? '✓' : spot.status === 'locked' ? <Icon name="roadmap" size={16}/> : `${spot.mastery}%`}
-        {spot.due && <span className="absolute -right-1 -top-1 w-3 h-3 rounded-full bg-orange border-2 border-bg2 animate-pulse"/>}
-      </span>
-      <span className={clsx('mt-2 text-[10px] sm:text-[11px] font-semibold leading-tight max-w-[88px] truncate group-hover:text-text', selected ? 'text-text' : 'text-muted')}>{spot.name}</span>
-      <span className={clsx('mt-1 text-[8px] px-1.5 py-0.5 rounded-full border leading-none', status.tone)}>{status.label}</span>
-    </button>
-  );
+const TREE_POSITIONS = ['UTG', 'HJ', 'CO', 'BU', 'SB', 'BB'];
+
+function SkillTree({ stages, selectedKey, recommendedKey, onSelect }: { stages: RoadmapStage[]; selectedKey?: string; recommendedKey?: string; onSelect: (spot: RoadmapSpot) => void }) {
+  const allSpots = stages.flatMap(stage => stage.spots);
+  return <div className="overflow-x-auto pb-4 -mx-1 px-1">
+    <div className="min-w-[1040px]">
+      <div className="mb-5 flex items-center justify-between gap-4 rounded-xl border border-border bg-bg2/80 px-4 py-3">
+        <div><div className="text-xs font-bold">Arbre de compétences préflop</div><div className="text-[10px] text-muted mt-1">Chaque branche descend de l’Open de la position Hero.</div></div>
+        <div className="flex items-center gap-3 text-[9px] text-muted"><span><b className="text-accent">◆</b> Accessible</span><span><b className="text-green">✓</b> Maîtrisée</span><span><b>▣</b> Verrouillée</span></div>
+      </div>
+      <div className="grid grid-cols-6 gap-4 items-start">
+        {TREE_POSITIONS.map(position => {
+          const laneSpots = allSpots.filter(spot => spot.heroPosition === position);
+          const mastered = laneSpots.filter(spot => spot.status === 'mastered').length;
+          return <section key={position} className="relative min-w-0">
+            <div className="sticky top-0 z-10 rounded-xl border border-border2 bg-bg2/95 p-3 text-center shadow-lg backdrop-blur">
+              <div className="text-[9px] tracking-[0.2em] font-bold text-muted">BRANCHE</div>
+              <div className="text-lg font-black mt-0.5">{position}</div>
+              <div className="text-[9px] text-muted mt-1">{mastered}/{laneSpots.length} maîtrisées</div>
+            </div>
+            <div className="relative mt-3 px-1 before:absolute before:left-1/2 before:top-0 before:bottom-4 before:w-px before:-translate-x-1/2 before:bg-gradient-to-b before:from-accent/70 before:via-border2 before:to-border">
+              {stages.map(stage => {
+                const spots = stage.spots.filter(spot => spot.heroPosition === position);
+                if (!spots.length) return null;
+                return <div key={stage.id} className="relative pt-7 pb-5">
+                  <div className="relative z-[1] mx-auto mb-3 w-fit rounded-full border border-border2 bg-bg px-2.5 py-1 text-[8px] font-bold uppercase tracking-[0.14em] text-muted">{stage.title}</div>
+                  <div className="relative z-[1] space-y-3">
+                    {spots.map(spot => <SkillNode key={spot.key} spot={spot} selected={selectedKey === spot.key} recommended={recommendedKey === spot.key} onSelect={() => onSelect(spot)}/>)}
+                  </div>
+                </div>;
+              })}
+              {!laneSpots.length && <div className="relative z-[1] mt-8 rounded-xl border border-dashed border-border bg-bg2 px-3 py-8 text-center text-[9px] text-muted">Aucune compétence importée</div>}
+            </div>
+          </section>;
+        })}
+      </div>
+    </div>
+  </div>;
 }
 
-function PositionBranches({ stage, selectedKey, onSelect }: { stage: RoadmapStage; selectedKey?: string; onSelect: (spot: RoadmapSpot) => void }) {
-  const groups = [...new Map(stage.spots.map(spot => [spot.position, [] as RoadmapSpot[]])).entries()];
-  for (const spot of stage.spots) groups.find(([position]) => position === spot.position)![1].push(spot);
+function SkillNode({ spot, selected, recommended, onSelect }: { spot: RoadmapSpot; selected: boolean; recommended: boolean; onSelect: () => void }) {
+  const status = STATUS[spot.status];
+  const nodeTone = spot.status === 'mastered'
+    ? 'border-green/70 bg-green/10 text-green shadow-[0_7px_0_rgba(16,80,58,.45)]'
+    : spot.status === 'due'
+      ? 'border-orange/70 bg-orange/10 text-orange shadow-[0_7px_0_rgba(90,55,20,.5)]'
+      : spot.status === 'locked'
+        ? 'border-border bg-[repeating-linear-gradient(135deg,rgba(37,37,48,.95),rgba(37,37,48,.95)_7px,rgba(31,31,37,.95)_7px,rgba(31,31,37,.95)_14px)] text-muted shadow-[0_7px_0_rgba(0,0,0,.28)]'
+        : 'border-accent/70 bg-gradient-to-br from-accent/20 to-bg2 text-text shadow-[0_7px_0_rgba(45,39,125,.5)]';
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-      {groups.map(([position, spots]) => (
-        <div key={position} className="relative rounded-xl border border-border bg-bg2/55 px-2 py-3">
-          <div className="absolute -top-4 left-1/2 w-px h-4 bg-border2" aria-hidden="true"/>
-          <div className="text-[9px] uppercase tracking-[0.16em] text-muted font-bold text-center mb-3">{position}</div>
-          <div className="grid grid-cols-3 gap-x-2 gap-y-4">{spots.map(spot => <SkillNode key={spot.key} spot={spot} selected={selectedKey === spot.key} onSelect={() => onSelect(spot)}/>)}</div>
-        </div>
-      ))}
-    </div>
+    <button type="button" onClick={onSelect} aria-pressed={selected} title={`${spot.displayName} · ${spot.level} · Importance ${spot.importance}/5`} className={clsx('relative w-full min-h-[112px] rounded-xl border p-3 text-left transition-all duration-200 group hover:-translate-y-0.5', nodeTone, selected && 'ring-2 ring-accent ring-offset-2 ring-offset-bg', recommended && 'ring-1 ring-orange/70 shadow-[0_0_24px_rgba(224,149,64,.18)]')}>
+      <div className="flex items-start justify-between gap-2">
+        <span className={clsx('w-8 h-8 rounded-lg border flex items-center justify-center text-[10px] font-black flex-shrink-0', spot.status === 'locked' ? 'border-border2 bg-black/15' : spot.status === 'mastered' ? 'border-green/40 bg-green/15' : 'border-accent/40 bg-accent/15')}>
+          {spot.status === 'mastered' ? '✓' : spot.status === 'locked' ? <Icon name="lock" size={15}/> : `${spot.mastery}%`}
+        </span>
+        {recommended ? <span className="rounded-full border border-orange/30 bg-orange/10 px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-wider text-orange">Next</span> : <span className={clsx('rounded-full border px-1.5 py-0.5 text-[7px] font-bold', status.tone)}>{status.label}</span>}
+      </div>
+      <div className={clsx('mt-2 text-[10px] font-bold leading-snug', spot.status === 'locked' ? 'text-muted' : 'text-text')}>{spot.displayName}</div>
+      {spot.status === 'locked'
+        ? <div className="mt-1.5 flex items-start gap-1 text-[8px] leading-snug text-muted2"><Icon name="lock" size={10} className="mt-px flex-shrink-0"/><span>{spot.lockReason}</span></div>
+        : <div className="mt-1.5 flex items-center justify-between text-[8px] text-muted"><span>{spot.level}</span><span>{spot.recommended ? 'Prioritaire' : `Niv. ${spot.importance}/5`}</span></div>}
+      {spot.due && <span className="absolute -right-1 -top-1 w-3 h-3 rounded-full bg-orange border-2 border-bg2 animate-pulse"/>}
+    </button>
   );
 }
 
@@ -231,34 +248,34 @@ function RoadmapList({ stages, selectedKey, onSelect }: { stages: RoadmapStage[]
     const status = STATUS[spot.status];
     return <button key={spot.key} onClick={() => onSelect(spot)} className={clsx('w-full rounded-lg border p-3 flex items-center gap-3 text-left transition-colors', selectedKey === spot.key ? 'border-accent bg-accent/10' : 'border-border bg-bg2 hover:border-border2')}>
       <div className="w-10 h-10 rounded-full border border-accent/40 bg-accent/10 flex items-center justify-center text-[10px] font-bold text-accent">{spot.mastery}%</div>
-      <div className="min-w-0 flex-1"><div className="text-xs font-semibold">{spot.name}</div><div className="text-[10px] text-muted mt-0.5">{stage.title} · {spot.position} · {spot.level}</div></div>
+      <div className="min-w-0 flex-1"><div className="text-xs font-semibold">{spot.displayName}</div><div className="text-[10px] text-muted mt-0.5">Hero {spot.heroPosition} · {spot.level}</div></div>
       <span className={clsx('hidden sm:inline text-[9px] px-2 py-1 rounded-full border font-bold', status.tone)}>{status.label}</span>
       <div className="text-right"><div className="text-[10px] font-bold">{'●'.repeat(spot.importance)}<span className="text-bg4">{'●'.repeat(5 - spot.importance)}</span></div><div className="text-[8px] text-muted uppercase">importance</div></div>
     </button>;
   })}</div>;
 }
 
-function SkillDetail({ spot, selectedTab, onStart, onAdvance, onToggle }: { spot: RoadmapSpot; selectedTab: SelectedTab | null; onStart: () => void; onAdvance: (updates: Record<string, unknown>) => void; onToggle: (field: 'roadmapPinned' | 'roadmapSnoozed' | 'roadmapKnown', key: string) => void }) {
+function SkillDetail({ spot, onStart, onToggle }: { spot: RoadmapSpot; onStart: () => void; onToggle: (field: 'roadmapPinned' | 'roadmapSnoozed' | 'roadmapKnown', key: string) => void }) {
   const status = STATUS[spot.status];
   const phases = [
     ['discover', 'Découvrir'], ['understand', 'Comprendre'], ['practice', 'Flash'], ['validate', 'Grille'], ['retention', 'SRS'],
   ] as const;
   const phaseIndex = phases.findIndex(([phase]) => phase === spot.phase);
   const action = spot.phase === 'discover'
-    ? { label: 'Explorer la structure', help: 'Observe les actions et les frontières de la range, sans test.', run: () => onAdvance({ phase: 'understand', lessonCompleted: true }) }
+    ? { label: 'Ouvrir l’exploration', help: 'Commence par lire la forme globale, la taille et les actions présentes.', run: onStart }
     : spot.phase === 'understand'
-      ? { label: 'J’ai compris la logique', help: 'Repère les mains pures, les mixes et les limites avant de mémoriser.', run: () => onAdvance({ phase: 'practice', guidedCompleted: true }) }
+      ? { label: 'Continuer l’exploration', help: 'Mémorise surtout les bottoms, les folds voisins, les mixes et les actions rares.', run: onStart }
       : spot.phase === 'practice'
         ? { label: 'Lancer Flash', help: `Objectif : 80% de bonnes réponses. Meilleur score : ${formatScore(spot.flashScore)}.`, run: onStart }
         : spot.phase === 'validate'
-          ? { label: 'Reconstituer dans Grille', help: `Validation : ${spot.practiceDays}/2 jours réussis à au moins 80%.`, run: onStart }
+          ? { label: 'Reconstituer dans Grille', help: `Une reconstruction réussie à au moins 80% validera la range et activera automatiquement le SRS.`, run: onStart }
           : { label: spot.due ? 'Faire la révision SRS' : 'Range acquise', help: spot.due ? 'Une révision mémoire est disponible.' : 'Le SRS te la reproposera au bon moment.', run: onStart };
   return (
     <div className="lg:sticky lg:top-0">
       <div className="section-label">Compétence sélectionnée</div>
       <div className="mt-4 flex items-center gap-3">
         <div className="w-12 h-12 rounded-xl bg-accent/15 text-accent flex items-center justify-center"><Icon name="target" size={22}/></div>
-        <div className="min-w-0"><h3 className="font-bold truncate">{spot.name}</h3><p className="text-[11px] text-muted truncate">{spot.catName}</p></div>
+        <div className="min-w-0"><h3 className="font-bold">{spot.displayName}</h3><p className="text-[11px] text-muted truncate">{spot.catName}</p></div>
       </div>
 
       <div className="mt-5 flex items-end justify-between"><div><span className={clsx('text-[9px] px-2 py-1 rounded-full border font-bold', status.tone)}>{status.label}</span><div className="text-[10px] text-muted mt-2">Niveau · <strong className="text-text">{spot.level}</strong></div></div><span className="text-2xl font-bold">{spot.mastery}%</span></div>
@@ -268,19 +285,18 @@ function SkillDetail({ spot, selectedTab, onStart, onAdvance, onToggle }: { spot
         {phases.map(([phase, label], index) => <div key={phase} className="text-center min-w-0"><div className={clsx('h-1.5 rounded-full', index <= phaseIndex ? 'bg-accent' : 'bg-bg4')}/><div className={clsx('text-[8px] mt-1 truncate', index === phaseIndex ? 'text-text font-bold' : 'text-muted')}>{label}</div></div>)}
       </div>
 
-      {(spot.phase === 'discover' || spot.phase === 'understand') && selectedTab && <LearningRange selectedTab={selectedTab}/>}
-
       <div className="mt-5 rounded-lg border border-border bg-bg3/60 p-3">
         <div className="text-[9px] uppercase tracking-wider font-bold text-muted">Pourquoi maintenant ?</div>
         <p className="text-xs leading-relaxed mt-1.5">{spot.reason}</p>
       </div>
 
       <div className="mt-5 rounded-lg border border-accent/25 bg-accent/5 p-3"><div className="text-[9px] uppercase tracking-wider font-bold text-accent">Étape actuelle · {phases[phaseIndex]?.[1]}</div><p className="text-[11px] text-muted mt-1.5 leading-relaxed">{action.help}</p></div>
-      <Button variant="primary" className="w-full mt-3" onClick={action.run} disabled={spot.phase === 'retention' && !spot.due}>{action.label} {!(spot.phase === 'retention' && !spot.due) && <span aria-hidden="true">→</span>}</Button>
+      {!spot.unlocked && <div className="mt-5 rounded-lg border border-border bg-bg3 p-3 text-[11px] text-muted"><span className="font-bold text-text">Prérequis</span><br/>{spot.lockReason}</div>}
+      <Button variant="primary" className="w-full mt-3" onClick={action.run} disabled={!spot.unlocked || (spot.phase === 'retention' && !spot.due)}>{spot.unlocked ? action.label : 'Range verrouillée'} {spot.unlocked && !(spot.phase === 'retention' && !spot.due) && <span aria-hidden="true">→</span>}</Button>
       <details className="mt-3 rounded-lg border border-border px-3 py-2">
         <summary className="text-[10px] text-muted cursor-pointer">Détails d’apprentissage</summary>
         <div className="mt-3 text-[10px] text-muted flex items-center justify-between"><span>Prérequis directs</span><strong className="text-text">{spot.prerequisiteKeys.length || 'Aucun'}</strong></div>
-        <div className="mt-3 grid grid-cols-3 gap-2 text-center"><DetailMetric value={formatScore(spot.flashScore)} label="Flash"/><DetailMetric value={formatScore(spot.grilleScore)} label="Grille"/><DetailMetric value={`${spot.practiceDays}/2`} label="Validations"/><DetailMetric value={`${spot.stability}%`} label="Stabilité"/><DetailMetric value={`${spot.importance}/5`} label="Importance"/><DetailMetric value={spot.due ? 'Due' : spot.memory === 'none' ? '—' : 'Planifiée'} label="Mémoire" warn={spot.due}/></div>
+        <div className="mt-3 grid grid-cols-3 gap-2 text-center"><DetailMetric value={formatScore(spot.flashScore)} label="Flash"/><DetailMetric value={formatScore(spot.grilleScore)} label="Grille"/><DetailMetric value={spot.phase === 'retention' ? 'Oui' : 'Non'} label="Validée"/><DetailMetric value={`${spot.stability}%`} label="Stabilité"/><DetailMetric value={`${spot.importance}/5`} label="Importance"/><DetailMetric value={spot.due ? 'Due' : spot.memory === 'none' ? '—' : 'Planifiée'} label="Mémoire" warn={spot.due}/></div>
         <div className="grid grid-cols-3 gap-1.5 mt-3">
           <button onClick={() => onToggle('roadmapPinned', spot.key)} className={clsx('min-h-8 rounded border text-[9px] font-semibold', spot.pinned ? 'border-accent bg-accent/15 text-accent' : 'border-border text-muted')}>{spot.pinned ? 'Épinglée' : 'Épingler'}</button>
           <button onClick={() => onToggle('roadmapSnoozed', spot.key)} className={clsx('min-h-8 rounded border text-[9px] font-semibold', spot.snoozed ? 'border-orange bg-orange/10 text-orange' : 'border-border text-muted')}>{spot.snoozed ? 'Reportée' : 'Reporter'}</button>
@@ -289,12 +305,6 @@ function SkillDetail({ spot, selectedTab, onStart, onAdvance, onToggle }: { spot
       </details>
     </div>
   );
-}
-
-function LearningRange({ selectedTab }: { selectedTab: SelectedTab }) {
-  const actions = getRangeActionDefs(selectedTab.rangeMap);
-  const inRange = allHands().filter(({ hand }) => getNonFoldActions(hand, selectedTab.rangeMap).length > 0).length;
-  return <div className="mt-4 rounded-lg border border-border bg-bg3/50 p-2.5"><div className="flex items-center justify-between gap-2 mb-2"><span className="text-[9px] font-bold uppercase tracking-wider">Structure de la range</span><span className="text-[9px] text-muted">{inRange}/169 mains</span></div><div className="grid grid-cols-13 gap-px">{allHands().map(({ hand }) => { const handActions = getNonFoldActions(hand, selectedTab.rangeMap); const color = actions.find(([name]) => name === handActions[0]?.action)?.[1]; return <div key={hand} title={`${hand}${handActions.length > 1 ? ' · mix' : ''}`} className="aspect-square rounded-[2px] flex items-center justify-center text-[5px] xl:text-[6px] font-bold text-white/90" style={{ background: color ? hexRgba(color, .85) : 'rgba(107,114,128,.16)', outline: handActions.length > 1 ? '1px solid rgba(255,255,255,.5)' : undefined }}>{hand}</div>; })}</div><div className="flex flex-wrap gap-x-2 gap-y-1 mt-2">{actions.map(([name, color]) => <span key={name} className="text-[8px] text-muted inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full" style={{ background: color }}/>{name}</span>)}<span className="text-[8px] text-muted">Contour = mix</span></div></div>;
 }
 
 function Legend({ color, label }: { color: string; label: string }) {
@@ -311,17 +321,4 @@ function matchesFilters(spot: RoadmapSpot, query: string, status: 'all' | 'due' 
   const textMatch = !query.trim() || `${spot.name} ${spot.catName} ${spot.position}`.toLowerCase().includes(query.trim().toLowerCase());
   const statusMatch = status === 'all' || (status === 'due' ? spot.due : status === 'mastered' ? spot.mastery >= 85 : spot.mastery < 85 && spot.mastery > 0);
   return textMatch && statusMatch;
-}
-
-function filterPath(stages: RoadmapStage[], path: 'essential' | 'complete' | 'blinds' | 'aggression'): RoadmapStage[] {
-  if (path === 'complete') return stages;
-  return stages.map(stage => ({
-    ...stage,
-    spots: stage.spots.filter(spot => {
-      if (spot.due || spot.pinned) return true;
-      if (path === 'essential') return spot.essential;
-      if (path === 'blinds') return stage.id === 'defense' || spot.position === 'SB' || spot.position === 'BB';
-      return stage.id === 'threebet' || stage.id === 'vs-threebet' || stage.id === 'vs-fourbet';
-    }),
-  })).filter(stage => stage.spots.length > 0);
 }

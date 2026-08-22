@@ -68,6 +68,21 @@ export interface RoadmapProgressEntry {
   validationDays: string[];
   startedAt: string;
   updatedAt: string;
+  flashSession?: RoadmapFlashSession;
+}
+
+export interface RoadmapFlashAnswer {
+  hand: string;
+  given: string;
+  expected: string;
+  outcome: 'correct' | 'partial' | 'wrong';
+}
+
+export interface RoadmapFlashSession {
+  hands: string[];
+  index: number;
+  answers: RoadmapFlashAnswer[];
+  startedAt: string;
 }
 
 // ── Session / Stats ───────────────────────────────────────
