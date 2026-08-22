@@ -9,6 +9,7 @@ import { createFlashSchedulerState, drawSmartFlashHand, recordFlashOutcome, type
 import type { HandItem, SelectedTab, HandAction } from '@/lib/types';
 import { Modal } from '@/components/ui/Modal';
 import { Icon } from '@/components/ui/Icon';
+import { RoadmapFlashSession } from '@/components/roadmap/RoadmapFlashSession';
 
 // ── Types ─────────────────────────────────────────────────────
 type Suit = '♠' | '♥' | '♦' | '♣';
@@ -81,7 +82,14 @@ function evaluateAnswer(
 // ── FlashView (orchestrator) ───────────────────────────────────
 export function FlashView() {
   const store = useAppStore();
-  const { selectedTab, selectedTabKey, srs, addSession, setPendingSrsKey, pendingSrsKey, saveConfig, progressSrsDrill, startSrsReview } = store;
+  const progress = store.selectedTabKey ? store.config.roadmapProgress?.[store.selectedTabKey] : undefined;
+  if (store.selectedTab && store.selectedTabKey && progress?.flashSession) return <RoadmapFlashSession spotKey={store.selectedTabKey} selectedTab={store.selectedTab} progress={progress}/>;
+  return <StandardFlashView/>;
+}
+
+function StandardFlashView() {
+  const store = useAppStore();
+  const { selectedTab, selectedTabKey, srs, addSession, setPendingSrsKey, pendingSrsKey, saveConfig, progressSrsDrill, startSrsReview, roadmapQueue, roadmapQueueIndex, advanceRoadmapSession, cancelRoadmapSession, recordRoadmapFlash } = store;
   const cfg = getCfg(store);
 
   const [tableCount,   setTableCount]   = useState<TableCount>(1);
@@ -162,6 +170,13 @@ export function FlashView() {
   const drillProgress = drillEntry ? srsDrillProgress(drillEntry) : 0;
   const isSrsDrill = Boolean(drillEntry && srsRequiresDrill(drillEntry));
   const drillComplete = isSrsDrill && drillProgress >= SRS_DRILL_HANDS;
+  const finishSession = () => {
+    const stats = totalStatsRef.current;
+    const total = stats.correct + stats.wrong + stats.imprecision;
+    if (selectedTabKey && total >= cfg.minHands) recordRoadmapFlash(selectedTabKey, Math.round(stats.correct / total * 100));
+    setPaused(true);
+    setSessionEnded(true);
+  };
 
   return (
     <div className="flex-1 flex flex-col relative overflow-hidden bg-gradient-to-b from-bg3/20 to-bg">
@@ -177,6 +192,13 @@ export function FlashView() {
               Faire la Grille →
             </button>
           )}
+        </div>
+      )}
+
+      {roadmapQueue.length > 0 && (
+        <div className="flex items-center justify-between gap-3 px-3 py-2 bg-accent/10 border-b border-accent/30 flex-shrink-0">
+          <div className="min-w-0"><div className="text-xs font-bold text-accent">Session Roadmap · étape {roadmapQueueIndex + 1}/{roadmapQueue.length}</div><div className="text-[10px] text-muted truncate">{roadmapQueue.map(item => item.name).join(' → ')}</div></div>
+          <button onClick={cancelRoadmapSession} className="text-[10px] text-muted hover:text-text">Quitter</button>
         </div>
       )}
 
@@ -225,7 +247,7 @@ export function FlashView() {
             )}>
             {paused ? 'Reprendre' : 'Pause'}
           </button>
-          <button onClick={() => { setPaused(true); setSessionEnded(true); }}
+          <button onClick={finishSession}
             aria-label="Terminer la session"
             className="text-[11px] min-h-8 px-2.5 py-1 rounded border border-border text-muted hover:border-red hover:text-red transition-all">
             Terminer
@@ -321,10 +343,13 @@ export function FlashView() {
                 </div>
               ))}
             </div>
-            <button onClick={handleNewSession}
-              className="w-full py-2.5 rounded-lg bg-accent text-white text-sm font-semibold hover:opacity-90 transition-opacity cursor-pointer">
-              Nouvelle session
-            </button>
+            {roadmapQueue.length > 0 ? (
+              <button onClick={() => { setSessionEnded(false); advanceRoadmapSession(); }} className="w-full py-2.5 rounded-lg bg-accent text-white text-sm font-semibold hover:opacity-90 transition-opacity cursor-pointer">
+                {roadmapQueueIndex + 1 < roadmapQueue.length ? 'Étape suivante →' : 'Terminer le parcours ✓'}
+              </button>
+            ) : (
+              <button onClick={handleNewSession} className="w-full py-2.5 rounded-lg bg-accent text-white text-sm font-semibold hover:opacity-90 transition-opacity cursor-pointer">Nouvelle session</button>
+            )}
           </div>
         </div>
       )}

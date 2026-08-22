@@ -216,6 +216,9 @@ export function GrilleView() {
   const { selectedTab, selectedTabKey, addSession, srs, setPendingSrsKey, pendingSrsKey, srsReviewKey, finishSrsReview } = store;
   const cfg = getCfg(store);
   const colorOverrides = store.colorOverrides;
+  const roadmapEntry = selectedTabKey ? store.config.roadmapProgress?.[selectedTabKey] : undefined;
+  const isRoadmapGrille = Boolean(roadmapEntry && (roadmapEntry.phase === 'validate' || (roadmapEntry.flashScore ?? 0) >= 80) && roadmapEntry.phase !== 'retention');
+  const [roadmapGrilleSession] = useState(isRoadmapGrille);
 
   const [selected,      setSelected]      = useState<Selection>(() => initAllFold());
   const [checkResult,   setCheckResult]   = useState<CheckResult | null>(null);
@@ -366,7 +369,9 @@ export function GrilleView() {
       }
     }
     addSession({ key: `grille_${selectedTabKey}`, date: todayStr(), name: selectedTab.name, catName: selectedTab.catName, mode: 'grille', score: result.score, correct: result.correct, missed: result.missed, extra: result.extra, wrongAct: result.wrongAct });
-    if (selectedTabKey && !srs[selectedTabKey] && result.score >= cfg.grilleThreshold && pendingSrsKey !== selectedTabKey) {
+    if (roadmapGrilleSession) setPendingSrsKey(null);
+    if (selectedTabKey) store.recordRoadmapGrille(selectedTabKey, result.score);
+    if (!roadmapGrilleSession && selectedTabKey && !srs[selectedTabKey] && result.score >= cfg.grilleThreshold && pendingSrsKey !== selectedTabKey) {
       setPendingSrsKey(selectedTabKey);
     }
   };
@@ -400,6 +405,7 @@ export function GrilleView() {
           <button onClick={() => store.setMode('srs')} className="min-h-8 px-2 text-[11px] text-muted hover:text-text transition-colors flex-shrink-0">Annuler</button>
         </div>
       )}
+      {roadmapGrilleSession && <div className="flex-shrink-0 mb-1.5 px-3 py-2 bg-accent/10 border border-accent/30 rounded-lg flex items-center justify-between gap-2"><div><span className="text-xs font-bold text-accent">Validation Roadmap</span><span className="text-[11px] text-muted ml-2">Reconstitue la range puis valide-la. Le SRS sera activé automatiquement.</span></div><button onClick={() => store.setMode('roadmap')} className="text-[10px] text-muted hover:text-text">Quitter</button></div>}
 
       {/* ── Editing UI ──────────────────────────────────────────── */}
       {!checkResult && (
@@ -474,14 +480,14 @@ export function GrilleView() {
           <div className="flex gap-1.5 mb-1.5">
             <button onClick={handleCheck}
               className="px-3 py-1.5 text-[11px] font-semibold rounded border bg-accent border-accent text-white hover:opacity-90 transition-opacity cursor-pointer">
-              ✓ Vérifier
+              {roadmapGrilleSession ? '✓ Valider la range' : '✓ Vérifier'}
             </button>
-            <button onClick={() => setRevealed(v => !v)}
+            {!roadmapGrilleSession && <button onClick={() => setRevealed(v => !v)}
               className={clsx('px-3 py-1.5 text-[11px] font-semibold rounded border transition-colors cursor-pointer',
                 revealed ? 'bg-blue/20 border-blue text-blue' : 'border-border text-muted hover:text-text hover:border-border2'
               )}>
               👁 Révéler
-            </button>
+            </button>}
             <button onClick={handleReset}
               className="px-3 py-1.5 text-[11px] font-semibold rounded border border-border text-muted hover:text-text hover:border-border2 transition-colors cursor-pointer">
               ↺ Reset
@@ -525,9 +531,11 @@ export function GrilleView() {
             ))}
           </div>
 
+          {roadmapGrilleSession && <div className={clsx('rounded-xl border p-3', checkResult.score >= cfg.grilleThreshold ? 'border-green/35 bg-green/10' : 'border-red/35 bg-red/10')}><div className={clsx('text-xs font-bold', checkResult.score >= cfg.grilleThreshold ? 'text-green' : 'text-red')}>{checkResult.score >= cfg.grilleThreshold ? 'Range validée · SRS activé automatiquement' : `Validation échouée · ${checkResult.score}% / ${cfg.grilleThreshold}% requis`}</div><p className="text-[10px] text-muted mt-1">{checkResult.score >= cfg.grilleThreshold ? 'Cette compétence est acquise et passera désormais en répétition espacée.' : 'Corrige les zones indiquées puis recommence une reconstruction complète.'}</p>{checkResult.score >= cfg.grilleThreshold && <button onClick={() => store.setMode('roadmap')} className="w-full mt-3 py-2 rounded-lg bg-green text-white text-xs font-bold hover:opacity-90">Retour à la Roadmap →</button>}</div>}
+
           <button onClick={handleReset}
             className="w-full py-2 rounded-lg bg-bg3 border border-border text-xs font-semibold text-text hover:bg-bg4 hover:border-border2 transition-all cursor-pointer">
-            ↺ Recommencer
+            {roadmapGrilleSession && checkResult.score < cfg.grilleThreshold ? '↺ Recommencer la validation' : '↺ Recommencer'}
           </button>
 
           {isSrsReview && selectedTabKey && (

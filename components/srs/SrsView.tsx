@@ -41,7 +41,7 @@ export function SrsView() {
         <SectionHeading eyebrow="Apprentissage" title="Révisions SRS" description={summary} />
         {entries.length > 0 && (
           <button
-            onClick={() => { if (confirm('Réinitialiser tout le SRS ?')) clearSrs(); }}
+            onClick={() => { if (confirm('Réinitialiser uniquement le calendrier SRS ? La progression Roadmap sera conservée.')) clearSrs(); }}
             className="min-h-8 px-2 text-[11px] text-muted hover:text-red transition-colors cursor-pointer"
           >
             Réinitialiser

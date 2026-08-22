@@ -54,7 +54,36 @@ export interface HandItem {
 }
 
 // ── App modes ─────────────────────────────────────────────
-export type Mode = 'flash' | 'grille' | 'srs' | 'tracker';
+export type Mode = 'roadmap' | 'flash' | 'grille' | 'srs' | 'tracker';
+
+export type RoadmapPhase = 'discover' | 'understand' | 'practice' | 'validate' | 'retention';
+
+export interface RoadmapProgressEntry {
+  key: string;
+  phase: RoadmapPhase;
+  lessonCompleted: boolean;
+  guidedCompleted: boolean;
+  flashScore: number | null;
+  grilleScore: number | null;
+  validationDays: string[];
+  startedAt: string;
+  updatedAt: string;
+  flashSession?: RoadmapFlashSession;
+}
+
+export interface RoadmapFlashAnswer {
+  hand: string;
+  given: string;
+  expected: string;
+  outcome: 'correct' | 'partial' | 'wrong';
+}
+
+export interface RoadmapFlashSession {
+  hands: string[];
+  index: number;
+  answers: RoadmapFlashAnswer[];
+  startedAt: string;
+}
 
 // ── Session / Stats ───────────────────────────────────────
 export interface Session {
@@ -116,6 +145,12 @@ export interface AppConfig {
   flashHandFilter: string[] | null;
   trackerHeroName?: string;
   trackerMappings?: Record<string, string>; // position -> tabKey (folderId__catId__tabId)
+  roadmapPath: 'essential' | 'complete' | 'blinds' | 'aggression';
+  roadmapDailyMinutes: 10 | 20 | 30;
+  roadmapPinned: string[];
+  roadmapSnoozed: string[];
+  roadmapKnown: string[];
+  roadmapProgress: Record<string, RoadmapProgressEntry>;
 }
 
 // ── Tracker ───────────────────────────────────────────────

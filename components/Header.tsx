@@ -6,6 +6,7 @@ import { Icon, type IconName } from './ui/Icon';
 import { IconButton } from './ui/Primitives';
 
 export const MODES: { id: Mode; label: string; icon: IconName }[] = [
+  { id: 'roadmap', label: 'Roadmap', icon: 'roadmap' },
   { id: 'flash',  label: 'Flash',  icon: 'flash' },
   { id: 'grille', label: 'Grille', icon: 'grid' },
   { id: 'srs',    label: 'SRS',    icon: 'calendar' },
@@ -38,14 +39,14 @@ export function Header({ onOpenSidebar, syncState }: { onOpenSidebar: () => void
       {/* Spot name */}
       <div className="min-w-0 flex-1">
         <h2 className="text-sm font-semibold truncate leading-tight">
-          {selectedTab?.name ?? 'Sélectionne un spot'}
+          {currentMode === 'roadmap' ? 'Roadmap' : selectedTab?.name ?? 'Sélectionne un spot'}
         </h2>
         <p className="text-[11px] text-muted truncate hidden sm:block leading-tight mt-0.5">
-          {selectedTab ? `${selectedTab.catName} / ${selectedTab.name}` : 'Importe un .rm puis clique sur un spot'}
+          {currentMode === 'roadmap' ? 'Ton parcours guidé par priorité' : selectedTab ? `${selectedTab.catName} / ${selectedTab.name}` : 'Importe un .rm puis clique sur un spot'}
         </p>
       </div>
 
-      {selectedTab && spots.length > 1 && (
+      {currentMode !== 'roadmap' && selectedTab && spots.length > 1 && (
         <div className="hidden md:flex items-center gap-1" aria-label="Parcourir les spots">
           <IconButton icon="chevron" label="Spot précédent" onClick={() => moveSpot(-1)} className="!w-8 !h-8 [&>svg]:rotate-180"/>
           <IconButton icon="chevron" label="Spot suivant" onClick={() => moveSpot(1)} className="!w-8 !h-8"/>

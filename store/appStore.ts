@@ -8,7 +8,7 @@ import { scheduleSrsReview, SRS_DRILL_HANDS, srsNeedsDrill } from '@/lib/srs';
 import type {
   RmData, RangeColor, SelectedTab, Mode,
   Session, ErrorEntry, SrsEntry, AppConfig, Category, RangeInfo,
-  TrackerImportSession,
+  TrackerImportSession, RoadmapProgressEntry,
 } from '@/lib/types';
 
 // ── Persisted (localStorage) ──────────────────────────────
@@ -35,6 +35,8 @@ interface Ephemeral {
   srsReviewKey: string | null;   // which entry is currently being reviewed
   calYear: number;
   calMonth: number;
+  roadmapQueue: Array<{ key: string; catId: string; tabId: string; name: string }>;
+  roadmapQueueIndex: number;
 }
 
 // ── Actions ───────────────────────────────────────────────
@@ -61,6 +63,17 @@ interface Actions {
   setCalendar: (year: number, month: number) => void;
   saveColorOverride: (name: string, color: string) => void;
   addTrackerSession: (session: TrackerImportSession) => void;
+  startRoadmapSession: (queue: Array<{ key: string; catId: string; tabId: string; name: string }>) => void;
+  advanceRoadmapSession: () => void;
+  cancelRoadmapSession: () => void;
+  updateRoadmapProgress: (key: string, updates: Partial<RoadmapProgressEntry>) => void;
+  recordRoadmapFlash: (key: string, score: number) => void;
+  finishRoadmapFlash: (key: string, session: NonNullable<RoadmapProgressEntry['flashSession']>, score: number) => void;
+  closeRoadmapFlash: (key: string, score: number) => void;
+  recordRoadmapGrille: (key: string, score: number) => void;
+  resetRoadmapProgress: () => void;
+  clearErrors: () => void;
+  resetLearningData: () => void;
 }
 
 export type AppStore = Persisted & Ephemeral & Actions;
@@ -161,6 +174,8 @@ export const useAppStore = create<AppStore>()(
       srsReviewKey: null,
       calYear: new Date().getFullYear(),
       calMonth: new Date().getMonth(),
+      roadmapQueue: [],
+      roadmapQueueIndex: 0,
 
       // ── Actions ───────────────────────────────────────
       importRmFile: (name, content) => {
@@ -441,6 +456,88 @@ export const useAppStore = create<AppStore>()(
 
       addTrackerSession: (session) =>
         set(s => ({ trackerSessions: [...s.trackerSessions, session].slice(-50) })),
+
+      startRoadmapSession: (queue) => {
+        const first = queue[0];
+        if (!first) return;
+        get().selectTab(first.catId, first.tabId);
+        set({ roadmapQueue: queue, roadmapQueueIndex: 0, currentMode: 'flash' });
+      },
+
+      advanceRoadmapSession: () => {
+        const { roadmapQueue, roadmapQueueIndex } = get();
+        const nextIndex = roadmapQueueIndex + 1;
+        const next = roadmapQueue[nextIndex];
+        if (!next) {
+          set({ roadmapQueue: [], roadmapQueueIndex: 0, currentMode: 'roadmap' });
+          return;
+        }
+        get().selectTab(next.catId, next.tabId);
+        set({ roadmapQueueIndex: nextIndex, currentMode: 'flash' });
+      },
+
+      cancelRoadmapSession: () => set({ roadmapQueue: [], roadmapQueueIndex: 0 }),
+
+      updateRoadmapProgress: (key, updates) => set(s => {
+        const now = new Date().toISOString();
+        const current = s.config.roadmapProgress?.[key];
+        const entry: RoadmapProgressEntry = {
+          phase: 'discover', lessonCompleted: false, guidedCompleted: false,
+          flashScore: null, grilleScore: null, validationDays: [], startedAt: now,
+          ...current, ...updates, key, updatedAt: now,
+        };
+        return { config: { ...s.config, roadmapProgress: { ...(s.config.roadmapProgress ?? {}), [key]: entry } } };
+      }),
+
+      recordRoadmapFlash: (key, score) => {
+        const entry = get().config.roadmapProgress?.[key];
+        if (!entry || entry.phase !== 'practice') return;
+        get().updateRoadmapProgress(key, { flashScore: Math.max(entry.flashScore ?? 0, score), phase: score >= 80 ? 'validate' : 'practice' });
+      },
+
+      finishRoadmapFlash: (key, session, score) => set(s => {
+        const current = s.config.roadmapProgress?.[key];
+        if (!current) return s;
+        const entry: RoadmapProgressEntry = {
+          ...current,
+          flashSession: session,
+          flashScore: Math.max(current.flashScore ?? 0, score),
+          phase: score >= 80 ? 'validate' : 'practice',
+          updatedAt: new Date().toISOString(),
+        };
+        return { config: { ...s.config, roadmapProgress: { ...(s.config.roadmapProgress ?? {}), [key]: entry } } };
+      }),
+
+      closeRoadmapFlash: (key, score) => set(s => {
+        const current = s.config.roadmapProgress?.[key];
+        if (!current) return s;
+        const entry: RoadmapProgressEntry = {
+          ...current,
+          flashSession: undefined,
+          flashScore: Math.max(current.flashScore ?? 0, score),
+          phase: score >= 80 ? 'validate' : 'practice',
+          updatedAt: new Date().toISOString(),
+        };
+        return { config: { ...s.config, roadmapProgress: { ...(s.config.roadmapProgress ?? {}), [key]: entry } } };
+      }),
+
+      recordRoadmapGrille: (key, score) => {
+        const entry = get().config.roadmapProgress?.[key];
+        if (!entry || (entry.phase !== 'validate' && (entry.flashScore ?? 0) < 80)) return;
+        const cfg = getCfg(get());
+        const passed = score >= cfg.grilleThreshold;
+        const days = passed ? [...new Set([...entry.validationDays, todayStr()])] : entry.validationDays;
+        const phase = passed ? 'retention' as const : 'validate' as const;
+        get().updateRoadmapProgress(key, { grilleScore: Math.max(entry.grilleScore ?? 0, score), validationDays: days, phase });
+        if (passed && !get().srs[key]) {
+          const tab = get().selectedTab;
+          get().addSrs(key, { key, name: tab?.name ?? key, catName: tab?.catName ?? '', interval: cfg.intervals[0], nextReview: addDays(todayStr(), cfg.intervals[0]), added: todayStr(), lastScore: score, drillProgress: 0 });
+        }
+      },
+
+      resetRoadmapProgress: () => set(s => ({ config: { ...s.config, roadmapProgress: {}, roadmapPinned: [], roadmapSnoozed: [], roadmapKnown: [] } })),
+      clearErrors: () => set({ errors: {}, heatmap: {} }),
+      resetLearningData: () => set(s => ({ sessions: [], errors: {}, heatmap: {}, srs: {}, config: { ...s.config, roadmapProgress: {}, roadmapPinned: [], roadmapSnoozed: [], roadmapKnown: [] } })),
     }),
     {
       name: 'range-trainer-v5',
