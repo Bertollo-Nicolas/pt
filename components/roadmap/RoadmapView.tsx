@@ -6,7 +6,7 @@ import { buildDailyRoadmapSession, buildRoadmap, nextRoadmapSpot, roadmapMilesto
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState } from '@/components/ui/Primitives';
-import { SectionHeading, StatCard, Surface } from '@/components/ui/Surface';
+import { SectionHeading, Surface } from '@/components/ui/Surface';
 
 const STATUS: Record<RoadmapStatus, { label: string; tone: string }> = {
   due: { label: 'À réviser', tone: 'text-orange bg-orange/10 border-orange/25' },
@@ -66,92 +66,61 @@ export function RoadmapView() {
   return (
     <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
       <div className="max-w-6xl mx-auto space-y-5">
-        <SectionHeading eyebrow="Parcours d’apprentissage" title="Roadmap préflop" description="Une progression guidée par la fréquence des spots, leur valeur, tes erreurs et les révisions SRS. Les étapes restent accessibles : le verrou indique une priorité, pas une interdiction." action={<div className="w-10 h-10 rounded-xl bg-accent/15 text-accent flex items-center justify-center"><Icon name="roadmap" size={21}/></div>} />
+        <SectionHeading eyebrow="Parcours" title="Roadmap préflop" description="Suis simplement la mission proposée, puis avance dans le chemin." action={<div className="w-10 h-10 rounded-xl bg-accent/15 text-accent flex items-center justify-center"><Icon name="roadmap" size={21}/></div>} />
 
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          <StatCard label="Maîtrise" value={`${globalMastery}%`} detail="sur le parcours" />
-          <StatCard label="Acquises" value={`${mastered}/${allSpots.length}`} detail="ranges à 85 % +" tone="positive" />
-          <StatCard label="SRS dues" value={due} detail="prioritaires aujourd’hui" tone={due ? 'warning' : 'positive'} />
+        <div className="flex items-center gap-3 text-xs">
+          <div className="flex-1 h-2 rounded-full bg-bg3 overflow-hidden"><div className="h-full rounded-full bg-accent" style={{ width: `${globalMastery}%` }}/></div>
+          <strong>{globalMastery}%</strong>
+          <span className="text-muted hidden sm:inline">· {mastered}/{allSpots.length} maîtrisées</span>
+          {due > 0 && <span className="text-orange">· {due} à réviser</span>}
         </div>
 
-        <Surface className="p-3 sm:p-4">
-          <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="section-label">Mon parcours</div>
-              <div className="flex flex-wrap gap-2 mt-2">
-                <select aria-label="Type de parcours" value={cfg.roadmapPath} onChange={event => saveConfig({ roadmapPath: event.target.value as typeof cfg.roadmapPath })} className="control text-xs min-w-[170px]">
-                  <option value="essential">Essentiel</option><option value="complete">Complet</option><option value="blinds">Défense des blindes</option><option value="aggression">Jeu agressif</option>
-                </select>
-                <select aria-label="Temps quotidien" value={cfg.roadmapDailyMinutes} onChange={event => saveConfig({ roadmapDailyMinutes: Number(event.target.value) as 10 | 20 | 30 })} className="control text-xs">
-                  <option value={10}>10 min / jour</option><option value={20}>20 min / jour</option><option value={30}>30 min / jour</option>
-                </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-center">
-              <MiniMetric value={`${estimatedDays} j`} label="estimation"/><MiniMetric value={weekly.sessions} label="sessions / 7 j"/><MiniMetric value={weekly.spots} label="spots travaillés" className="hidden sm:block"/>
-            </div>
-          </div>
-        </Surface>
-
-        {recommended && (
+        {recommended && dailySession.length > 0 && (
           <Surface className="p-4 sm:p-5 border-accent/40 bg-gradient-to-br from-accent/10 to-bg2">
             <div className="flex flex-col sm:flex-row sm:items-center gap-4">
               <div className="w-11 h-11 rounded-xl bg-accent text-white flex items-center justify-center flex-shrink-0"><Icon name="target" size={22}/></div>
               <div className="min-w-0 flex-1">
-                <div className="section-label text-accent">Prochaine étape recommandée</div>
-                <h3 className="text-lg font-bold mt-1">{recommended.name}</h3>
-                <p className="text-xs text-muted mt-1">{recommended.catName} · {recommended.reason}</p>
+                <div className="section-label text-accent">Aujourd’hui · {cfg.roadmapDailyMinutes} min</div>
+                <h3 className="text-lg font-bold mt-1">Commence par {recommended.name}</h3>
+                <p className="text-xs text-muted mt-1">{dailySession.length} ranges préparées, révisions comprises.</p>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="text-right"><div className="text-xl font-bold">{recommended.mastery}%</div><div className="text-[10px] text-muted">maîtrise</div></div>
-                <Button variant="primary" onClick={() => start(recommended)} className="whitespace-nowrap">Commencer <span aria-hidden="true">→</span></Button>
-              </div>
+              <Button variant="primary" onClick={() => startRoadmapSession(dailySession.map(({ key, catId, tabId, name }) => ({ key, catId, tabId, name })))} className="whitespace-nowrap">Démarrer <span aria-hidden="true">→</span></Button>
             </div>
           </Surface>
         )}
 
-        {dailySession.length > 0 && (
-          <Surface className="p-4 sm:p-5">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-              <div className="flex-1 min-w-0">
-                <div className="section-label">Session du jour · {cfg.roadmapDailyMinutes} minutes</div>
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {dailySession.map((spot, index) => <span key={spot.key} className={clsx('text-[10px] rounded-full border px-2 py-1', spot.due ? 'border-orange/30 bg-orange/10 text-orange' : 'border-border bg-bg3 text-muted')}>{index + 1}. {spot.name}</span>)}
-                </div>
-                <p className="text-[10px] text-muted mt-2">Mélange automatique : apprentissage actuel, révisions SRS et anciennes fragilités.</p>
+        <details className="rounded-xl border border-border bg-bg2 px-4 py-3">
+          <summary className="text-xs font-semibold cursor-pointer text-muted hover:text-text">Réglages et progression</summary>
+          <div className="mt-4 grid lg:grid-cols-2 gap-4 border-t border-border pt-4">
+            <div>
+              <div className="section-label">Parcours</div>
+              <div className="flex flex-wrap gap-2 mt-2">
+                <select aria-label="Type de parcours" value={cfg.roadmapPath} onChange={event => saveConfig({ roadmapPath: event.target.value as typeof cfg.roadmapPath })} className="control text-xs"><option value="essential">Essentiel</option><option value="complete">Complet</option><option value="blinds">Défense des blindes</option><option value="aggression">Jeu agressif</option></select>
+                <select aria-label="Temps quotidien" value={cfg.roadmapDailyMinutes} onChange={event => saveConfig({ roadmapDailyMinutes: Number(event.target.value) as 10 | 20 | 30 })} className="control text-xs"><option value={10}>10 min / jour</option><option value={20}>20 min / jour</option><option value={30}>30 min / jour</option></select>
               </div>
-              <Button variant="primary" onClick={() => startRoadmapSession(dailySession.map(({ key, catId, tabId, name }) => ({ key, catId, tabId, name })))} className="whitespace-nowrap">Lancer la session</Button>
+              <p className="text-[11px] text-muted mt-3">Environ {estimatedDays} jours restants · {weekly.sessions} sessions cette semaine · {weekly.scoreDelta > 0 ? '+' : ''}{weekly.scoreDelta} pts.</p>
             </div>
-          </Surface>
-        )}
-
-        <div className="grid lg:grid-cols-[1fr_320px] gap-3">
-          <Surface className="p-4">
-            <div className="section-label">Jalons</div>
-            <div className="grid sm:grid-cols-2 gap-2 mt-3">{milestones.map(milestone => <div key={milestone.label} className={clsx('rounded-lg border px-3 py-2 text-xs flex items-center gap-2', milestone.achieved ? 'border-green/30 bg-green/10 text-green' : 'border-border bg-bg3 text-muted')}><span className="font-bold">{milestone.achieved ? '✓' : '○'}</span>{milestone.label}</div>)}</div>
-          </Surface>
-          <Surface className="p-4">
-            <div className="section-label">Cette semaine</div>
-            <div className="text-2xl font-bold mt-3">{weekly.sessions} <span className="text-sm font-normal text-muted">sessions</span></div>
-            <p className="text-xs text-muted mt-1">{weekly.spots} compétence{weekly.spots > 1 ? 's' : ''} différente{weekly.spots > 1 ? 's' : ''} travaillée{weekly.spots > 1 ? 's' : ''} sur les 7 derniers jours.</p>
-            <div className={clsx('text-xs font-bold mt-2', weekly.scoreDelta > 0 ? 'text-green' : weekly.scoreDelta < 0 ? 'text-orange' : 'text-muted')}>{weekly.scoreDelta > 0 ? '+' : ''}{weekly.scoreDelta} pts de précision vs semaine précédente</div>
-          </Surface>
-        </div>
+            <div>
+              <div className="section-label">Jalons</div>
+              <div className="space-y-1.5 mt-2">{milestones.map(milestone => <div key={milestone.label} className={clsx('text-[11px] flex gap-2', milestone.achieved ? 'text-green' : 'text-muted')}><span>{milestone.achieved ? '✓' : '○'}</span>{milestone.label}</div>)}</div>
+            </div>
+          </div>
+        </details>
 
         <Surface className="overflow-hidden">
           <div className="px-4 sm:px-5 py-4 border-b border-border">
-            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
-              <div>
-                <div className="section-label">Arbre de compétences</div>
-                <p className="text-xs text-muted mt-1">Sélectionne un nœud pour comprendre sa priorité et commencer l’entraînement.</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher…" className="control !min-h-8 w-32 text-[11px]"/>
-                <select value={statusFilter} onChange={event => setStatusFilter(event.target.value as typeof statusFilter)} className="control !min-h-8 text-[11px]"><option value="all">Tous les états</option><option value="due">SRS dues</option><option value="learning">En apprentissage</option><option value="mastered">Maîtrisées</option></select>
-                <div className="flex rounded-lg border border-border overflow-hidden"><button onClick={() => setView('tree')} className={clsx('min-h-8 px-2 text-[10px]', view === 'tree' ? 'bg-accent text-white' : 'text-muted')}>Arbre</button><button onClick={() => setView('list')} className={clsx('min-h-8 px-2 text-[10px]', view === 'list' ? 'bg-accent text-white' : 'text-muted')}>Liste</button></div>
-              </div>
+            <div className="flex items-start justify-between gap-3">
+              <div><div className="section-label">Ton chemin</div><p className="text-xs text-muted mt-1">Le nœud lumineux est ta prochaine priorité.</p></div>
+              <details className="relative text-right">
+                <summary className="list-none cursor-pointer min-h-8 px-2.5 rounded border border-border text-[10px] text-muted inline-flex items-center">Options</summary>
+                <div className="absolute right-0 top-10 z-20 w-64 rounded-xl border border-border2 bg-bg2 shadow-xl p-3 text-left">
+                  <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher…" className="control w-full text-[11px]"/>
+                  <select value={statusFilter} onChange={event => setStatusFilter(event.target.value as typeof statusFilter)} className="control w-full text-[11px] mt-2"><option value="all">Tous les états</option><option value="due">SRS dues</option><option value="learning">En apprentissage</option><option value="mastered">Maîtrisées</option></select>
+                  <div className="grid grid-cols-2 rounded-lg border border-border overflow-hidden mt-2"><button onClick={() => setView('tree')} className={clsx('min-h-8 text-[10px]', view === 'tree' ? 'bg-accent text-white' : 'text-muted')}>Arbre</button><button onClick={() => setView('list')} className={clsx('min-h-8 text-[10px]', view === 'list' ? 'bg-accent text-white' : 'text-muted')}>Liste</button></div>
+                  <div className="grid grid-cols-2 gap-2 mt-3 text-[9px] font-bold uppercase tracking-wider"><Legend color="bg-green" label="Maîtrisée"/><Legend color="bg-accent" label="En cours"/><Legend color="bg-orange" label="SRS"/><Legend color="bg-bg4 border border-border2" label="À venir"/></div>
+                </div>
+              </details>
             </div>
-            <div className="flex flex-wrap gap-2 mt-3 text-[9px] font-bold uppercase tracking-wider"><Legend color="bg-green" label="Maîtrisée"/><Legend color="bg-accent" label="En cours"/><Legend color="bg-orange" label="SRS"/><Legend color="bg-bg4 border border-border2" label="À venir"/></div>
           </div>
           <div className="grid lg:grid-cols-[minmax(0,1fr)_300px]">
             <div className="p-4 sm:p-7 lg:border-r border-border bg-[radial-gradient(circle_at_50%_0%,rgba(108,99,255,0.10),transparent_42%)]">
@@ -278,19 +247,17 @@ function SkillDetail({ spot, onStart, onToggle }: { spot: RoadmapSpot; onStart: 
         <p className="text-xs leading-relaxed mt-1.5">{spot.reason}</p>
       </div>
 
-      <div className="mt-3 text-[10px] text-muted flex items-center justify-between"><span>Prérequis directs</span><strong className="text-text">{spot.prerequisiteKeys.length || 'Aucun'}</strong></div>
-
-      <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-        <DetailMetric value={formatScore(spot.flashScore)} label="Flash"/><DetailMetric value={formatScore(spot.grilleScore)} label="Grille"/><DetailMetric value={spot.errorCount} label="Erreurs" warn={spot.errorCount > 0}/>
-        <DetailMetric value={`${spot.stability}%`} label="Stabilité"/><DetailMetric value={`${spot.importance}/5`} label="Importance"/><DetailMetric value={spot.due ? 'Due' : spot.memory === 'none' ? '—' : 'Planifiée'} label="Mémoire" warn={spot.due}/>
-      </div>
-
       <Button variant="primary" className="w-full mt-5" onClick={onStart}>{spot.due ? 'Lancer la révision' : 'Travailler cette range'} <span aria-hidden="true">→</span></Button>
-      <div className="grid grid-cols-3 gap-1.5 mt-2">
-        <button onClick={() => onToggle('roadmapPinned', spot.key)} className={clsx('min-h-8 rounded border text-[9px] font-semibold', spot.pinned ? 'border-accent bg-accent/15 text-accent' : 'border-border text-muted')}>{spot.pinned ? 'Épinglée' : 'Épingler'}</button>
-        <button onClick={() => onToggle('roadmapSnoozed', spot.key)} className={clsx('min-h-8 rounded border text-[9px] font-semibold', spot.snoozed ? 'border-orange bg-orange/10 text-orange' : 'border-border text-muted')}>{spot.snoozed ? 'Reportée' : 'Reporter'}</button>
-        <button onClick={() => onToggle('roadmapKnown', spot.key)} className={clsx('min-h-8 rounded border text-[9px] font-semibold', spot.known ? 'border-green bg-green/10 text-green' : 'border-border text-muted')}>{spot.known ? 'Déjà connue' : 'Je connais'}</button>
-      </div>
+      <details className="mt-3 rounded-lg border border-border px-3 py-2">
+        <summary className="text-[10px] text-muted cursor-pointer">Détails d’apprentissage</summary>
+        <div className="mt-3 text-[10px] text-muted flex items-center justify-between"><span>Prérequis directs</span><strong className="text-text">{spot.prerequisiteKeys.length || 'Aucun'}</strong></div>
+        <div className="mt-3 grid grid-cols-3 gap-2 text-center"><DetailMetric value={formatScore(spot.flashScore)} label="Flash"/><DetailMetric value={formatScore(spot.grilleScore)} label="Grille"/><DetailMetric value={spot.errorCount} label="Erreurs" warn={spot.errorCount > 0}/><DetailMetric value={`${spot.stability}%`} label="Stabilité"/><DetailMetric value={`${spot.importance}/5`} label="Importance"/><DetailMetric value={spot.due ? 'Due' : spot.memory === 'none' ? '—' : 'Planifiée'} label="Mémoire" warn={spot.due}/></div>
+        <div className="grid grid-cols-3 gap-1.5 mt-3">
+          <button onClick={() => onToggle('roadmapPinned', spot.key)} className={clsx('min-h-8 rounded border text-[9px] font-semibold', spot.pinned ? 'border-accent bg-accent/15 text-accent' : 'border-border text-muted')}>{spot.pinned ? 'Épinglée' : 'Épingler'}</button>
+          <button onClick={() => onToggle('roadmapSnoozed', spot.key)} className={clsx('min-h-8 rounded border text-[9px] font-semibold', spot.snoozed ? 'border-orange bg-orange/10 text-orange' : 'border-border text-muted')}>{spot.snoozed ? 'Reportée' : 'Reporter'}</button>
+          <button onClick={() => onToggle('roadmapKnown', spot.key)} className={clsx('min-h-8 rounded border text-[9px] font-semibold', spot.known ? 'border-green bg-green/10 text-green' : 'border-border text-muted')}>{spot.known ? 'Déjà connue' : 'Je connais'}</button>
+        </div>
+      </details>
     </div>
   );
 }
@@ -301,10 +268,6 @@ function Legend({ color, label }: { color: string; label: string }) {
 
 function DetailMetric({ value, label, warn }: { value: React.ReactNode; label: string; warn?: boolean }) {
   return <div className="rounded-lg bg-bg3 p-2"><div className={clsx('text-xs font-bold', warn && 'text-orange')}>{value}</div><div className="text-[8px] text-muted uppercase mt-0.5">{label}</div></div>;
-}
-
-function MiniMetric({ value, label, className }: { value: React.ReactNode; label: string; className?: string }) {
-  return <div className={clsx('rounded-lg bg-bg3 px-3 py-2 min-w-[82px]', className)}><div className="text-sm font-bold">{value}</div><div className="text-[8px] text-muted uppercase tracking-wider">{label}</div></div>;
 }
 
 function formatScore(score: number | null): string { return score == null ? '—' : `${score}%`; }
