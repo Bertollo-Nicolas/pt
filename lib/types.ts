@@ -56,6 +56,20 @@ export interface HandItem {
 // ── App modes ─────────────────────────────────────────────
 export type Mode = 'roadmap' | 'flash' | 'grille' | 'srs' | 'tracker';
 
+export type RoadmapPhase = 'discover' | 'understand' | 'practice' | 'validate' | 'retention';
+
+export interface RoadmapProgressEntry {
+  key: string;
+  phase: RoadmapPhase;
+  lessonCompleted: boolean;
+  guidedCompleted: boolean;
+  flashScore: number | null;
+  grilleScore: number | null;
+  validationDays: string[];
+  startedAt: string;
+  updatedAt: string;
+}
+
 // ── Session / Stats ───────────────────────────────────────
 export interface Session {
   id?: string;
@@ -121,6 +135,7 @@ export interface AppConfig {
   roadmapPinned: string[];
   roadmapSnoozed: string[];
   roadmapKnown: string[];
+  roadmapProgress: Record<string, RoadmapProgressEntry>;
 }
 
 // ── Tracker ───────────────────────────────────────────────

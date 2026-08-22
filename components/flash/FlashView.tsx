@@ -81,7 +81,7 @@ function evaluateAnswer(
 // ── FlashView (orchestrator) ───────────────────────────────────
 export function FlashView() {
   const store = useAppStore();
-  const { selectedTab, selectedTabKey, srs, addSession, setPendingSrsKey, pendingSrsKey, saveConfig, progressSrsDrill, startSrsReview, roadmapQueue, roadmapQueueIndex, advanceRoadmapSession, cancelRoadmapSession } = store;
+  const { selectedTab, selectedTabKey, srs, addSession, setPendingSrsKey, pendingSrsKey, saveConfig, progressSrsDrill, startSrsReview, roadmapQueue, roadmapQueueIndex, advanceRoadmapSession, cancelRoadmapSession, recordRoadmapFlash } = store;
   const cfg = getCfg(store);
 
   const [tableCount,   setTableCount]   = useState<TableCount>(1);
@@ -162,6 +162,13 @@ export function FlashView() {
   const drillProgress = drillEntry ? srsDrillProgress(drillEntry) : 0;
   const isSrsDrill = Boolean(drillEntry && srsRequiresDrill(drillEntry));
   const drillComplete = isSrsDrill && drillProgress >= SRS_DRILL_HANDS;
+  const finishSession = () => {
+    const stats = totalStatsRef.current;
+    const total = stats.correct + stats.wrong + stats.imprecision;
+    if (selectedTabKey && total >= cfg.minHands) recordRoadmapFlash(selectedTabKey, Math.round(stats.correct / total * 100));
+    setPaused(true);
+    setSessionEnded(true);
+  };
 
   return (
     <div className="flex-1 flex flex-col relative overflow-hidden bg-gradient-to-b from-bg3/20 to-bg">
@@ -232,7 +239,7 @@ export function FlashView() {
             )}>
             {paused ? 'Reprendre' : 'Pause'}
           </button>
-          <button onClick={() => { setPaused(true); setSessionEnded(true); }}
+          <button onClick={finishSession}
             aria-label="Terminer la session"
             className="text-[11px] min-h-8 px-2.5 py-1 rounded border border-border text-muted hover:border-red hover:text-red transition-all">
             Terminer

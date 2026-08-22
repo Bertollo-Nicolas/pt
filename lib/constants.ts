@@ -14,6 +14,7 @@ export const DEFAULT_CFG: AppConfig = {
   roadmapPinned: [],
   roadmapSnoozed: [],
   roadmapKnown: [],
+  roadmapProgress: {},
 };
 
 export const MAX_SESSIONS = 200;

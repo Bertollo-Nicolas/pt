@@ -366,6 +366,7 @@ export function GrilleView() {
       }
     }
     addSession({ key: `grille_${selectedTabKey}`, date: todayStr(), name: selectedTab.name, catName: selectedTab.catName, mode: 'grille', score: result.score, correct: result.correct, missed: result.missed, extra: result.extra, wrongAct: result.wrongAct });
+    if (selectedTabKey) store.recordRoadmapGrille(selectedTabKey, result.score);
     if (selectedTabKey && !srs[selectedTabKey] && result.score >= cfg.grilleThreshold && pendingSrsKey !== selectedTabKey) {
       setPendingSrsKey(selectedTabKey);
     }

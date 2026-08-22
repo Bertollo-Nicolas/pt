@@ -8,7 +8,7 @@ import { scheduleSrsReview, SRS_DRILL_HANDS, srsNeedsDrill } from '@/lib/srs';
 import type {
   RmData, RangeColor, SelectedTab, Mode,
   Session, ErrorEntry, SrsEntry, AppConfig, Category, RangeInfo,
-  TrackerImportSession,
+  TrackerImportSession, RoadmapProgressEntry,
 } from '@/lib/types';
 
 // ── Persisted (localStorage) ──────────────────────────────
@@ -66,6 +66,12 @@ interface Actions {
   startRoadmapSession: (queue: Array<{ key: string; catId: string; tabId: string; name: string }>) => void;
   advanceRoadmapSession: () => void;
   cancelRoadmapSession: () => void;
+  updateRoadmapProgress: (key: string, updates: Partial<RoadmapProgressEntry>) => void;
+  recordRoadmapFlash: (key: string, score: number) => void;
+  recordRoadmapGrille: (key: string, score: number) => void;
+  resetRoadmapProgress: () => void;
+  clearErrors: () => void;
+  resetLearningData: () => void;
 }
 
 export type AppStore = Persisted & Ephemeral & Actions;
@@ -469,6 +475,40 @@ export const useAppStore = create<AppStore>()(
       },
 
       cancelRoadmapSession: () => set({ roadmapQueue: [], roadmapQueueIndex: 0 }),
+
+      updateRoadmapProgress: (key, updates) => set(s => {
+        const now = new Date().toISOString();
+        const current = s.config.roadmapProgress?.[key];
+        const entry: RoadmapProgressEntry = {
+          phase: 'discover', lessonCompleted: false, guidedCompleted: false,
+          flashScore: null, grilleScore: null, validationDays: [], startedAt: now,
+          ...current, ...updates, key, updatedAt: now,
+        };
+        return { config: { ...s.config, roadmapProgress: { ...(s.config.roadmapProgress ?? {}), [key]: entry } } };
+      }),
+
+      recordRoadmapFlash: (key, score) => {
+        const entry = get().config.roadmapProgress?.[key];
+        if (!entry || entry.phase !== 'practice') return;
+        get().updateRoadmapProgress(key, { flashScore: Math.max(entry.flashScore ?? 0, score), phase: score >= 80 ? 'validate' : 'practice' });
+      },
+
+      recordRoadmapGrille: (key, score) => {
+        const entry = get().config.roadmapProgress?.[key];
+        if (!entry || entry.phase !== 'validate') return;
+        const cfg = getCfg(get());
+        const days = score >= cfg.grilleThreshold ? [...new Set([...entry.validationDays, todayStr()])] : entry.validationDays;
+        const phase = days.length >= 2 ? 'retention' as const : 'validate' as const;
+        get().updateRoadmapProgress(key, { grilleScore: Math.max(entry.grilleScore ?? 0, score), validationDays: days, phase });
+        if (phase === 'retention' && !get().srs[key]) {
+          const tab = get().selectedTab;
+          get().addSrs(key, { key, name: tab?.name ?? key, catName: tab?.catName ?? '', interval: cfg.intervals[0], nextReview: addDays(todayStr(), cfg.intervals[0]), added: todayStr(), lastScore: score, drillProgress: 0 });
+        }
+      },
+
+      resetRoadmapProgress: () => set(s => ({ config: { ...s.config, roadmapProgress: {}, roadmapPinned: [], roadmapSnoozed: [], roadmapKnown: [] } })),
+      clearErrors: () => set({ errors: {}, heatmap: {} }),
+      resetLearningData: () => set(s => ({ sessions: [], errors: {}, heatmap: {}, srs: {}, config: { ...s.config, roadmapProgress: {}, roadmapPinned: [], roadmapSnoozed: [], roadmapKnown: [] } })),
     }),
     {
       name: 'range-trainer-v5',

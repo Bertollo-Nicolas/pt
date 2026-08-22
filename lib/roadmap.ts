@@ -1,5 +1,4 @@
-import type { RmData, Session, ErrorEntry, SrsEntry, AppConfig } from './types';
-import { buildLearningSpots } from './learning';
+import type { RmData, Session, ErrorEntry, SrsEntry, AppConfig, RoadmapPhase, RoadmapProgressEntry } from './types';
 import { tabKey } from './poker';
 import { todayStr } from './utils';
 
@@ -34,6 +33,8 @@ export interface RoadmapSpot {
   practiceDays: number;
   prerequisiteKeys: string[];
   unlocked: boolean;
+  phase: RoadmapPhase;
+  progress: RoadmapProgressEntry | null;
 }
 
 export interface RoadmapStage {
@@ -56,9 +57,7 @@ const STAGES: Array<Omit<RoadmapStage, 'spots' | 'mastery' | 'completed' | 'unlo
 
 export function buildRoadmap(rmData: RmData | null, sessions: Session[], errors: Record<string, ErrorEntry>, srs: Record<string, SrsEntry>, config?: Partial<AppConfig>): RoadmapStage[] {
   if (!rmData) return STAGES.map(stage => ({ ...stage, spots: [], mastery: 0, completed: 0, unlocked: stage.id === 'open' }));
-  const learning = new Map(buildLearningSpots(sessions, errors).map(spot => [spot.key, spot]));
   const today = todayStr();
-  const practiceDays = buildPracticeDays(sessions);
   const grouped = new Map<RoadmapStageId, RoadmapSpot[]>(STAGES.map(stage => [stage.id, []]));
   const categoryPaths = buildCategoryPaths(rmData);
 
@@ -70,28 +69,27 @@ export function buildRoadmap(rmData: RmData | null, sessions: Session[], errors:
       const stageId = classifyStage(classificationLabel);
       if (!stageId) continue;
       const key = tabKey(catId, tabId);
-      const insight = learning.get(key);
+      const progress = config?.roadmapProgress?.[key] ?? null;
       const known = config?.roadmapKnown?.includes(key) ?? false;
       const pinned = config?.roadmapPinned?.includes(key) ?? false;
       const snoozed = config?.roadmapSnoozed?.includes(key) ?? false;
-      const mastery = known ? 100 : insight?.mastery ?? 0;
-      const due = Boolean(srs[key] && srs[key].nextReview <= today);
+      const mastery = known ? 100 : phaseMastery(progress);
+      const due = Boolean(progress?.phase === 'retention' && srs[key] && srs[key].nextReview <= today);
       const position = detectPosition(`${cat.name} ${tab.name}`);
       const base = stageBase(stageId) * positionWeight(classificationLabel);
-      const errorBoost = Math.min(32, (insight?.errorCount ?? 0) * 3);
       const learningGap = Math.max(0, 100 - mastery) * 0.45;
-      const priority = Math.round(base + errorBoost + learningGap + (due ? 45 : 0) + (pinned ? 60 : 0) - (snoozed ? 120 : 0));
-      const status: RoadmapStatus = due ? 'due' : mastery >= 85 ? 'mastered' : mastery >= 70 ? 'consolidate' : insight ? 'learning' : 'new';
-      const days = practiceDays.get(key)?.size ?? 0;
+      const priority = Math.round(base + learningGap + (due ? 45 : 0) + (pinned ? 60 : 0) - (snoozed ? 120 : 0));
+      const status: RoadmapStatus = due ? 'due' : progress?.phase === 'retention' || known ? 'mastered' : progress?.phase === 'validate' ? 'consolidate' : progress ? 'learning' : 'new';
+      const days = progress?.validationDays.length ?? 0;
       const importance = importanceScore(stageId, classificationLabel);
       const essential = importance >= 4;
       grouped.get(stageId)!.push({
         key, catId, tabId, name: tab.name, catName: cat.name, stageId, mastery, priority, status, due,
-        reason: due ? 'Révision SRS arrivée à échéance' : pinned ? 'Épinglée dans tes priorités' : snoozed ? 'Reportée temporairement' : errorBoost >= 12 ? 'Erreurs récentes à corriger' : stageReason(stageId),
+        reason: due ? 'Révision mémoire arrivée à échéance' : pinned ? 'Épinglée dans tes priorités' : snoozed ? 'Reportée temporairement' : stageReason(stageId),
         level: masteryLevel(mastery, days), importance, memory: due ? 'due' : srs[key] ? (mastery >= 85 ? 'stable' : 'scheduled') : 'none',
-        flashScore: insight?.flashScore ?? null, grilleScore: insight?.grilleScore ?? null, stability: insight?.stability ?? 0,
-        errorCount: insight?.errorCount ?? 0, position, essential, pinned, snoozed, known, practiceDays: days,
-        prerequisiteKeys: [], unlocked: stageId === 'open',
+        flashScore: progress?.flashScore ?? null, grilleScore: progress?.grilleScore ?? null, stability: Math.min(100, days * 50),
+        errorCount: 0, position, essential, pinned, snoozed, known, practiceDays: days,
+        prerequisiteKeys: [], unlocked: stageId === 'open', phase: progress?.phase ?? 'discover', progress,
       });
     }
   }
@@ -105,14 +103,14 @@ export function buildRoadmap(rmData: RmData | null, sessions: Session[], errors:
     const completed = spots.filter(spot => spot.mastery >= 85).length;
     const unlocked = index === 0 || previousReady;
     const essentials = spots.filter(spot => spot.essential);
-    const readyEssentials = essentials.filter(spot => spot.known || (spot.mastery >= 80 && spot.practiceDays >= 2));
+    const readyEssentials = essentials.filter(spot => spot.known || spot.phase === 'retention');
     previousReady = essentials.length === 0 || readyEssentials.length / essentials.length >= 0.8;
     return {
       ...definition,
       spots: spots.map(spot => {
         const prerequisitesReady = spot.prerequisiteKeys.every(key => {
           const prerequisite = allLookup.get(key);
-          return !prerequisite || prerequisite.known || (prerequisite.mastery >= 80 && prerequisite.practiceDays >= 2);
+          return !prerequisite || prerequisite.known || prerequisite.phase === 'retention';
         });
         const nodeUnlocked = spot.due || spot.known || (unlocked && prerequisitesReady);
         return { ...spot, unlocked: nodeUnlocked, status: nodeUnlocked ? spot.status : 'locked' as const };
@@ -260,6 +258,15 @@ function masteryLevel(mastery: number, practiceDays: number): MasteryLevel {
   if (mastery >= 70) return 'Solide';
   if (mastery > 0) return 'Initié';
   return 'Découverte';
+}
+
+function phaseMastery(progress: RoadmapProgressEntry | null): number {
+  if (!progress) return 0;
+  if (progress.phase === 'discover') return 5;
+  if (progress.phase === 'understand') return 20;
+  if (progress.phase === 'practice') return Math.max(35, Math.round((progress.flashScore ?? 0) * 0.6));
+  if (progress.phase === 'validate') return Math.max(65, 65 + progress.validationDays.length * 10);
+  return 100;
 }
 
 function stageBase(stage: RoadmapStageId): number {
