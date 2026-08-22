@@ -179,8 +179,58 @@ const TREE_POSITIONS = ['UTG', 'HJ', 'CO', 'BU', 'SB', 'BB'];
 
 function SkillTree({ stages, selectedKey, recommendedKey, onSelect }: { stages: RoadmapStage[]; selectedKey?: string; recommendedKey?: string; onSelect: (spot: RoadmapSpot) => void }) {
   const allSpots = stages.flatMap(stage => stage.spots);
-  return <div className="overflow-x-auto pb-4 -mx-1 px-1">
-    <div className="min-w-[1040px]">
+  const recommendedPosition = allSpots.find(spot => spot.key === recommendedKey)?.heroPosition;
+  const firstPosition = TREE_POSITIONS.find(position => allSpots.some(spot => spot.heroPosition === position)) ?? 'UTG';
+  const [mobilePosition, setMobilePosition] = useState(recommendedPosition ?? firstPosition);
+  const mobileSpots = allSpots.filter(spot => spot.heroPosition === mobilePosition);
+  const mobileMastered = mobileSpots.filter(spot => spot.status === 'mastered').length;
+  const mobileProgress = mobileSpots.length ? Math.round(mobileSpots.reduce((sum, spot) => sum + spot.mastery, 0) / mobileSpots.length) : 0;
+
+  return <>
+    <div className="lg:hidden">
+      <div className="rounded-xl border border-border bg-bg2/80 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div><div className="text-xs font-bold">Choisis une branche</div><div className="text-[9px] text-muted mt-0.5">Progression par position Hero</div></div>
+          <div className="text-right"><div className="text-lg font-black">{mobileProgress}%</div><div className="text-[8px] text-muted">{mobileMastered}/{mobileSpots.length} maîtrisées</div></div>
+        </div>
+        <div className="mt-3 -mx-1 px-1 flex gap-2 overflow-x-auto pb-1 snap-x">
+          {TREE_POSITIONS.map(position => {
+            const spots = allSpots.filter(spot => spot.heroPosition === position);
+            const mastered = spots.filter(spot => spot.status === 'mastered').length;
+            const hasNext = spots.some(spot => spot.key === recommendedKey);
+            const active = position === mobilePosition;
+            return <button key={position} type="button" onClick={() => setMobilePosition(position)} className={clsx('relative flex-shrink-0 snap-start w-[70px] rounded-lg border px-2 py-2.5 text-center transition-colors', active ? 'border-accent bg-accent/15 text-text' : 'border-border bg-bg3 text-muted', !spots.length && 'opacity-45')}>
+              {hasNext && <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-orange"/>}
+              <span className="block text-sm font-black">{position}</span>
+              <span className="block text-[8px] mt-0.5">{mastered}/{spots.length}</span>
+            </button>;
+          })}
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-xl border border-border bg-bg2/45 px-3 pb-5">
+        <div className="sticky top-0 z-10 -mx-3 flex items-center gap-3 border-b border-border bg-bg2/95 px-4 py-3 backdrop-blur">
+          <div className="w-9 h-9 rounded-lg border border-accent/40 bg-accent/15 flex items-center justify-center font-black text-accent">{mobilePosition}</div>
+          <div className="min-w-0 flex-1"><div className="text-xs font-bold">Branche {mobilePosition}</div><div className="text-[9px] text-muted">Du premier Open jusqu’à la rétention</div></div>
+          {recommendedPosition === mobilePosition && <span className="rounded-full border border-orange/30 bg-orange/10 px-2 py-1 text-[8px] font-bold text-orange">Prioritaire</span>}
+        </div>
+        <div className="relative pl-7 pt-2 before:absolute before:left-[13px] before:top-2 before:bottom-4 before:w-px before:bg-gradient-to-b before:from-accent before:via-border2 before:to-border">
+          {stages.map(stage => {
+            const spots = stage.spots.filter(spot => spot.heroPosition === mobilePosition);
+            if (!spots.length) return null;
+            return <section key={stage.id} className="relative pt-5">
+              <span className="absolute -left-[20px] top-[25px] z-[1] h-3 w-3 rounded-full border-2 border-bg bg-accent"/>
+              <div className="mb-2 flex items-center justify-between"><div className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted">{stage.title}</div><div className="text-[8px] text-muted">{spots.filter(spot => spot.status === 'mastered').length}/{spots.length}</div></div>
+              <div className="space-y-3">{spots.map(spot => <SkillNode key={spot.key} spot={spot} selected={selectedKey === spot.key} recommended={recommendedKey === spot.key} onSelect={() => onSelect(spot)}/>)}</div>
+            </section>;
+          })}
+          {!mobileSpots.length && <div className="mt-5 rounded-xl border border-dashed border-border p-8 text-center text-[10px] text-muted">Aucune compétence disponible pour cette position.</div>}
+        </div>
+      </div>
+    </div>
+
+    <div className="hidden lg:block overflow-x-auto pb-4 -mx-1 px-1">
+      <div className="min-w-[1040px]">
       <div className="mb-5 flex items-center justify-between gap-4 rounded-xl border border-border bg-bg2/80 px-4 py-3">
         <div><div className="text-xs font-bold">Arbre de compétences préflop</div><div className="text-[10px] text-muted mt-1">Chaque branche descend de l’Open de la position Hero.</div></div>
         <div className="flex items-center gap-3 text-[9px] text-muted"><span><b className="text-accent">◆</b> Accessible</span><span><b className="text-green">✓</b> Maîtrisée</span><span><b>▣</b> Verrouillée</span></div>
@@ -211,8 +261,9 @@ function SkillTree({ stages, selectedKey, recommendedKey, onSelect }: { stages: 
           </section>;
         })}
       </div>
+      </div>
     </div>
-  </div>;
+  </>;
 }
 
 function SkillNode({ spot, selected, recommended, onSelect }: { spot: RoadmapSpot; selected: boolean; recommended: boolean; onSelect: () => void }) {
