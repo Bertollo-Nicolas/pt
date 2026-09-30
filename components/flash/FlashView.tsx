@@ -9,6 +9,7 @@ import { createFlashSchedulerState, drawSmartFlashHand, recordFlashOutcome, type
 import type { HandItem, SelectedTab, HandAction } from '@/lib/types';
 import { Modal } from '@/components/ui/Modal';
 import { Icon } from '@/components/ui/Icon';
+import { ExerciseHeading } from '@/components/ExerciseHeading';
 import { RoadmapFlashSession } from '@/components/roadmap/RoadmapFlashSession';
 
 // ── Types ─────────────────────────────────────────────────────
@@ -179,7 +180,8 @@ function StandardFlashView() {
   };
 
   return (
-    <div className="flex-1 flex flex-col relative overflow-hidden bg-gradient-to-b from-bg3/20 to-bg">
+    <div className="exercise-workspace flex-1 flex flex-col relative overflow-hidden">
+      <ExerciseHeading mode="flash"/>
 
       {isSrsDrill && (
         <div className="flex items-center justify-between gap-3 px-3 py-2 bg-orange/10 border-b border-orange/30 flex-shrink-0">
@@ -203,7 +205,7 @@ function StandardFlashView() {
       )}
 
       {/* ── Row 1: Stats + Session Controls ──────────────────── */}
-      <div className="flex items-center gap-2 px-3 py-2.5 bg-bg2/95 border-b border-border flex-shrink-0 overflow-x-auto no-scrollbar">
+      <div className="exercise-toolbar flex items-center gap-2 flex-shrink-0 overflow-x-auto no-scrollbar">
         <span className="text-xs font-bold text-green flex-shrink-0">✓{totalStats.correct}</span>
         {totalStats.imprecision > 0 && <span className="text-xs font-bold text-orange flex-shrink-0">≈{totalStats.imprecision}</span>}
         <span className="text-xs font-bold text-red flex-shrink-0">✗{totalStats.wrong}</span>
@@ -256,7 +258,7 @@ function StandardFlashView() {
       </div>
 
       {/* ── Row 2: Timer + Tables ─────────────────────────────── */}
-      <div className="flex items-center gap-1.5 px-3 py-2 bg-bg3 border-b border-border flex-shrink-0 overflow-x-auto no-scrollbar">
+      <div className="exercise-options flex items-center gap-1.5 flex-shrink-0 overflow-x-auto no-scrollbar">
         <span className="section-label flex-shrink-0">Timer</span>
         {([0, 5000, 8000, 12000, 15000, 20000] as TimerMs[]).map(ms => (
           <button key={ms} onClick={() => setTimerMs(ms)}
@@ -701,7 +703,7 @@ function FlashPanel({
         <div className="w-full h-0.5 bg-bg3 rounded-full overflow-hidden flex-shrink-0">
           <div className="h-full rounded-full transition-none"
             style={{ width: `${timerPct}%`,
-              background: timerPct > 40 ? '#6c63ff' : timerPct > 20 ? '#e09540' : '#e05555' }} />
+              background: timerPct > 40 ? '#8bc6a1' : timerPct > 20 ? '#e09540' : '#e05555' }} />
         </div>
       )}
 

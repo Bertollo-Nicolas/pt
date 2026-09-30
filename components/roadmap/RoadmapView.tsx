@@ -20,7 +20,7 @@ const STATUS: Record<RoadmapStatus, { label: string; tone: string }> = {
   locked: { label: 'Verrouillée', tone: 'text-muted bg-bg3 border-border' },
 };
 
-export function RoadmapView() {
+export function RoadmapView({ onLibrary }: { onLibrary: () => void }) {
   const store = useAppStore();
   const { rmData, sessions, errors, srs, selectedTab, selectedTabKey, selectTab, setMode, saveConfig, updateRoadmapProgress, resetRoadmapProgress, clearErrors, resetLearningData, addSrs } = store;
   const cfg = getCfg(store);
@@ -31,7 +31,7 @@ export function RoadmapView() {
   const [selectedKey, setSelectedKey] = useState<string | null>(recommended?.key ?? null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
-  const [view, setView] = useState<'tree' | 'list'>('tree');
+  const [view, setView] = useState<'tree' | 'list'>('list');
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'due' | 'learning' | 'mastered'>('all');
   const selectedSpot = allSpots.find(spot => spot.key === selectedKey) ?? recommended;
@@ -75,7 +75,7 @@ export function RoadmapView() {
   };
 
   if (!rmData || allSpots.length === 0) {
-    return <div className="flex-1 overflow-y-auto p-4 sm:p-6"><EmptyState icon="roadmap" title="Roadmap indisponible" description="Importe des ranges Open, BB vs Open, 3-bet, Vs 3-bet ou Vs 4-bet pour générer ton parcours." /></div>;
+    return <div className="flex-1 overflow-y-auto p-4 sm:p-6"><EmptyState icon="roadmap" title="Construisons ton parcours." description="Importe tes ranges Open, BB vs Open, 3-bet, Vs 3-bet ou Vs 4-bet. Nous organiserons les étapes de ton apprentissage." action={<Button variant="primary" onClick={onLibrary}>Ouvrir ma bibliothèque</Button>} /></div>;
   }
 
   if (workspaceOpen && selectedSpot && selectedTabKey === selectedSpot.key && selectedTab) {
@@ -85,7 +85,7 @@ export function RoadmapView() {
   return (
     <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
       <div className="max-w-[1600px] mx-auto space-y-5">
-        <SectionHeading eyebrow="Parcours" title="Roadmap préflop" description="Suis simplement la mission proposée, puis avance dans le chemin." action={<div className="w-10 h-10 rounded-xl bg-accent/15 text-accent flex items-center justify-center"><Icon name="roadmap" size={21}/></div>} />
+        <SectionHeading eyebrow="Parcours" title="Un plan pour progresser." description="Découvre, pratique et consolide. Chaque étape te rapproche d’un préflop maîtrisé." action={<div className="w-10 h-10 rounded-xl bg-accent/15 text-accent flex items-center justify-center"><Icon name="roadmap" size={21}/></div>} />
 
         <div className="flex items-center gap-3 text-xs">
           <div className="flex-1 h-2 rounded-full bg-bg3 overflow-hidden"><div className="h-full rounded-full bg-accent" style={{ width: `${globalMastery}%` }}/></div>
@@ -133,7 +133,7 @@ export function RoadmapView() {
         <Surface className="overflow-hidden">
           <div className="px-4 sm:px-5 py-4 border-b border-border">
             <div className="flex items-start justify-between gap-3">
-              <div><div className="section-label">Ton chemin</div><p className="text-xs text-muted mt-1">Le nœud lumineux est ta prochaine priorité.</p></div>
+              <div><div className="section-label">Ton chemin</div><p className="text-xs text-muted mt-1">Choisis une étape pour retrouver son objectif et les exercices associés.</p></div>
               <details className="relative text-right">
                 <summary className="list-none cursor-pointer min-h-8 px-2.5 rounded border border-border text-[10px] text-muted inline-flex items-center">Options</summary>
                 <div className="absolute right-0 top-10 z-20 w-64 rounded-xl border border-border2 bg-bg2 shadow-xl p-3 text-left">
@@ -146,7 +146,7 @@ export function RoadmapView() {
             </div>
           </div>
           <div className="grid 2xl:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="p-3 sm:p-6 2xl:border-r border-border bg-[radial-gradient(circle_at_50%_0%,rgba(108,99,255,0.08),transparent_42%)]">
+            <div className="p-3 sm:p-6 2xl:border-r border-border bg-[radial-gradient(circle_at_50%_0%,rgba(139,198,161,0.05),transparent_42%)]">
               {view === 'list' ? (
                 <RoadmapList stages={visibleStages} selectedKey={selectedSpot?.key} onSelect={selectSkill}/>
               ) : <SkillTree stages={visibleStages} selectedKey={selectedSpot?.key} recommendedKey={recommended?.key} onSelect={selectSkill}/>}

@@ -22,6 +22,8 @@ export function Modal({ open, onClose, children, className }: ModalProps) {
     (focusable?.[0] ?? dialog)?.focus();
 
     const handler = (e: KeyboardEvent) => {
+      const dialogs = document.querySelectorAll('[role="dialog"]');
+      if (dialogs[dialogs.length - 1] !== dialog) return;
       if (e.key === 'Escape') onClose();
       if (e.key !== 'Tab' || !dialog) return;
       const items = Array.from(dialog.querySelectorAll<HTMLElement>(

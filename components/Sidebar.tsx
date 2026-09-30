@@ -11,7 +11,7 @@ import { Modal, ModalTitle, ModalBody, ModalActions } from './ui/Modal';
 import { Icon } from './ui/Icon';
 
 export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings: () => void; onClose?: () => void; onLogout?: () => void }) {
-  const { rmData, rmFiles, srs, importRmFile, deleteRmFile, renameRmFile, selectTab, setMode, selectedTabKey } = useAppStore();
+  const { rmData, rmFiles, srs, importRmFile, deleteRmFile, renameRmFile, selectTab, setMode, selectedTabKey, currentMode } = useAppStore();
   const [search, setSearch] = useState('');
   const [openCats, setOpenCats] = useState<Set<string>>(() => {
     if (typeof window === 'undefined') return new Set();
@@ -57,7 +57,7 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
         body: JSON.stringify({ name: finalName, content: pendingFile.content }),
       });
     } catch { /* offline — localStorage fallback */ }
-    
+
     setPendingFile(null);
   };
 
@@ -73,7 +73,7 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
     const currentName = oldName.replace(/\.rm$/, '');
     let newName = prompt('Nouveau nom pour ce dossier ?', currentName);
     if (newName === null || !newName || newName === currentName) return;
-    
+
     if (!newName.endsWith('.rm')) newName += '.rm';
     renameRmFile(oldName, newName);
 
@@ -98,13 +98,13 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
   const dueCount = Object.values(srs).filter((e: SrsEntry) => e.nextReview <= today || srsRequiresDrill(e)).length;
 
   return (
-    <aside className="bg-bg2 border-r border-border flex flex-col overflow-hidden h-full">
+    <aside className="range-library bg-bg2 flex flex-col overflow-hidden h-full">
       {/* Header */}
       <div className="px-3.5 pt-3.5 pb-2.5 border-b border-border flex items-center justify-between flex-shrink-0">
         <div className="min-w-0">
           <div className="text-[15px] font-bold tracking-tight">
-            Range <span className="text-accent">Trainer</span>{' '}
-            <span className="text-[10px] text-muted font-normal">v5</span>
+            Ma <span className="text-accent">bibliothèque</span>{' '}
+
           </div>
           <div className="text-[10px] text-muted mt-0.5 hidden sm:block">Compatible .rm — Range Manager</div>
         </div>
@@ -119,7 +119,7 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
           {onClose && (
             <button
               onClick={onClose}
-              className="md:hidden bg-transparent border border-border rounded px-2 py-1 text-muted cursor-pointer text-sm hover:text-text hover:border-border2 transition-colors"
+              className="bg-transparent border border-border rounded px-2 py-1 text-muted cursor-pointer text-sm hover:text-text hover:border-border2 transition-colors"
               title="Fermer"
             >
               <Icon name="close" size={16} />
@@ -188,7 +188,7 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
               selectedTabKey={selectedTabKey}
               srs={srs}
               today={today}
-              onSelectTab={(catId, tabId) => selectTab(catId, tabId)}
+              onSelectTab={(catId, tabId) => { selectTab(catId, tabId); if (currentMode !== 'flash' && currentMode !== 'grille') setMode('flash'); onClose?.(); }}
             />
           ))
         )}
@@ -208,7 +208,7 @@ export function Sidebar({ onOpenSettings, onClose, onLogout }: { onOpenSettings:
             {Object.keys(rmFiles).map(name => (
               <div key={name} className="flex items-center justify-between gap-2 px-1.5 py-1 bg-bg3 rounded text-[10px] group">
                 <span className="truncate text-muted group-hover:text-text transition-colors flex-1">{name.replace(/\.rm$/, '')}</span>
-                <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1.5 opacity-100 transition-opacity">
                   <button
                     onClick={() => handleRenameFile(name)}
                     className="text-muted hover:text-accent transition-colors cursor-pointer"
@@ -320,7 +320,7 @@ function TreeNode({
 }) {
   const cat = cats[id];
   if (!cat) return null;
-  const isOpen = openCats.has(id);
+  const isOpen = !!search || openCats.has(id);
 
   if (cat.children) {
     return (

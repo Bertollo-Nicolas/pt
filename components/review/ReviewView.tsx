@@ -41,7 +41,7 @@ export function ReviewView() {
   return <div className="flex-1 overflow-y-auto bg-bg px-3 py-5 sm:px-6">
     <div className="max-w-6xl mx-auto space-y-5 pb-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div><p className="section-label">Journal de session</p><h1 className="text-2xl font-bold mt-1">Mains à revoir</h1><p className="text-sm text-muted mt-1">Colle tes mains Winamax. Les spots sont classés automatiquement.</p></div>
+        <div><p className="section-label">Journal de session</p><h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mt-3">Reviens sur tes décisions.</h1><p className="text-sm text-muted mt-1">Colle tes mains Winamax. Les spots sont classés automatiquement.</p></div>
         <div className="flex gap-2 items-center"><span className="text-xs rounded-full bg-orange/15 text-orange px-3 py-1.5">{pending} à revoir</span><span className="text-xs rounded-full bg-bg3 text-muted px-3 py-1.5">{reviewHands.length} au total</span></div>
       </div>
 

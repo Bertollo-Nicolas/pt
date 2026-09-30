@@ -174,7 +174,7 @@ export const useAppStore = create<AppStore>()(
       rangeColors: {},
       selectedTab: null,
       selectedTabKey: null,
-      currentMode: 'flash',
+      currentMode: 'home',
       pendingSrsKey: null,
       srsReviewKey: null,
       calYear: new Date().getFullYear(),

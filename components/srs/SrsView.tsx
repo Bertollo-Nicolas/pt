@@ -38,7 +38,7 @@ export function SrsView() {
 
       {/* Header */}
       <div className="flex items-start justify-between mb-5">
-        <SectionHeading eyebrow="Apprentissage" title="Révisions SRS" description={summary} />
+        <SectionHeading eyebrow="Apprentissage" title="Ancre tes connaissances." description={summary} />
         {entries.length > 0 && (
           <button
             onClick={() => { if (confirm('Réinitialiser uniquement le calendrier SRS ? La progression Roadmap sera conservée.')) clearSrs(); }}
@@ -51,7 +51,7 @@ export function SrsView() {
 
       {/* Empty state */}
       {entries.length === 0 && (
-        <EmptyState icon="calendar" title="Aucune range dans le SRS" description="Atteins le seuil de précision en Flash ou en Grille pour commencer ton programme de révision."/>
+        <EmptyState icon="calendar" title="Tes prochaines révisions se préparent ici." description="Commence par les flashcards ou le range builder. Une fois le seuil de précision atteint, tes ranges rejoignent automatiquement ton calendrier de révision." action={<button className="focus-cta" onClick={() => store.setMode('flash')}>Commencer un entraînement →</button>}/>
       )}
 
       <LearningInsights />

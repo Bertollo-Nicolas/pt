@@ -2,13 +2,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react';
 import clsx from 'clsx';
 import { Icon } from '@/components/ui/Icon';
+import { ExerciseHeading } from '@/components/ExerciseHeading';
 import { useAppStore, getCfg } from '@/store/appStore';
 import { allHands, getNonFoldActions, getHandActions, getRangeActionDefs, isFoldAction, isMixed, cellType } from '@/lib/poker';
 import { hexRgba, todayStr } from '@/lib/utils';
 import { scoreGrille, type GrilleCheckResult, type GrilleCheckState } from '@/lib/grille-score';
 import type { HandItem, SelectedTab } from '@/lib/types';
 
-const FOLD_COLOR = '#6b7280';
+const FOLD_COLOR = '#65766a';
 
 type CellFreqs = Record<string, number>;
 type Selection = Record<string, CellFreqs>;
@@ -96,7 +97,7 @@ function ScoreCircle({ score }: { score: number }) {
   const color = score >= 80 ? '#2ecc8a' : score >= 55 ? '#e09540' : '#e05555';
   return (
     <svg width="56" height="56" viewBox="0 0 56 56">
-      <circle cx="28" cy="28" r={r} fill="none" stroke="#2e2e38" strokeWidth="4" />
+      <circle cx="28" cy="28" r={r} fill="none" stroke="#303833" strokeWidth="4" />
       <circle cx="28" cy="28" r={r} fill="none" stroke={color} strokeWidth="4"
         strokeDasharray={`${dash} ${circ}`} strokeDashoffset={circ / 4} strokeLinecap="round" />
       <text x="28" y="32" textAnchor="middle" fontSize="11" fontWeight="bold" fill={color}>{score}%</text>
@@ -393,7 +394,8 @@ export function GrilleView() {
   const isSrsReview = srsReviewKey === selectedTabKey;
 
   return (
-    <div ref={containerRef} className="flex-1 flex flex-col overflow-hidden min-h-0 px-2 sm:px-3 md:px-5 py-3 bg-gradient-to-b from-bg3/20 to-bg">
+    <div ref={containerRef} className="exercise-workspace flex-1 flex flex-col overflow-hidden min-h-0 px-3 md:px-6 pb-4">
+      <ExerciseHeading mode="grille"/>
 
       {/* SRS banner */}
       {isSrsReview && (
@@ -580,7 +582,7 @@ export function GrilleView() {
                   if (nfTotal < 0.99) freqs['Fold'] = Math.round((1 - nfTotal) * 100);
                   selStyle = buildGradient(freqs, allActionButtons);
                 } else {
-                  selStyle = { background: hexRgba(colorOverrides['Fold'] ?? FOLD_COLOR, 0.22), borderColor: hexRgba(colorOverrides['Fold'] ?? FOLD_COLOR, 0.35), color: '#7a7a90' };
+                  selStyle = { background: hexRgba(colorOverrides['Fold'] ?? FOLD_COLOR, 0.22), borderColor: hexRgba(colorOverrides['Fold'] ?? FOLD_COLOR, 0.35), color: '#a1aaa3' };
                 }
               } else {
                 selStyle = buildGradient(selected[hand] ?? { Fold: 100 }, allActionButtons);

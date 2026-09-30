@@ -161,7 +161,7 @@ export function TrackerView() {
     <div className="flex-1 overflow-y-auto bg-gradient-to-b from-bg3/30 to-bg px-3 py-4 sm:p-6">
       <div className="max-w-6xl mx-auto pb-8">
       <Surface className="p-4 sm:p-6">
-        <SectionHeading eyebrow="Analyse" title="Poker Tracker" description="Reliez vos spots Winamax à vos ranges, importez une session puis identifiez rapidement les écarts prioritaires." action={<div className="w-10 h-10 rounded-xl bg-accent/15 text-accent flex items-center justify-center"><Icon name="chart" size={20}/></div>} />
+        <SectionHeading eyebrow="Analyse" title="Comprends ton jeu." description="Compare tes décisions Winamax à tes ranges et identifie les écarts à travailler en priorité." action={<div className="w-10 h-10 rounded-xl bg-accent/15 text-accent flex items-center justify-center"><Icon name="chart" size={20}/></div>} />
 
         {!cfg.trackerHeroName ? (
           <div className="bg-orange/10 border border-orange/30 p-4 rounded-lg text-orange text-sm mt-6">

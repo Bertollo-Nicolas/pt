@@ -54,7 +54,7 @@ export interface HandItem {
 }
 
 // ── App modes ─────────────────────────────────────────────
-export type Mode = 'roadmap' | 'flash' | 'grille' | 'srs' | 'tracker' | 'review';
+export type Mode = 'home' | 'roadmap' | 'flash' | 'grille' | 'srs' | 'tracker' | 'review';
 
 export interface ReviewHand {
   id: string;

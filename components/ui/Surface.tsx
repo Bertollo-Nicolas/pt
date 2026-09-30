@@ -1,7 +1,7 @@
 import clsx from 'clsx';
 
 export function Surface({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <section className={clsx('bg-bg2 border border-border rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.12)]', className)}>{children}</section>;
+  return <section className={clsx('bg-bg2 border border-border rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)]', className)}>{children}</section>;
 }
 
 export function SectionHeading({ eyebrow, title, description, action }: {
@@ -13,8 +13,8 @@ export function SectionHeading({ eyebrow, title, description, action }: {
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="min-w-0">
-        {eyebrow && <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-accent mb-1">{eyebrow}</div>}
-        <h2 className="text-lg sm:text-xl font-bold tracking-tight text-text">{title}</h2>
+        {eyebrow && <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-accent mb-3">{eyebrow}</div>}
+        <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-text">{title}</h2>
         {description && <p className="text-xs sm:text-sm text-muted mt-1.5 leading-relaxed max-w-2xl">{description}</p>}
       </div>
       {action && <div className="flex-shrink-0">{action}</div>}
