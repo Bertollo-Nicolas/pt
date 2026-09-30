@@ -8,7 +8,7 @@ import { scheduleSrsReview, SRS_DRILL_HANDS, srsNeedsDrill } from '@/lib/srs';
 import type {
   RmData, RangeColor, SelectedTab, Mode,
   Session, ErrorEntry, SrsEntry, AppConfig, Category, RangeInfo,
-  TrackerImportSession, RoadmapProgressEntry,
+  TrackerImportSession, RoadmapProgressEntry, ReviewHand,
 } from '@/lib/types';
 
 // ── Persisted (localStorage) ──────────────────────────────
@@ -22,6 +22,7 @@ interface Persisted {
   lastSpot: { catId: string; tabId: string } | null;
   colorOverrides: Record<string, string>; // action name → hex color
   trackerSessions: TrackerImportSession[];
+  reviewHands: ReviewHand[];
 }
 
 // ── Ephemeral ─────────────────────────────────────────────
@@ -63,6 +64,9 @@ interface Actions {
   setCalendar: (year: number, month: number) => void;
   saveColorOverride: (name: string, color: string) => void;
   addTrackerSession: (session: TrackerImportSession) => void;
+  addReviewHands: (hands: ReviewHand[]) => number;
+  updateReviewHand: (id: string, updates: Partial<Pick<ReviewHand, 'reviewed' | 'note'>>) => void;
+  deleteReviewHand: (id: string) => void;
   startRoadmapSession: (queue: Array<{ key: string; catId: string; tabId: string; name: string }>) => void;
   advanceRoadmapSession: () => void;
   cancelRoadmapSession: () => void;
@@ -163,6 +167,7 @@ export const useAppStore = create<AppStore>()(
       lastSpot: null,
       colorOverrides: {},
       trackerSessions: [],
+      reviewHands: [],
 
       // ── Ephemeral defaults ────────────────────────────
       rmData: null,
@@ -456,6 +461,14 @@ export const useAppStore = create<AppStore>()(
 
       addTrackerSession: (session) =>
         set(s => ({ trackerSessions: [...s.trackerSessions, session].slice(-50) })),
+      addReviewHands: (hands) => {
+        const existing = new Set(get().reviewHands.map(hand => hand.handId));
+        const fresh = hands.filter(hand => !existing.has(hand.handId) && (existing.add(hand.handId), true));
+        if (fresh.length) set(s => ({ reviewHands: [...fresh, ...s.reviewHands] }));
+        return fresh.length;
+      },
+      updateReviewHand: (id, updates) => set(s => ({ reviewHands: s.reviewHands.map(hand => hand.id === id ? { ...hand, ...updates } : hand) })),
+      deleteReviewHand: (id) => set(s => ({ reviewHands: s.reviewHands.filter(hand => hand.id !== id) })),
 
       startRoadmapSession: (queue) => {
         const first = queue[0];
@@ -551,6 +564,7 @@ export const useAppStore = create<AppStore>()(
         lastSpot: s.lastSpot,
         colorOverrides: s.colorOverrides,
         trackerSessions: s.trackerSessions,
+        reviewHands: s.reviewHands,
       }),
     },
   ),

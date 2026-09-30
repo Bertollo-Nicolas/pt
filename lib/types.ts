@@ -54,7 +54,22 @@ export interface HandItem {
 }
 
 // ── App modes ─────────────────────────────────────────────
-export type Mode = 'roadmap' | 'flash' | 'grille' | 'srs' | 'tracker';
+export type Mode = 'roadmap' | 'flash' | 'grille' | 'srs' | 'tracker' | 'review';
+
+export interface ReviewHand {
+  id: string;
+  handId: string;
+  raw: string;
+  importedAt: string;
+  playedAt: string;
+  hero: string;
+  heroCards: string;
+  position: string;
+  stakes: string;
+  tags: string[];
+  reviewed: boolean;
+  note: string;
+}
 
 export type RoadmapPhase = 'discover' | 'understand' | 'practice' | 'validate' | 'retention';
 

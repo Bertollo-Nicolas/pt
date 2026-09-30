@@ -11,6 +11,7 @@ export const MODES: { id: Mode; label: string; icon: IconName }[] = [
   { id: 'grille', label: 'Grille', icon: 'grid' },
   { id: 'srs',    label: 'SRS',    icon: 'calendar' },
   { id: 'tracker', label: 'Tracker', icon: 'chart' },
+  { id: 'review', label: 'Mains', icon: 'search' },
 ];
 
 export function Header({ onOpenSidebar, syncState }: { onOpenSidebar: () => void; syncState: 'loading' | 'saving' | 'synced' | 'offline' }) {
