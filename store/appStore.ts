@@ -65,7 +65,7 @@ interface Actions {
   saveColorOverride: (name: string, color: string) => void;
   addTrackerSession: (session: TrackerImportSession) => void;
   addReviewHands: (hands: ReviewHand[]) => number;
-  updateReviewHand: (id: string, updates: Partial<Pick<ReviewHand, 'reviewed' | 'note'>>) => void;
+  updateReviewHand: (id: string, updates: Partial<Pick<ReviewHand, 'reviewed' | 'note' | 'doubt' | 'conclusion' | 'workOn'>>) => void;
   deleteReviewHand: (id: string) => void;
   startRoadmapSession: (queue: Array<{ key: string; catId: string; tabId: string; name: string }>) => void;
   advanceRoadmapSession: () => void;

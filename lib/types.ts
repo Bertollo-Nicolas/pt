@@ -69,6 +69,9 @@ export interface ReviewHand {
   tags: string[];
   reviewed: boolean;
   note: string;
+  doubt?: string;
+  conclusion?: string;
+  workOn?: string;
 }
 
 export type RoadmapPhase = 'discover' | 'understand' | 'practice' | 'validate' | 'retention';

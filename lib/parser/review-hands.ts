@@ -1,27 +1,15 @@
 import type { ReviewHand } from '../types';
+import { historyCardBlock, normalizeHistory, seatPosition } from './hand-history';
 
 const header = /^Winamax Poker - .*?HandId:\s*#([^\s]+).*$/gm;
 
-function clean(raw: string): string {
-  return raw.replace(/&#x20;|&nbsp;/gi, ' ').replace(/\r/g, '')
-    .replace(/\[b\](ANTE\/BLINDS|PRE-FLOP|FLOP|TURN|RIVER|SHOW DOWN|SUMMARY)\[\/b\]/gi, '[$1]')
-    .replace(/\*\*\* (ANTE\/BLINDS|PRE-FLOP|FLOP|TURN|RIVER|SHOW DOWN|SUMMARY) \*\*\*/gi, '[$1]')
-    .trim();
-}
-
 function positionFor(raw: string, hero: string): string {
-  const button = Number(raw.match(/Seat #(\d+) is the button/)?.[1]);
-  const seats = [...raw.matchAll(/^Seat (\d+): (.+?) \(/gm)].map(match => ({ seat: Number(match[1]), name: match[2] })).sort((a, b) => a.seat - b.seat);
-  const buttonIndex = seats.findIndex(player => player.seat === button);
-  const heroIndex = seats.findIndex(player => player.name === hero);
-  if (buttonIndex < 0 || heroIndex < 0) return 'Position inconnue';
-  const fromButton = (heroIndex - buttonIndex + seats.length) % seats.length;
-  if (fromButton === 0) return 'BTN';
-  if (seats.length === 2) return 'BB';
-  if (fromButton === 1) return 'SB';
-  if (fromButton === 2) return 'BB';
-  const remaining = seats.length - fromButton;
-  return remaining === 1 ? 'CO' : remaining === 2 ? 'HJ' : 'UTG';
+  const setup = raw.split(/\[(?:ANTE\/BLINDS|PRE-FLOP)\]/)[0];
+  const button = Number(setup.match(/Seat #(\d+) is the button/)?.[1]);
+  const seats = [...setup.matchAll(/^Seat (\d+): (.+?) \(/gm)].map(match => ({ seat: Number(match[1]), name: match[2] }));
+  const heroSeat = seats.find(player => player.name === hero)?.seat;
+  const position = heroSeat === undefined ? '?' : seatPosition(heroSeat, seats.map(player => player.seat), button);
+  return position === '?' ? 'Position inconnue' : position;
 }
 
 function street(raw: string, name: string, next?: string): string {
@@ -37,7 +25,7 @@ function classify(raw: string, hero: string, cards: string): string[] {
   const flop = street(raw, 'FLOP', 'TURN');
   const turn = street(raw, 'TURN', 'RIVER');
   const river = street(raw, 'RIVER', 'SHOW DOWN');
-  const board = flop.match(/\[([2-9TJQKA])[CDHS]\]\s*\[([2-9TJQKA])[CDHS]\]\s*\[([2-9TJQKA])[CDHS]\]/i);
+  const board = historyCardBlock(flop.split('\n'), 0).slice(0, 3);
   const ranks = [...cards.matchAll(/\[([2-9TJQKA])[CDHS]\]/gi)].map(match => match[1].toUpperCase());
   const escaped = hero.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const heroAction = (section: string, action: string) => new RegExp(`^${escaped} (?:${action})\\b`, 'm').test(section);
@@ -49,8 +37,8 @@ function classify(raw: string, hero: string, cards: string): string[] {
   if (flop) tags.push('Flop');
   if (turn) tags.push('Turn');
   if (river) tags.push('River');
-  if (board && ranks.length === 2) {
-    const boardRanks = board.slice(1).map(rank => rank.toUpperCase());
+  if (board.length === 3 && ranks.length === 2) {
+    const boardRanks = board.map(card => card[0]);
     if (ranks[0] === ranks[1] && boardRanks.includes(ranks[0])) tags.push('Brelan floppé');
     else if (ranks.some(rank => boardRanks.includes(rank))) tags.push('Paire au flop');
   }
@@ -63,16 +51,18 @@ function classify(raw: string, hero: string, cards: string): string[] {
 }
 
 export function parseReviewHands(input: string): ReviewHand[] {
-  const normalized = clean(input);
+  const normalized = normalizeHistory(input);
   const matches = [...normalized.matchAll(header)];
   const result: ReviewHand[] = [];
   for (let i = 0; i < matches.length; i++) {
     const match = matches[i];
     const raw = normalized.slice(match.index, matches[i + 1]?.index).trim();
-    const dealt = raw.match(/Dealt to (.+?)\s*\[([2-9TJQKA][CDHS])\]\s*\[([2-9TJQKA][CDHS])\]/i);
-    if (!dealt || !/\[PRE-FLOP\]/.test(raw)) continue;
-    const hero = dealt[1].trim();
-    const cards = `[${dealt[2].toUpperCase()}] [${dealt[3].toUpperCase()}]`;
+    const lines = raw.split('\n');
+    const dealtIndex = lines.findIndex(line => /^Dealt to\s+/i.test(line.trim()));
+    const hero = lines[dealtIndex]?.trim().match(/^Dealt to\s+(.+?)(?:\s*\[|$)/i)?.[1].trim();
+    const dealtCards = dealtIndex >= 0 ? historyCardBlock(lines, dealtIndex) : [];
+    if (!hero || dealtCards.length !== 2 || !/\[PRE-FLOP\]/.test(raw)) continue;
+    const cards = dealtCards.map(card => `[${card}]`).join(' ');
     result.push({
       id: match[1], handId: match[1], raw,
       importedAt: new Date().toISOString(),
