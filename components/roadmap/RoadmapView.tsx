@@ -100,7 +100,7 @@ export function RoadmapView({ onLibrary }: { onLibrary: () => void }) {
               <div className="w-11 h-11 rounded-xl bg-accent text-white flex items-center justify-center flex-shrink-0"><Icon name="target" size={22}/></div>
               <div className="min-w-0 flex-1">
                 <div className="section-label text-accent">Aujourd’hui · {cfg.roadmapDailyMinutes} min</div>
-                <h3 className="text-lg font-bold mt-1">Commence par {recommended.name}</h3>
+                <h3 className="text-lg font-bold mt-1">Commence par {recommended.displayName}</h3>
                 <p className="text-xs text-muted mt-1">{dailySession.length} ranges préparées, révisions comprises.</p>
               </div>
               <Button variant="primary" onClick={() => selectSkill(recommended)} className="whitespace-nowrap">Voir l’étape <span aria-hidden="true">→</span></Button>
@@ -130,7 +130,7 @@ export function RoadmapView({ onLibrary }: { onLibrary: () => void }) {
           </div>
         </details>
 
-        <Surface className="overflow-hidden">
+        <Surface>
           <div className="px-4 sm:px-5 py-4 border-b border-border">
             <div className="flex items-start justify-between gap-3">
               <div><div className="section-label">Ton chemin</div><p className="text-xs text-muted mt-1">Choisis une étape pour retrouver son objectif et les exercices associés.</p></div>
@@ -152,8 +152,10 @@ export function RoadmapView({ onLibrary }: { onLibrary: () => void }) {
               ) : <SkillTree stages={visibleStages} selectedKey={selectedSpot?.key} recommendedKey={recommended?.key} onSelect={selectSkill}/>}
             </div>
 
-            <aside className="hidden 2xl:block p-4 sm:p-5 bg-bg2/70">
-              {selectedSpot ? <SkillDetail spot={selectedSpot} onStart={() => startFromDetail(selectedSpot)} onToggle={togglePreference}/> : <p className="text-xs text-muted">Sélectionne une compétence dans l’arbre.</p>}
+            <aside className="hidden 2xl:block p-4 sm:p-5 bg-bg2/70 rounded-r-xl">
+              <div className="sticky top-4 max-h-[calc(100dvh-6rem)] overflow-y-auto">
+                {selectedSpot ? <SkillDetail spot={selectedSpot} onStart={() => startFromDetail(selectedSpot)} onToggle={togglePreference}/> : <p className="text-xs text-muted">Sélectionne une compétence dans l’arbre.</p>}
+              </div>
             </aside>
           </div>
         </Surface>
@@ -346,7 +348,7 @@ function SkillDetail({ spot, onStart, onToggle }: { spot: RoadmapSpot; onStart: 
           ? { label: 'Reconstituer dans Grille', help: `Une reconstruction réussie à au moins 80% validera la range et activera automatiquement le SRS.`, run: onStart }
           : { label: spot.due ? 'Faire la révision SRS' : 'Range acquise', help: spot.due ? 'Une révision mémoire est disponible.' : 'Le SRS te la reproposera au bon moment.', run: onStart };
   return (
-    <div className="2xl:sticky 2xl:top-0">
+    <div>
       <div className="section-label">Compétence sélectionnée</div>
       <div className="mt-4 flex items-center gap-3">
         <div className="w-12 h-12 rounded-xl bg-accent/15 text-accent flex items-center justify-center"><Icon name="target" size={22}/></div>

@@ -46,9 +46,16 @@ export function HandReplayer({ hand, revealed, onReveal }: { hand: ReviewHand; r
         const angle = Math.PI / 2 + index * 2 * Math.PI / Math.max(2, ordered.length);
         const isHero = player.name === hand.hero;
         const cards = isHero && !player.cards.length ? ['?', '?'] : player.cards;
-        return <div key={player.seat} className={`replay-seat ${isHero ? 'is-hero' : ''} ${frame.actor === player.name ? 'is-acting' : ''} ${player.folded ? 'has-folded' : ''}`} style={{ left: `${50 + 39 * Math.cos(angle)}%`, top: `${50 + 34 * Math.sin(angle)}%` }}>
+        return <div key={player.seat} className={`replay-seat ${isHero ? 'is-hero' : ''} ${frame.actor === player.name ? 'is-acting' : ''} ${player.folded ? 'has-folded' : ''}`} style={{ left: `${50 + 39 * Math.cos(angle)}%`, top: `${50 + 35 * Math.sin(angle)}%` }}>
           <div className="seat-cards"><HandCards cards={cards} hidden={!isHero && !cards.length}/></div>
           <div className="seat-body"><div className="seat-position">{player.position}{isHero && <span>HERO</span>}</div><strong className="seat-name" title={player.name}>{player.name}</strong><span className="seat-stack">{format(player.stack)}</span><span className="seat-action">{player.folded ? 'Fold' : player.stack === 0 ? 'All-in' : player.lastAction || 'En attente'}</span></div>
+        </div>;
+      })}
+      {ordered.map((player, index) => {
+        if (player.committed <= 0) return null;
+        const angle = Math.PI / 2 + index * 2 * Math.PI / Math.max(2, ordered.length);
+        return <div key={`chips-${player.seat}`} className={`replay-bet ${frame.actor === player.name ? 'is-current-bet' : ''}`} style={{ left: `${50 + 27 * Math.cos(angle)}%`, top: `${50 + 17 * Math.sin(angle)}%` }} aria-label={`${player.name} a engagé ${format(player.committed)} sur cette rue`}>
+          <span className="replay-chip-stack" aria-hidden="true"><i/><i/><i/></span><span>{format(player.committed)}</span>
         </div>;
       })}
     </div>

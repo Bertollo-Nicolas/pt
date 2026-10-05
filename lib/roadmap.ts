@@ -83,12 +83,12 @@ export function buildRoadmap(rmData: RmData | null, sessions: Session[], errors:
       const due = Boolean(phase === 'retention' && srs[key] && srs[key].nextReview <= today);
       const positions = detectSpotPositions(stageId, categoryPaths.get(catId) ?? cat.name, cat.name, tab.name);
       const position = positions.hero;
-      const base = stageBase(stageId) * positionWeight(classificationLabel);
+      const base = stageBase(stageId) * positionWeight(stageId === 'open' ? positions.hero : positions.villain ?? positions.hero);
       const learningGap = Math.max(0, 100 - mastery) * 0.45;
       const priority = Math.round(base + learningGap + (due ? 45 : 0) + (pinned ? 60 : 0) - (snoozed ? 120 : 0));
       const status: RoadmapStatus = due ? 'due' : phase === 'retention' || known ? 'mastered' : phase === 'validate' ? 'consolidate' : progress ? 'learning' : 'new';
       const days = progress?.validationDays.length ?? 0;
-      const importance = importanceScore(stageId, classificationLabel);
+      const importance = importanceScore(base);
       const essential = importance >= 4;
       grouped.get(stageId)!.push({
         key, catId, tabId, name: tab.name, catName: cat.name, stageId, mastery, priority, status, due,
@@ -96,7 +96,7 @@ export function buildRoadmap(rmData: RmData | null, sessions: Session[], errors:
         level: masteryLevel(mastery, days), importance, memory: due ? 'due' : srs[key] ? (mastery >= 85 ? 'stable' : 'scheduled') : 'none',
         flashScore: progress?.flashScore ?? null, grilleScore: progress?.grilleScore ?? null, stability: Math.min(100, days * 50),
         errorCount: 0, position, heroPosition: positions.hero, villainPosition: positions.villain,
-        displayName: spotDisplayName(stageId, positions.hero, positions.villain, tab.name),
+        displayName: spotDisplayName(stageId, positions.hero, positions.villain, tab.name, classificationLabel),
         recommended: importance >= 4, lockReason: null, essential, pinned, snoozed, known, practiceDays: days,
         prerequisiteKeys: [], unlocked: stageId === 'open', phase, progress,
       });
@@ -150,6 +150,10 @@ function attachDependencies(grouped: Map<RoadmapStageId, RoadmapSpot[]>): void {
 const POSITION_ORDER = ['UTG', 'HJ', 'CO', 'BU', 'SB', 'BB', 'Autres'];
 
 function compareRoadmapSpots(a: RoadmapSpot, b: RoadmapSpot): number {
+  const importance = b.importance - a.importance;
+  if (importance) return importance;
+  const impact = b.priority - a.priority;
+  if (impact) return impact;
   const hero = POSITION_ORDER.indexOf(a.heroPosition) - POSITION_ORDER.indexOf(b.heroPosition);
   if (hero) return hero;
   const villain = POSITION_ORDER.indexOf(a.villainPosition ?? 'Autres') - POSITION_ORDER.indexOf(b.villainPosition ?? 'Autres');
@@ -178,7 +182,7 @@ export function buildDailyRoadmapSession(stages: RoadmapStage[], minutes: 10 | 2
   const count = minutes === 10 ? 2 : minutes === 20 ? 4 : 6;
   const all = stages.flatMap(stage => stage.spots);
   const due = all.filter(spot => spot.due && !spot.snoozed).sort((a, b) => b.priority - a.priority);
-  const current = all.filter(spot => spot.status !== 'locked' && !spot.due && !spot.snoozed && spot.mastery < 85).sort((a, b) => b.priority - a.priority);
+  const current = all.filter(spot => spot.status !== 'locked' && !spot.due && !spot.snoozed && spot.mastery < 85).sort(compareRoadmapSpots);
   const weak = all.filter(spot => spot.mastery > 0 && spot.mastery < 75 && !spot.due && !spot.snoozed).sort((a, b) => b.errorCount - a.errorCount || a.mastery - b.mastery);
   const targets = [
     ...due.slice(0, Math.max(1, Math.round(count * 0.3))),
@@ -186,7 +190,7 @@ export function buildDailyRoadmapSession(stages: RoadmapStage[], minutes: 10 | 2
     ...weak.slice(0, Math.max(1, Math.round(count * 0.2))),
   ];
   const unique = new Map(targets.map(spot => [spot.key, spot]));
-  for (const spot of all.filter(spot => !spot.snoozed).sort((a, b) => b.priority - a.priority)) {
+  for (const spot of all.filter(spot => !spot.snoozed && spot.unlocked).sort(compareRoadmapSpots)) {
     if (unique.size >= count) break;
     unique.set(spot.key, spot);
   }
@@ -233,11 +237,8 @@ function buildCategoryPaths(rmData: RmData): Map<string, string> {
 export function nextRoadmapSpot(stages: RoadmapStage[]): RoadmapSpot | null {
   const due = stages.flatMap(stage => stage.spots).filter(spot => spot.due).sort((a, b) => b.priority - a.priority)[0];
   if (due) return due;
-  for (const stage of stages) {
-    if (!stage.unlocked) continue;
-    const next = stage.spots.find(spot => spot.status !== 'mastered');
-    if (next) return next;
-  }
+  const next = stages.flatMap(stage => stage.spots).filter(spot => spot.unlocked && spot.status !== 'mastered' && !spot.snoozed).sort(compareRoadmapSpots)[0];
+  if (next) return next;
   return stages.flatMap(stage => stage.spots).sort((a, b) => b.priority - a.priority)[0] ?? null;
 }
 
@@ -293,14 +294,19 @@ function extractVersusPosition(value: string): string | null {
   return match[1].toUpperCase() === 'BTN' ? 'BU' : match[1].toUpperCase();
 }
 
-function spotDisplayName(stage: RoadmapStageId, hero: string, villain: string | null, fallback: string): string {
+function spotDisplayName(stage: RoadmapStageId, hero: string, villain: string | null, fallback: string, source: string): string {
   if (stage === 'open') return `Open ${hero}`;
   const matchup = villain ? `${hero} vs ${villain}` : hero !== 'Autres' ? hero : fallback;
-  return `${STAGES.find(item => item.id === stage)?.title ?? ''} · ${matchup}`;
+  const sizing = stage === 'defense' ? extractOpenSizing(fallback) ?? extractOpenSizing(source) : null;
+  return `${STAGES.find(item => item.id === stage)?.title ?? ''} · ${matchup}${sizing ? ` - BB vs ${sizing}` : ''}`;
 }
 
-function importanceScore(stage: RoadmapStageId, value: string): 1 | 2 | 3 | 4 | 5 {
-  const weight = stageBase(stage) * positionWeight(value);
+function extractOpenSizing(value: string): string | null {
+  const match = value.match(/(?:^|[^\d])([2-9](?:[.,]\d+)?)\s*x\b/i);
+  return match ? `${match[1].replace(',', '.')}x` : null;
+}
+
+function importanceScore(weight: number): 1 | 2 | 3 | 4 | 5 {
   return weight >= 108 ? 5 : weight >= 88 ? 4 : weight >= 64 ? 3 : weight >= 42 ? 2 : 1;
 }
 

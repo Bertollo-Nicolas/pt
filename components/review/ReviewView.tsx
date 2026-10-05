@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useAppStore } from '@/store/appStore';
 import { parseReviewHands } from '@/lib/parser/review-hands';
 import type { ReviewHand } from '@/lib/types';
@@ -57,8 +58,9 @@ export function ReviewView() {
     const url = URL.createObjectURL(new Blob([JSON.stringify(reviewHands, null, 2)], { type: 'application/json' }));
     const link = document.createElement('a'); link.href = url; link.download = 'mains-a-revoir.json'; link.click(); URL.revokeObjectURL(url);
   };
+  const toolbar = <div className="review-heading-actions"><Button aria-expanded={queueOpen} onClick={() => setQueueOpen(!queueOpen)}><Icon name="menu" size={15} className="inline-block mr-2"/>File de revue · {filtered.length}</Button>{reviewHands.length > 0 && <Button onClick={exportHands}>Exporter</Button>}<Button variant="primary" onClick={() => { setMessage(''); setImportOpen(true); }}><Icon name="upload" size={15} className="inline-block mr-2"/>Importer des mains</Button></div>;
   return <div className="review-workspace">
-    <header className="review-page-heading"><div><p className="eyebrow">OBSERVER / COMPRENDRE / PROGRESSER</p><h1>Revue de mains</h1></div><div className="review-heading-actions"><Button aria-expanded={queueOpen} onClick={() => setQueueOpen(!queueOpen)}><Icon name="menu" size={15} className="inline-block mr-2"/>File de revue · {filtered.length}</Button>{reviewHands.length > 0 && <Button onClick={exportHands}>Exporter</Button>}<Button variant="primary" onClick={() => { setMessage(''); setImportOpen(true); }}><Icon name="upload" size={15} className="inline-block mr-2"/>Importer des mains</Button></div></header>
+    <h1 className="sr-only">Revue de mains</h1>
     <div className={`review-columns ${queueOpen ? 'queue-open' : ''}`}>
       {queueOpen && <button className="review-queue-scrim" aria-label="Fermer la file de revue" onClick={() => setQueueOpen(false)}/>}
       <aside className="review-queue" aria-label="File de revue">
@@ -69,7 +71,7 @@ export function ReviewView() {
         </div><div className="queue-footer">{filtered.length} / {reviewHands.length} mains · sauvegarde locale</div>
       </aside>
       <section className="review-detail" aria-label="Analyse de la main">
-        {selected ? <ReviewDetail key={selected.id} hand={selected} index={selectedIndex} total={filtered.length} onPrevious={() => select(filtered[selectedIndex - 1].id)} onNext={() => select(filtered[selectedIndex + 1].id)} onStatus={changeStatus} onDelete={remove} onUpdate={updates => updateReviewHand(selected.id, updates)}/> : <div className="review-no-selection"><span className="practice-icon"><Icon name="search" size={24}/></span><h2>Prends le temps de comprendre.</h2><p>Sélectionne une main dans ta file pour la rejouer, noter ton raisonnement et en tirer une leçon.</p><div className="review-empty-steps"><span>01 · Rejouer</span><span>02 · Analyser</span><span>03 · Retenir</span></div></div>}
+        {selected ? <ReviewDetail key={selected.id} hand={selected} index={selectedIndex} total={filtered.length} toolbar={toolbar} onPrevious={() => select(filtered[selectedIndex - 1].id)} onNext={() => select(filtered[selectedIndex + 1].id)} onStatus={changeStatus} onDelete={remove} onUpdate={updates => updateReviewHand(selected.id, updates)}/> : <><div className="review-detail-bar"><span className="eyebrow">REPLAYER / ANALYSE</span>{toolbar}</div><div className="review-no-selection"><span className="practice-icon"><Icon name="search" size={24}/></span><h2>Prends le temps de comprendre.</h2><p>Sélectionne une main dans ta file pour la rejouer, noter ton raisonnement et en tirer une leçon.</p><div className="review-empty-steps"><span>01 · Rejouer</span><span>02 · Analyser</span><span>03 · Retenir</span></div></div></>}
       </section>
     </div>
     <p role="status" className="review-storage-note">{!importOpen && message ? `${message} ` : ''}Ton carnet est conservé dans ce navigateur. Exporte-le régulièrement pour garder une copie.</p>
@@ -78,7 +80,7 @@ export function ReviewView() {
 }
 
 type Annotation = Partial<Pick<ReviewHand, 'note' | 'doubt' | 'conclusion' | 'workOn'>>;
-function ReviewDetail({ hand, index, total, onPrevious, onNext, onStatus, onDelete, onUpdate }: { hand: ReviewHand; index: number; total: number; onPrevious: () => void; onNext: () => void; onStatus: () => void; onDelete: () => void; onUpdate: (updates: Annotation) => void }) {
+function ReviewDetail({ hand, index, total, toolbar, onPrevious, onNext, onStatus, onDelete, onUpdate }: { hand: ReviewHand; index: number; total: number; toolbar: ReactNode; onPrevious: () => void; onNext: () => void; onStatus: () => void; onDelete: () => void; onUpdate: (updates: Annotation) => void }) {
   const [revealed, setRevealed] = useState(false);
   const [panel, setPanel] = useState<'replay' | 'notes'>('replay');
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -88,8 +90,9 @@ function ReviewDetail({ hand, index, total, onPrevious, onNext, onStatus, onDele
   return <>
     <div className="review-detail-bar">
       <div className="detail-hand-title"><HeroCards value={hand.heroCards}/><div><span className="eyebrow">MAIN {index + 1} / {total}</span><h2>{hand.hero}<span> · {hand.position}</span></h2></div></div>
+      <div className="review-hand-navigation"><button className="icon-control" disabled={index === 0} onClick={onPrevious} aria-label="Main précédente"><Icon name="chevron" className="rotate-180" size={17}/></button><button className="icon-control" disabled={index === total - 1} onClick={onNext} aria-label="Main suivante"><Icon name="chevron" size={17}/></button></div>
       <div className="detail-view-tabs" aria-label="Panneau de la main"><button aria-pressed={panel === 'replay'} onClick={() => setPanel('replay')}>Table</button><button aria-pressed={panel === 'notes'} onClick={() => setPanel('notes')}>Mes notes</button></div>
-      <div className="flex gap-2"><button className="icon-control" disabled={index === 0} onClick={onPrevious} aria-label="Main précédente"><Icon name="chevron" className="rotate-180" size={17}/></button><button className="icon-control" disabled={index === total - 1} onClick={onNext} aria-label="Main suivante"><Icon name="chevron" size={17}/></button></div>
+      {toolbar}
     </div>
     <div className={`review-analysis-grid panel-${panel}`}>
       <HandReplayer hand={hand} revealed={revealed} onReveal={setRevealed}/>
