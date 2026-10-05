@@ -15,7 +15,7 @@ const STATUS: Record<RoadmapStatus, { label: string; tone: string }> = {
   due: { label: 'À réviser', tone: 'text-orange bg-orange/10 border-orange/25' },
   mastered: { label: 'Maîtrisée', tone: 'text-green bg-green/10 border-green/25' },
   consolidate: { label: 'À consolider', tone: 'text-blue bg-blue/10 border-blue/25' },
-  learning: { label: 'En apprentissage', tone: 'text-accent bg-accent/10 border-accent/25' },
+  learning: { label: 'En apprentissage', tone: 'text-blue bg-blue/10 border-blue/25' },
   new: { label: 'À découvrir', tone: 'text-text bg-bg3 border-border2' },
   locked: { label: 'Verrouillée', tone: 'text-muted bg-bg3 border-border' },
 };
@@ -95,11 +95,11 @@ export function RoadmapView({ onLibrary }: { onLibrary: () => void }) {
         </div>
 
         {recommended && dailySession.length > 0 && (
-          <Surface className="p-4 sm:p-5 border-accent/40 bg-gradient-to-br from-accent/10 to-bg2">
+          <Surface className="p-4 sm:p-5 border-signal/45 bg-gradient-to-br from-signal/10 to-bg2">
             <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-              <div className="w-11 h-11 rounded-xl bg-accent text-white flex items-center justify-center flex-shrink-0"><Icon name="target" size={22}/></div>
+              <div className="w-11 h-11 rounded-xl bg-signal/15 text-signal border border-signal/35 flex items-center justify-center flex-shrink-0"><Icon name="target" size={22}/></div>
               <div className="min-w-0 flex-1">
-                <div className="section-label text-accent">Aujourd’hui · {cfg.roadmapDailyMinutes} min</div>
+                <div className="section-label text-signal">Aujourd’hui · {cfg.roadmapDailyMinutes} min</div>
                 <h3 className="text-lg font-bold mt-1">Commence par {recommended.displayName}</h3>
                 <p className="text-xs text-muted mt-1">{dailySession.length} ranges préparées, révisions comprises.</p>
               </div>
@@ -214,7 +214,7 @@ function SkillTree({ stages, selectedKey, recommendedKey, onSelect }: { stages: 
         <div className="sticky top-0 z-10 flex items-center gap-3 bg-bg2/95 px-1 py-3 backdrop-blur">
           <div className="w-9 h-9 rounded-lg border border-accent/40 bg-accent/15 flex items-center justify-center font-black text-accent">{mobilePosition}</div>
           <div className="min-w-0 flex-1"><div className="text-xs font-bold">Branche {mobilePosition}</div><div className="text-[9px] text-muted">Du premier Open jusqu’à la rétention</div></div>
-          {recommendedPosition === mobilePosition && <span className="rounded-full border border-orange/30 bg-orange/10 px-2 py-1 text-[8px] font-bold text-orange">Prioritaire</span>}
+          {recommendedPosition === mobilePosition && <span className="rounded-full border border-signal/40 bg-signal/10 px-2 py-1 text-[8px] font-bold text-signal">Prioritaire</span>}
         </div>
         <div className="relative pt-1 pb-3 before:absolute before:left-1/2 before:top-1 before:bottom-3 before:w-px before:-translate-x-1/2 before:bg-gradient-to-b before:from-accent before:via-border2 before:to-border">
           {stages.map(stage => {
@@ -279,12 +279,12 @@ function SkillNode({ spot, selected, recommended, onSelect }: { spot: RoadmapSpo
         ? 'border-border bg-[repeating-linear-gradient(135deg,rgba(37,37,48,.95),rgba(37,37,48,.95)_7px,rgba(31,31,37,.95)_7px,rgba(31,31,37,.95)_14px)] text-muted shadow-[0_7px_0_rgba(0,0,0,.28)]'
         : 'border-accent/70 bg-gradient-to-br from-accent/20 to-bg2 text-text shadow-[0_7px_0_rgba(45,39,125,.5)]';
   return (
-    <button type="button" onClick={onSelect} aria-pressed={selected} title={`${spot.displayName} · ${spot.level} · Importance ${spot.importance}/5`} className={clsx('relative w-full min-h-[112px] rounded-xl border p-3 text-left transition-all duration-200 group hover:-translate-y-0.5', nodeTone, selected && 'ring-2 ring-accent ring-offset-2 ring-offset-bg', recommended && 'ring-1 ring-orange/70 shadow-[0_0_24px_rgba(224,149,64,.18)]')}>
+    <button type="button" onClick={onSelect} aria-pressed={selected} title={`${spot.displayName} · ${spot.level} · Importance ${spot.importance}/5`} className={clsx('relative w-full min-h-[112px] rounded-xl border p-3 text-left transition-all duration-200 group hover:-translate-y-0.5', nodeTone, selected && 'ring-2 ring-signal ring-offset-2 ring-offset-bg', recommended && 'ring-1 ring-signal/70 shadow-[0_0_24px_rgba(232,183,127,.18)]')}>
       <div className="flex items-start justify-between gap-2">
         <span className={clsx('w-8 h-8 rounded-lg border flex items-center justify-center text-[10px] font-black flex-shrink-0', spot.status === 'locked' ? 'border-border2 bg-black/15' : spot.status === 'mastered' ? 'border-green/40 bg-green/15' : 'border-accent/40 bg-accent/15')}>
           {spot.status === 'mastered' ? '✓' : spot.status === 'locked' ? <Icon name="lock" size={15}/> : `${spot.mastery}%`}
         </span>
-        {recommended ? <span className="rounded-full border border-orange/30 bg-orange/10 px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-wider text-orange">Next</span> : <span className={clsx('rounded-full border px-1.5 py-0.5 text-[7px] font-bold', status.tone)}>{status.label}</span>}
+        {recommended ? <span className="rounded-full border border-signal/40 bg-signal/10 px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-wider text-signal">Next</span> : <span className={clsx('rounded-full border px-1.5 py-0.5 text-[7px] font-bold', status.tone)}>{status.label}</span>}
       </div>
       <div className={clsx('mt-2 text-[10px] font-bold leading-snug', spot.status === 'locked' ? 'text-muted' : 'text-text')}>{spot.displayName}</div>
       {spot.status === 'locked'
@@ -304,7 +304,7 @@ function MobileSkillNode({ spot, selected, recommended, onSelect }: { spot: Road
       : locked
         ? 'border-border bg-[repeating-linear-gradient(135deg,rgba(37,37,48,.97),rgba(37,37,48,.97)_7px,rgba(31,31,37,.97)_7px,rgba(31,31,37,.97)_14px)] shadow-[0_4px_0_rgba(0,0,0,.28)]'
         : 'border-accent/60 bg-gradient-to-br from-accent/20 to-bg2 shadow-[0_4px_0_rgba(45,39,125,.45)]';
-  return <button type="button" onClick={onSelect} aria-pressed={selected} className={clsx('relative mx-auto flex w-full max-w-[300px] items-center gap-3 rounded-xl border p-3 text-left transition-transform active:translate-y-0.5', tone, selected && 'ring-2 ring-accent ring-offset-2 ring-offset-bg', recommended && 'ring-1 ring-orange/70')}>
+  return <button type="button" onClick={onSelect} aria-pressed={selected} className={clsx('relative mx-auto flex w-full max-w-[300px] items-center gap-3 rounded-xl border p-3 text-left transition-transform active:translate-y-0.5', tone, selected && 'ring-2 ring-signal ring-offset-2 ring-offset-bg', recommended && 'ring-1 ring-signal/70')}>
     <span className={clsx('flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border text-[10px] font-black', locked ? 'border-border2 bg-black/15 text-muted' : spot.status === 'mastered' ? 'border-green/40 bg-green/15 text-green' : 'border-accent/40 bg-accent/15 text-accent')}>
       {spot.status === 'mastered' ? '✓' : locked ? <Icon name="lock" size={16}/> : `${spot.mastery}%`}
     </span>
@@ -314,7 +314,7 @@ function MobileSkillNode({ spot, selected, recommended, onSelect }: { spot: Road
         {locked && <Icon name="lock" size={9} className="flex-shrink-0"/>}<span className="line-clamp-2">{locked ? spot.lockReason : spot.level}</span>
       </span>
     </span>
-    <span className={clsx('self-start rounded-full border px-1.5 py-0.5 text-[7px] font-bold uppercase', recommended ? 'border-orange/30 bg-orange/10 text-orange' : locked ? 'border-border2 bg-bg3 text-muted' : 'border-accent/30 bg-accent/10 text-accent')}>{recommended ? 'Next' : locked ? 'Bloqué' : spot.status === 'mastered' ? 'OK' : 'Go'}</span>
+    <span className={clsx('self-start rounded-full border px-1.5 py-0.5 text-[7px] font-bold uppercase', recommended ? 'border-signal/40 bg-signal/10 text-signal' : locked ? 'border-border2 bg-bg3 text-muted' : 'border-accent/30 bg-accent/10 text-accent')}>{recommended ? 'Next' : locked ? 'Bloqué' : spot.status === 'mastered' ? 'OK' : 'Go'}</span>
   </button>;
 }
 
@@ -323,11 +323,11 @@ function RoadmapList({ stages, selectedKey, onSelect }: { stages: RoadmapStage[]
   if (spots.length === 0) return <div className="py-12 text-center text-xs text-muted">Aucune compétence ne correspond aux filtres.</div>;
   return <div className="space-y-2">{spots.map(({ stage, spot }) => {
     const status = STATUS[spot.status];
-    return <button key={spot.key} onClick={() => onSelect(spot)} className={clsx('w-full rounded-lg border p-3 flex items-center gap-3 text-left transition-colors', selectedKey === spot.key ? 'border-accent bg-accent/10' : 'border-border bg-bg2 hover:border-border2')}>
+    return <button key={spot.key} onClick={() => onSelect(spot)} className={clsx('w-full rounded-lg border p-3 flex items-center gap-3 text-left transition-colors', selectedKey === spot.key ? 'border-signal/70 bg-signal/10' : 'border-border bg-bg2 hover:border-border2')}>
       <div className="w-10 h-10 rounded-full border border-accent/40 bg-accent/10 flex items-center justify-center text-[10px] font-bold text-accent">{spot.mastery}%</div>
       <div className="min-w-0 flex-1"><div className="text-xs font-semibold">{spot.displayName}</div><div className="text-[10px] text-muted mt-0.5">Hero {spot.heroPosition} · {spot.level}</div></div>
       <span className={clsx('hidden sm:inline text-[9px] px-2 py-1 rounded-full border font-bold', status.tone)}>{status.label}</span>
-      <div className="text-right"><div className="text-[10px] font-bold">{'●'.repeat(spot.importance)}<span className="text-bg4">{'●'.repeat(5 - spot.importance)}</span></div><div className="text-[8px] text-muted uppercase">importance</div></div>
+      <div className="text-right"><div className={clsx('text-[10px] font-bold', spot.importance >= 4 ? 'text-signal' : 'text-muted')}>{'●'.repeat(spot.importance)}<span className="text-bg4">{'●'.repeat(5 - spot.importance)}</span></div><div className="text-[8px] text-muted uppercase">importance</div></div>
     </button>;
   })}</div>;
 }
@@ -367,7 +367,7 @@ function SkillDetail({ spot, onStart, onToggle }: { spot: RoadmapSpot; onStart: 
         <p className="text-xs leading-relaxed mt-1.5">{spot.reason}</p>
       </div>
 
-      <div className="mt-5 rounded-lg border border-accent/25 bg-accent/5 p-3"><div className="text-[9px] uppercase tracking-wider font-bold text-accent">Étape actuelle · {phases[phaseIndex]?.[1]}</div><p className="text-[11px] text-muted mt-1.5 leading-relaxed">{action.help}</p></div>
+      <div className="mt-5 rounded-lg border border-signal/30 bg-signal/5 p-3"><div className="text-[9px] uppercase tracking-wider font-bold text-signal">Étape actuelle · {phases[phaseIndex]?.[1]}</div><p className="text-[11px] text-muted mt-1.5 leading-relaxed">{action.help}</p></div>
       {!spot.unlocked && <div className="mt-5 rounded-lg border border-border bg-bg3 p-3 text-[11px] text-muted"><span className="font-bold text-text">Prérequis</span><br/>{spot.lockReason}</div>}
       <Button variant="primary" className="w-full mt-3" onClick={action.run} disabled={!spot.unlocked || (spot.phase === 'retention' && !spot.due)}>{spot.unlocked ? action.label : 'Range verrouillée'} {spot.unlocked && !(spot.phase === 'retention' && !spot.due) && <span aria-hidden="true">→</span>}</Button>
       <details className="mt-3 rounded-lg border border-border px-3 py-2">

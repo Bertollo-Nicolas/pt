@@ -18,6 +18,7 @@ export default {
       muted:   '#a1aaa3',
       muted2:  '#7c8980',
       accent:  '#337454',
+      signal:  '#e8b77f',
       green:   '#8bd5ad',
       red:     '#e05555',
       orange:  '#e09540',
