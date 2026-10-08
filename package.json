@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:review": "node tests/review.test.cjs"
+    "test:review": "node tests/review.test.cjs",
+    "test:drill": "node tests/cbet-drill.test.cjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

@@ -54,7 +54,7 @@ export interface HandItem {
 }
 
 // ── App modes ─────────────────────────────────────────────
-export type Mode = 'home' | 'roadmap' | 'flash' | 'grille' | 'srs' | 'tracker' | 'review';
+export type Mode = 'home' | 'roadmap' | 'flash' | 'grille' | 'srs' | 'drill' | 'tracker' | 'review';
 
 export interface ReviewHand {
   id: string;
@@ -155,6 +155,7 @@ export interface SrsEntry {
 
 // ── Settings ──────────────────────────────────────────────
 export interface AppConfig {
+  cbetDrill?: import('./cbet-drill/types').DrillProgress;
   threshold: number;
   minHands: number;
   grilleThreshold: number;

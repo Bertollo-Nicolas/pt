@@ -227,7 +227,7 @@ button:disabled { cursor: not-allowed; }
 .section-title-row h2 { font-size: 20px; letter-spacing: -.6px; font-weight: 500; margin-top: 6px; }
 .text-link { display: inline-flex; align-items: center; gap: 9px; color: #bdccbf; font-size: 10px; flex-shrink: 0; min-height: 36px; }
 .text-link:hover { color: var(--mint); }
-.practice-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18px; }
+.practice-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }
 .practice-card { padding: 22px; border: 1px solid var(--line); border-radius: 11px; text-align: left; background: var(--panel); transition: border-color .2s, transform .2s; }
 .practice-card:hover { border-color: #67866f; transform: translateY(-3px); }
 .practice-icon { display: grid; place-items: center; width: 37px; height: 37px; border: 1px solid #3c4b40; border-radius: 10px; background: #27312a; color: #c8dac8; }
@@ -469,3 +469,66 @@ button:disabled { cursor: not-allowed; }
   .replay-bet { font-size:8px; padding:2px 4px 2px 2px; gap:2px; }
   .replay-chip-stack { transform:scale(.75); transform-origin:center; width:14px; }
 }
+/* C-bet decision drill */
+.cbet-scroll { overflow-y:auto; height:100%; }
+.cbet-workspace { max-width:1500px; margin:auto; padding:36px clamp(16px,3vw,48px); }
+.cbet-heading { display:flex; align-items:center; justify-content:space-between; gap:20px; margin-bottom:30px; }
+.cbet-heading h1 { font-size:clamp(26px,3vw,38px); font-weight:650; letter-spacing:-1.2px; margin:10px 0; line-height:1.2; }
+.cbet-heading p { color:var(--secondary); font-size:14px; }
+.cbet-spot { display:flex; gap:9px; align-items:center; color:var(--signal); background:#e8b77f0c; border:1px solid #e8b77f30; padding:10px 15px; border-radius:30px; font-size:12px; white-space:nowrap; }
+.cbet-setup-grid { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(280px,1fr); gap:24px; }
+.cbet-panel,.cbet-stats { background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:clamp(20px,3vw,36px); }
+.cbet-panel h2 { font-size:clamp(23px,2vw,30px); font-weight:600; letter-spacing:-.7px; margin-top:12px; }
+.cbet-mode-grid { display:grid; gap:10px; }
+.cbet-mode { padding:16px 18px; border:1px solid var(--line); border-radius:10px; cursor:pointer; display:flex; gap:16px; align-items:center; justify-content:space-between; }
+.cbet-mode strong { font-size:14px; }
+.cbet-mode span { font-size:12px; color:var(--secondary); text-align:right; }
+.cbet-mode.is-selected { border-color:#e8b77f80; background:#e8b77f0b; }
+.cbet-mode:focus-within { outline:2px solid var(--signal); outline-offset:3px; }
+.cbet-select { display:block; width:100%; margin-top:10px; background:#111413; border:1px solid var(--line); padding:12px; color:var(--ink); border-radius:8px; font-size:13px; }
+.cbet-start { margin-top:28px; display:flex; align-items:center; flex-wrap:wrap; gap:14px; }
+.cbet-start>span { font-size:12px; color:var(--secondary); }
+.cbet-stat-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:22px; }
+.cbet-stat-grid>div { display:flex; flex-direction:column; gap:5px; }
+.cbet-stat-grid span { color:var(--secondary); font-size:12px; }
+.cbet-stat-grid strong { font-size:30px; font-weight:600; letter-spacing:-1px; }
+.cbet-stat-grid>div:first-child strong { color:var(--signal); }
+.cbet-categories { display:grid; gap:14px; }
+.cbet-stat-track,.cbet-session-track { background:#303833; height:4px; border-radius:10px; overflow:hidden; margin-top:7px; }
+.cbet-stat-track>span { background:#8bd5ad; height:100%; display:block; }
+.cbet-session-track { margin:12px 0 24px; }
+.cbet-session-track>span { background:var(--signal); display:block; height:100%; transition:width .2s; }
+.cbet-session-top { display:flex; gap:18px; align-items:center; font-size:13px; flex-wrap:wrap; }
+.cbet-session-top>button { margin-left:auto; }
+.cbet-play-grid { display:grid; grid-template-columns:minmax(0,1.8fr) minmax(290px,1fr); gap:24px; align-items:start; }
+.cbet-table-panel { border:1px solid var(--line); border-radius:18px; padding:24px; background:radial-gradient(ellipse at 50% 20%,#24433355,transparent 70%),var(--panel); text-align:center; }
+.cbet-table-meta { display:flex; align-items:center; justify-content:center; gap:20px; font-size:11px; letter-spacing:1.4px; color:var(--secondary); }
+.cbet-table-meta b { font-size:9px; color:var(--signal); margin-left:6px; }
+.cbet-board { display:flex; justify-content:center; gap:12px; padding:36px 0 18px; }
+.cbet-card { position:relative; width:clamp(72px,7.6vw,112px); height:clamp(108px,11vw,158px); border-radius:9px; background:#f4f1e7; box-shadow:0 8px 20px #0003; color:#234738; text-align:left; padding:10px 13px; }
+.cbet-card>span { font-size:clamp(26px,3vw,38px); font-weight:700; line-height:1; }
+.cbet-card>b { display:block; text-align:center; font-size:clamp(30px,3.8vw,46px); line-height:1.15; }
+.cbet-card>small { position:absolute; bottom:8px; right:10px; transform:rotate(180deg); font-size:17px; font-weight:600; }
+.cbet-card.suit-H { color:#b83b3b; }.cbet-card.suit-D { color:#296aa5; }.cbet-card.suit-S { color:#232a27; }
+.cbet-hint { color:var(--secondary); font-size:12px; min-height:18px; }
+.cbet-table-panel h2 { font-size:clamp(18px,2vw,25px); margin:22px 0 7px; font-weight:600; letter-spacing:-.5px; }
+.cbet-answers { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:9px; margin-top:25px; }
+.cbet-answer { display:flex; flex-direction:column; justify-content:center; align-items:center; gap:6px; border:1px solid var(--line); border-radius:10px; min-height:90px; padding:12px 5px; background:#11141366; transition:border-color .15s,background .15s; }
+.cbet-answer strong { font-size:12px; }.cbet-answer>span { font-size:14px; color:var(--secondary); }.cbet-answer>small { font-size:9px; }
+.cbet-answer:hover:not(:disabled) { border-color:var(--signal); background:#e8b77f0d; }
+.cbet-answer:focus-visible { outline:2px solid var(--signal); outline-offset:3px; }
+.cbet-answer:disabled { cursor:default; }.cbet-answer:disabled:not(.is-correct):not(.is-wrong) { opacity:.45; }
+.cbet-answer.is-correct { border-color:#8bd5ad; background:#8bd5ad13; color:#8bd5ad; }.cbet-answer.is-wrong { border-color:var(--signal); background:#e8b77f0c; color:var(--signal); }
+.cbet-confidence { display:flex; gap:8px; justify-content:center; align-items:center; flex-wrap:wrap; margin-top:20px; color:var(--secondary); font-size:12px; }
+.cbet-confidence select { background:var(--panel); border:1px solid var(--line); border-radius:6px; color:var(--ink); padding:8px; }
+.cbet-feedback { border:1px solid var(--line); background:var(--panel); border-radius:18px; padding:26px; display:flex; flex-direction:column; gap:20px; }
+.cbet-feedback h3 { font-size:25px; font-weight:600; letter-spacing:-.6px; margin:8px 0 14px; }
+.cbet-feedback p { line-height:1.65; }.cbet-feedback ol { list-style:decimal; padding-left:18px; display:grid; gap:17px; font-size:14px; color:var(--secondary); }
+.cbet-feedback.has-answer { border-color:#e8b77f40; }
+.cbet-rule { background:#e8b77f0b; border-left:2px solid var(--signal); padding:16px 18px; border-radius:0 8px 8px 0; }
+.cbet-rule>span { color:var(--signal); font-size:10px; font-weight:700; letter-spacing:1.2px; }.cbet-rule p { margin-top:8px; font-size:15px; line-height:1.6; }
+.cbet-tag { color:var(--secondary); font-size:10px; padding:5px 8px; border:1px solid var(--line); border-radius:20px; }
+.cbet-summary { max-width:800px; margin:auto; }.cbet-summary>h2 { font-size:48px; color:var(--signal); }.cbet-summary>h2>span { font-size:18px; color:var(--ink); letter-spacing:0; }
+.cbet-summary .cbet-stats { padding:22px 0; border:0; }.cbet-footnote { font-size:11px; color:var(--secondary); line-height:1.7; margin-top:24px; }
+@media(max-width:1150px) { .cbet-play-grid { grid-template-columns:minmax(0,1fr); }.cbet-feedback { gap:16px; }.cbet-setup-grid { grid-template-columns:minmax(0,1fr); } }
+@media(max-width:600px) { .cbet-workspace { padding:24px 16px; }.cbet-spot { display:none; }.cbet-heading p { font-size:12px; line-height:1.7; }.cbet-mode { align-items:start; flex-direction:column; gap:5px; }.cbet-mode span { text-align:left; }.cbet-table-panel { padding:20px 14px; }.cbet-board { padding-top:28px; }.cbet-answers { grid-template-columns:repeat(2,minmax(0,1fr)); }.cbet-answer:last-child { grid-column:1/-1; min-height:70px; }.cbet-answer { min-height:78px; }.cbet-session-top { gap:10px; font-size:12px; }.cbet-session-top>button { margin-left:0; }.cbet-summary>h2>span { display:block; }.cbet-feedback { padding:22px; } }

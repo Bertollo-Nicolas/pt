@@ -9,6 +9,7 @@ export const MODES: { id: Mode; label: string; icon: IconName }[] = [
   { id: 'flash', label: 'Flashcards', icon: 'flash' },
   { id: 'grille', label: 'Range builder', icon: 'target' },
   { id: 'srs', label: 'Révisions', icon: 'calendar' },
+  { id: 'drill', label: 'Drill C-bet', icon: 'target' },
   { id: 'tracker', label: 'Analyse du jeu', icon: 'chart' },
   { id: 'review', label: 'Revue de mains', icon: 'search' },
 ];

@@ -13,7 +13,7 @@ export function Navigation({ onSettings, onLibrary, onClose, onLogout }: { onSet
     <div className="workspace-select"><span className="workspace-avatar">P</span><div><strong>Mon espace poker</strong><span>Apprendre. Pratiquer. Progresser.</span></div></div>
     <nav aria-label="Navigation principale" className="nav-links">
       {MODES.map((mode, index) => <div key={mode.id}>
-        {(index === 0 || index === 2 || index === 5) && <p className="nav-label">{index === 0 ? 'VUE D’ENSEMBLE' : index === 2 ? 'ENTRAÎNEMENT' : 'ANALYSE'}</p>}
+        {(mode.id === 'home' || mode.id === 'flash' || mode.id === 'tracker') && <p className="nav-label">{index === 0 ? 'VUE D’ENSEMBLE' : mode.id === 'flash' ? 'ENTRAÎNEMENT' : 'ANALYSE'}</p>}
         <button data-mode={mode.id} aria-current={currentMode === mode.id ? 'page' : undefined} onClick={() => { setMode(mode.id); onClose?.(); }} className={`nav-link ${currentMode === mode.id ? 'is-active' : ''}`}><Icon name={mode.icon} size={18}/><span>{mode.label}</span>{mode.id === 'srs' && due > 0 ? <span className="nav-count">{due}</span> : currentMode === mode.id ? <span className="nav-active-dot"/> : null}</button>
       </div>)}
     </nav>

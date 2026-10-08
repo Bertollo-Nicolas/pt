@@ -38,7 +38,8 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   };
 
   const handleReset = () => {
-    useAppStore.setState({ config: {} });
+    // Reset preferences without deleting saved drill decisions.
+    useAppStore.setState(state => ({ config: { cbetDrill: state.config.cbetDrill } }));
     onClose();
   };
 
