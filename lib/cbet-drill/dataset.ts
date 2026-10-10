@@ -1,8 +1,11 @@
 import type { Category, DrillQuestion, Sizing, Texture } from './types';
+import { classifyBoard } from './board';
 
 // Editorial model from codex_cbet_drill_spec.md. Answers are deliberately authored,
-// never inferred from suit distribution or connectivity. These are not solver outputs.
+// refined for dry rainbow boards by the course's gutshot distinction, using the
+// user's medium-sizing simplification. These are not solver outputs.
 const rules = {
+  gutshots: ['Rainbow ne veut pas dire sans tirages : plusieurs gutshots sont possibles.', 'Ce board permet plusieurs familles de gutshots ou de tirages quinte à huit outs. On le classe parmi les boards à tirages, même sans flush draw direct. Pour cette texture intermédiaire, le repère pédagogique retenu est demi-pot, avec une range de check conservée. La fréquence doit être vérifiée séparément.', 'Plusieurs tirages quinte sur un rainbow : texture intermédiaire, demi-pot.'],
   dry: ['Un petit sizing suffit sur ce flop sec.', 'BTN peut miser une large partie de sa range sans faire grossir inutilement le pot. Les mains moyennes et les bluffs peu coûteux bénéficient du même petit sizing.', 'Peu de connexion : petit sizing, fréquence élevée.'],
   drawy: ['La connexion accompagne ici un avantage de nuts pour BTN.', 'Dans ce modèle, les grosses paires et les meilleures combinaisons de BTN permettent une construction plus polarisée. Les tirages donnent une raison de faire payer davantage, avec moins de mises.', 'Connexion + avantage de nuts : grosse mise possible.'],
   extra: ['BB possède beaucoup de nuts sur ce board bas et connecté.', 'Les quintes, doubles paires et gros tirages de BB limitent la pression que BTN peut exercer. On retient une mise intermédiaire autour de 40 %, avec davantage de checks.', 'Très connecté ne veut pas dire miser très gros.'],
@@ -85,16 +88,23 @@ const rows: Row[] = [
 ];
 
 export const QUESTIONS: DrillQuestion[] = rows.map(([cards, texture, sizing, rule, difficulty, tags = []]) => {
+  const boardCards = cards.split(' ') as [string, string, string];
+  const classification = classifyBoard(boardCards);
+  // Only refine the generic dry rule. Explicit ace-high, paired, monotone and
+  // already draw-heavy strategic rules keep their existing authored answers.
+  if (rule === 'dry' && classification.suits === 'rainbow' && !classification.paired && classification.multipleStraightDraws) {
+    texture = 'drawy'; sizing = 'MEDIUM'; rule = 'gutshots';
+  }
   const [short, detailed, mentalRule] = rules[rule];
-  const frequencies: Record<Rule, [number, number]> = {
+  const frequencies: Partial<Record<Rule, [number, number]>> = {
     dry: [70, 90], drawy: [40, 60], extra: [45, 55], mono: [40, 60],
     pairHigh: [60, 80], pairMid: [40, 60], aceTop: [30, 40], aceBroadway: [30, 40], aceLow: [40, 60],
   };
   const labels: Record<Sizing, string> = { CHECK: 'Check majoritaire', SMALL: '25–33 % du pot', MEDIUM: '≈ 40 % du pot', BIG: '60–75 % du pot', OVERBET: 'Pot / Overbet' };
   return {
     id: `btn-bb-${cards.replaceAll(' ', '-').toLowerCase()}`, spot: 'BTN_VS_BB',
-    board: { cards: cards.split(' ') as [string, string, string], texture }, tags,
-    correctAnswer: { sizing, sizingLabel: labels[sizing], frequencyMin: frequencies[rule][0], frequencyMax: frequencies[rule][1] },
+    board: { cards: boardCards, texture }, tags,
+    correctAnswer: { sizing, sizingLabel: rule === 'gutshots' ? '50 % du pot' : labels[sizing], frequencyMin: frequencies[rule]?.[0], frequencyMax: frequencies[rule]?.[1] },
     explanation: { short, detailed, mentalRule }, difficulty,
   };
 });

@@ -15,8 +15,10 @@ for (const q of QUESTIONS) {
   const classification = classifyBoard(q.board.cards);
   assert.equal(q.spot, 'BTN_VS_BB');
   assert.ok(q.explanation.mentalRule && q.explanation.short && q.explanation.detailed);
-  assert.ok(q.correctAnswer.frequencyMin <= q.correctAnswer.frequencyMax);
-  assert.ok(q.correctAnswer.frequencyMax <= 100);
+  if (q.correctAnswer.frequencyMin !== undefined) {
+    assert.ok(q.correctAnswer.frequencyMin <= q.correctAnswer.frequencyMax);
+    assert.ok(q.correctAnswer.frequencyMax <= 100);
+  }
   if (q.board.texture === 'monotone') assert.equal(classification.suits, 'monotone');
   if (q.board.texture === 'paired') assert.equal(classification.paired, true);
   for (const answer of SIZINGS) assert.equal(evaluateAnswer(q, answer.id).correct, answer.id === q.correctAnswer.sizing);
@@ -29,6 +31,29 @@ assert.throws(() => classifyBoard(['AS', 'AS', '2H']));
 assert.throws(() => classifyBoard(['1S', 'KH', '2H']));
 
 const byBoard = board => QUESTIONS.find(q => q.board.cards.join(' ') === board);
+const t62 = classifyBoard(['TS', '6H', '2D']);
+assert.deepEqual(new Set(t62.gutshotHands), new Set(['98', '97', '87', '54', '53', '43']));
+assert.ok(!t62.gutshotHands.includes('65'), 'A pair with a backdoor is not a gutshot');
+for (const cards of [['QS', '8H', '4D'], ['JS', '7H', '4D'], ['JS', '8H', '2D'], ['QS', '6H', '3D']]) {
+  assert.equal(classifyBoard(cards).multipleStraightDraws, true, `Rainbow ${cards} must account for straight draws`);
+}
+for (const cards of [['KS', '7H', '2D'], ['KS', '8H', '3D'], ['QS', '7H', '2D'], ['QS', '7H', '3D']]) {
+  assert.equal(classifyBoard(cards).multipleStraightDraws, false, 'Course disconnected examples remain separate');
+}
+const q84 = classifyBoard(['QS', '8H', '4D']);
+for (const hand of ['75', '65', 'T9', 'JT']) assert.ok(q84.gutshotHands.includes(hand));
+assert.equal(classifyBoard(['9S', '8H', '2D']).eightOutHands.includes('76'), true);
+assert.equal(classifyBoard(['9S', '8H', '2D']).gutshotHands.includes('76'), false, 'Open-ended draws are not counted as gutshots');
+const q84Reverse = classifyBoard(['4S', 'QH', '8C']);
+assert.deepEqual(new Set(q84Reverse.gutshotHands), new Set(q84.gutshotHands), 'Card order and rainbow suits do not change rank connectivity');
+for (const board of ['TS 6H 2D', 'JS 7D 4C', 'JH 8C 2D']) {
+  assert.equal(byBoard(board).board.texture, 'drawy');
+  assert.equal(byBoard(board).correctAnswer.sizing, 'MEDIUM');
+  assert.equal(byBoard(board).correctAnswer.sizingLabel, '50 % du pot');
+  assert.equal(byBoard(board).correctAnswer.frequencyMin, undefined, 'Do not invent frequencies for the new heuristic');
+}
+assert.equal(byBoard('KS 7H 2D').correctAnswer.sizing, 'SMALL');
+assert.equal(byBoard('QS 7C 2H').correctAnswer.sizing, 'SMALL');
 assert.equal(byBoard('KS QS 8D').correctAnswer.sizing, 'BIG');
 for (const board of ['7S 6S 5H', '6H 5H 4C', '7H 6D 5C', '8H 7S 6D']) {
   assert.equal(byBoard(board).correctAnswer.sizing, 'MEDIUM', 'Connected BB nuts must not imply big bets, including rainbow');

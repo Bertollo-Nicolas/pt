@@ -1,20 +1,6 @@
 import type { Category, DrillAttempt, DrillProgress, DrillQuestion, Mastery, Sizing } from './types';
 import { SIZINGS } from './types';
-
-export function classifyBoard(cards: [string, string, string]) {
-  if (new Set(cards).size !== 3 || cards.some(card => !/^[2-9TJQKA][SHDC]$/.test(card))) throw new Error('Flop invalide');
-  const ranks = cards.map(card => '23456789TJQKA'.indexOf(card[0]) + 2);
-  const suits = new Set(cards.map(card => card[1])).size;
-  const unique = [...new Set(ranks)].sort((a, b) => a - b);
-  const span = unique[unique.length - 1] - unique[0];
-  const wheelSpan = ranks.includes(14) ? Math.max(...ranks.filter(rank => rank !== 14)) - 1 : Infinity;
-  return {
-    suits: suits === 1 ? 'monotone' : suits === 2 ? 'two-tone' : 'rainbow',
-    paired: unique.length < 3,
-    aceHigh: ranks.includes(14),
-    connected: unique.length === 3 && Math.min(span, wheelSpan) <= 4,
-  };
-}
+export { classifyBoard } from './board';
 
 export function emptyProgress(): DrillProgress {
   return { attempts: 0, correct: 0, streak: 0, bestStreak: 0, totalTimeMs: 0, categories: {}, questions: {}, recent: [] };

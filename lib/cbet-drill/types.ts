@@ -7,7 +7,7 @@ export interface DrillQuestion {
   spot: 'BTN_VS_BB';
   board: { cards: [string, string, string]; texture: Texture };
   tags: Category[];
-  correctAnswer: { sizing: Sizing; sizingLabel: string; frequencyMin: number; frequencyMax: number };
+  correctAnswer: { sizing: Sizing; sizingLabel: string; frequencyMin?: number; frequencyMax?: number };
   explanation: { short: string; detailed: string; mentalRule: string };
   difficulty: 1 | 2 | 3 | 4;
 }
