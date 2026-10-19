@@ -16,7 +16,7 @@ import { ReviewView } from './review/ReviewView';
 import { RoadmapView } from './roadmap/RoadmapView';
 import { SrsToast } from './ui/SrsToast';
 import { SettingsModal } from './modals/SettingsModal';
-import { CbetDrillView } from './drill/CbetDrillView';
+import { DrillView } from './drill/DrillView';
 
 export default function RangeTrainer() {
   const { rehydrateRmData, selectedTab, currentMode, lastSpot, selectTab } = useAppStore();
@@ -38,7 +38,7 @@ export default function RangeTrainer() {
     if (currentMode === 'srs') return <SrsView />;
     if (currentMode === 'tracker') return <TrackerView />;
     if (currentMode === 'review') return <ReviewView />;
-    if (currentMode === 'drill') return <CbetDrillView />;
+    if (currentMode === 'drill') return <DrillView />;
     if (!selectedTab) return <ChooseRange onLibrary={openLibrary}/>;
     if (currentMode === 'flash') return <FlashView />;
     if (currentMode === 'grille') return <GrilleView />;

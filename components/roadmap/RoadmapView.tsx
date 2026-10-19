@@ -124,7 +124,7 @@ export function RoadmapView({ onLibrary }: { onLibrary: () => void }) {
               <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-border">
                 <button onClick={() => confirm('Réinitialiser uniquement la Roadmap ? Le SRS et les erreurs seront conservés.') && resetRoadmapProgress()} className="text-[10px] text-muted hover:text-text">Réinitialiser la Roadmap</button>
                 <button onClick={() => confirm('Effacer l’historique des erreurs ?') && clearErrors()} className="text-[10px] text-muted hover:text-text">Effacer les erreurs</button>
-                <button onClick={() => confirm('Tout réinitialiser : Roadmap, SRS, drill C-bet, sessions et erreurs ?') && resetLearningData()} className="text-[10px] text-red hover:opacity-80">Tout réinitialiser</button>
+                <button onClick={() => confirm('Tout réinitialiser : Roadmap, SRS, drills C-bet et maths, sessions et erreurs ?') && resetLearningData()} className="text-[10px] text-red hover:opacity-80">Tout réinitialiser</button>
               </div>
             </div>
           </div>

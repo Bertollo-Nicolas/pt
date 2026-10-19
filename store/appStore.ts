@@ -7,6 +7,7 @@ import { todayStr, addDays } from '@/lib/utils';
 import { scheduleSrsReview, SRS_DRILL_HANDS, srsNeedsDrill } from '@/lib/srs';
 import { emptyProgress, recordAttempt } from '@/lib/cbet-drill/engine';
 import type { DrillAttempt, DrillQuestion } from '@/lib/cbet-drill/types';
+import { emptyMathProgress, recordMathAttempt, type MathAttempt } from '@/lib/math-drill';
 import type {
   RmData, RangeColor, SelectedTab, Mode,
   Session, ErrorEntry, SrsEntry, AppConfig, Category, RangeInfo,
@@ -45,6 +46,7 @@ interface Ephemeral {
 // ── Actions ───────────────────────────────────────────────
 interface Actions {
   recordCbetAttempt: (question: DrillQuestion, attempt: DrillAttempt) => void;
+  recordMathAttempt: (attempt: MathAttempt) => void;
   importRmFile: (name: string, content: string) => void;
   deleteRmFile: (name: string) => void;
   renameRmFile: (oldName: string, newName: string) => void;
@@ -187,6 +189,7 @@ export const useAppStore = create<AppStore>()(
 
       // ── Actions ───────────────────────────────────────
       recordCbetAttempt: (question, attempt) => set(s => ({ config: { ...s.config, cbetDrill: recordAttempt(s.config.cbetDrill ?? emptyProgress(), question, attempt) } })),
+      recordMathAttempt: (attempt) => set(s => ({ config: { ...s.config, mathDrill: recordMathAttempt(s.config.mathDrill ?? emptyMathProgress(), attempt) } })),
       importRmFile: (name, content) => {
         set((s) => {
           const nextFiles = { ...s.rmFiles, [name]: content };
@@ -554,7 +557,7 @@ export const useAppStore = create<AppStore>()(
 
       resetRoadmapProgress: () => set(s => ({ config: { ...s.config, roadmapProgress: {}, roadmapPinned: [], roadmapSnoozed: [], roadmapKnown: [] } })),
       clearErrors: () => set({ errors: {}, heatmap: {} }),
-      resetLearningData: () => set(s => ({ sessions: [], errors: {}, heatmap: {}, srs: {}, config: { ...s.config, cbetDrill: undefined, roadmapProgress: {}, roadmapPinned: [], roadmapSnoozed: [], roadmapKnown: [] } })),
+      resetLearningData: () => set(s => ({ sessions: [], errors: {}, heatmap: {}, srs: {}, config: { ...s.config, cbetDrill: undefined, mathDrill: undefined, roadmapProgress: {}, roadmapPinned: [], roadmapSnoozed: [], roadmapKnown: [] } })),
     }),
     {
       name: 'range-trainer-v5',

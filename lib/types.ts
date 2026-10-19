@@ -156,6 +156,7 @@ export interface SrsEntry {
 // ── Settings ──────────────────────────────────────────────
 export interface AppConfig {
   cbetDrill?: import('./cbet-drill/types').DrillProgress;
+  mathDrill?: import('./math-drill').MathProgress;
   threshold: number;
   minHands: number;
   grilleThreshold: number;

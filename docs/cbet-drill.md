@@ -1,6 +1,6 @@
 # Drill C-bet
 
-Navigation : **Entraînement → Drill C-bet**, ou carte dédiée sur le dashboard. Aucune range importée nécessaire.
+Navigation : **Entraînement → Drill → C-bet théorie**, ou onglet C-bet théorie dans le catalogue. Le nom du module est **C-bet théorie · IP BU vs BB**. Aucune range importée nécessaire. Le catalogue contient aussi le module Maths, avec sa propre progression.
 
 Le MVP comporte 64 flops BTN vs BB en pot relancé, des sessions de 20 décisions, trois modes (apprentissage, drill, mastery), quatre niveaux cumulatifs et une confiance facultative avant la réponse. Les fréquences renseignées sont présentées dans le feedback, sans être évaluées.
 
