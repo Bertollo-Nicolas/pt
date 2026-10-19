@@ -15,7 +15,7 @@ La correction comprend la réponse attendue, le calcul et l’interprétation. L
 - River polarisée : value par bluff `(P + B) / B`. Une mise de demi-pot correspond à trois values pour un bluff, soit 25 % de bluffs **parmi les mises**, sans généraliser à la range totale.
 - Les réponses attendues suivent les repères du cours fournis par l’utilisateur : 15 outs → 30 % sur une street, 54 % sur deux ; 12 → 24/48 ; 9 → 18/36 ; 8 → 16/32 ; 6 → 12/24 ; 4 → 8/16. La probabilité exacte reste présentée séparément. Voir deux cartes suppose l’absence de nouveau paiement. Les outs sont supposés propres.
 - « Flush draw + straight » est précisé : flush draw + gutshot donne généralement 12 outs (9 + 4 − 1) ; flush draw + OESD en donne généralement 15 (9 + 8 − 2).
-- Implicites sur la prochaine carte : `max(0, C/p − (P + 2C))`, gain futur conditionnel pris à vilain, sans nouveaux frais si le tirage rate. Pour P=10, C=7,5 et p=9/47 : environ 14,2 bb supplémentaires. Aucun gain futur n’est garanti.
+- Implicites sur la prochaine carte : la fiche, l’indice et la correction suivent l’écriture du cours, `(cote du tirage − cote du pot) × montant à payer`. Les deux cotes sont détaillées séparément : `(47 − outs) / outs` et `(pot avant la mise + mise adverse) / call`. L’exemple pot 10, call 7,5, 9 outs donne `(4,22 − 2,33) × 7,5 ≈ 14,2 bb` ; pot 6, call 4,5, 4 outs donne `(10,75 − 2,33) × 4,5 ≈ 37,9 bb`. Les arrondis servent à l’affichage ; le résultat est calculé en pleine précision. Un résultat négatif est ramené à zéro. Aucun gain futur n’est garanti.
 
 ## Implémentation et sauvegarde
 

@@ -45,6 +45,14 @@ for (const [outs,one,two] of [[15,30,54],[12,24,48],[9,18,36],[8,16,32],[6,12,24
 }
 assert.equal(questions.find(q=>q.id==='outs-12-2').answer,48);
 assert.ok(questions.find(q=>q.id==='implied-10-0.75-9').calculation.includes('14,2'));
+const impliedExample = questions.find(q=>q.id==='implied-6-0.75-4');
+assert.ok(impliedExample.calculation.includes('(47 − 4) ÷ 4 ≈ 10,75'));
+assert.ok(impliedExample.calculation.includes('(6 + 4,5) ÷ 4,5 ≈ 2,33'));
+assert.ok(impliedExample.calculation.includes('(10,75 − 2,33) × 4,5 ≈ 37,9'));
+for (const q of questions.filter(q=>q.topic==='implied')) {
+  assert.equal(q.formula,'(Cote du tirage − cote du pot) × montant à payer');
+  assert.ok(q.calculation.includes('Cote du tirage :') && q.calculation.includes('Cote du pot :'));
+}
 let progress = math.emptyMathProgress();
 const attempt = (q, correct, id) => ({id,questionId:q.id,topic:q.topic,answer:q.answer+(correct?0:10),correct,responseTimeMs:1200,createdAt:'2026-10-19T10:00:00Z'});
 const first = attempt(questions[0],true,'first');

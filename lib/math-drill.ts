@@ -25,7 +25,7 @@ export const MATH_TOPICS: { id: MathTopic; title: string; description: string; f
   { id: 'outs', title: 'Outs et probabilités', description: 'Transformer tes outs en chances de toucher.', formula: 'Sur une carte : ≈ outs × 2 ; sur deux cartes : repères du cours', rule: 'Utilise les repères du cours, notamment 15 outs → 30 % sur une carte et 54 % sur deux cartes. Deux cartes supposent de voir turn ET river sans nouveau paiement. Les outs doivent être propres et sans doublons.' },
   { id: 'bluff', title: 'Rentabilité d’un bluff', description: 'Combien de folds faut-il pour rentrer dans ses frais ?', formula: 'Mise ÷ (pot avant la mise + mise)', rule: 'Bluff pur, sans équité ni investissement futur : le seuil est une fréquence de fold, pas une équité de call.' },
   { id: 'ratio', title: 'Ratio value / bluff', description: 'Construire une mise polarisée à la river.', formula: 'Value par bluff = (pot avant la mise + mise) ÷ mise', rule: 'Modèle river polarisé : la value gagne toujours, les bluffs perdent toujours si payés. ½ pot → 3 values pour 1 bluff, soit 25 % de bluffs parmi les mises.' },
-  { id: 'implied', title: 'Cote implicite', description: 'Ce qu’il reste à gagner après avoir touché.', formula: 'Gain supplémentaire = max(0, call ÷ probabilité − pot final après call)', rule: 'Modèle sur la prochaine carte : outs propres, aucun paiement supplémentaire si tu rates, et gain futur estimé chez vilain lorsque tu touches. Ce gain n’est jamais garanti.' },
+  { id: 'implied', title: 'Cote implicite', description: 'Ce qu’il reste à gagner après avoir touché.', formula: '(Cote du tirage − cote du pot) × montant à payer', rule: 'Cote du tirage : (cartes inconnues − outs) ÷ outs. Cote du pot : (pot avant la mise + mise adverse) ÷ montant à payer. Modèle sur la prochaine carte, avec des outs propres et sans frais supplémentaires si tu rates. Le gain futur n’est pas garanti.' },
 ];
 export const BET_SIZES = [
   { label: 'Pot', fraction: 1 }, { label: '¾ pot', fraction: 3 / 4 },
@@ -107,11 +107,13 @@ export function buildMathQuestions(): MathQuestion[] {
     const call = pot * fraction;
     const probability = hitProbability(outs, 1);
     const answer = impliedGain(pot, call, probability);
+    const drawOdds = (47 - outs) / outs;
+    const potOdds = (pot + call) / call;
     questions.push({ id: `implied-${pot}-${fraction}-${outs}`, topic: 'implied', context: 'Flop → turn seulement. Outs propres ; tu abandonnes sans frais si tu rates. Montant supplémentaire à prendre à vilain lorsque tu touches.',
       prompt: 'Combien de bb supplémentaires dois-tu gagner après avoir touché ?',
       facts: [{ label: 'Pot avant la mise', value: `${pot} bb` }, { label: 'À payer', value: `${formatMath(call)} bb` }, { label: 'Outs / cartes inconnues', value: `${outs} / 47` }],
       answer, unit: 'bb', tolerance: .06, formula: MATH_TOPICS[4].formula,
-      calculation: `${formatMath(call)} × (47 ÷ ${outs}) − (${pot} + 2 × ${formatMath(call)}) = ${formatMath(answer)} bb supplémentaires.`,
+      calculation: `Cote du tirage : (47 − ${outs}) ÷ ${outs} ≈ ${formatMath(drawOdds, 2)}.\nCote du pot : (${pot} + ${formatMath(call)}) ÷ ${formatMath(call)} ≈ ${formatMath(potOdds, 2)}.\n(${formatMath(drawOdds, 2)} − ${formatMath(potOdds, 2)}) × ${formatMath(call)} ≈ ${formatMath(answer)} bb supplémentaires.`,
       lesson: 'C’est le gain futur minimal conditionnel à toucher, pas une somme déjà acquise. Ton investissement futur ne compte pas comme un gain pris à vilain.' });
   }
   return questions;
