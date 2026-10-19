@@ -22,7 +22,7 @@ export interface MathProgress extends MathStats {
 }
 export const MATH_TOPICS: { id: MathTopic; title: string; description: string; formula: string; rule: string }[] = [
   { id: 'call', title: 'Cote de call', description: 'Le prix à payer pour rester dans le coup.', formula: 'Call ÷ (pot avant la mise + mise adverse + call)', rule: 'Le pot doit inclure la mise adverse. Avec une mise de demi-pot, il faut 25 % d’équité.' },
-  { id: 'outs', title: 'Outs et probabilités', description: 'Transformer tes outs en chances de toucher.', formula: '≈ outs × 2 sur une carte ; ≈ outs × 4 sur deux cartes', rule: 'Ce sont des approximations. Deux cartes supposent de voir turn ET river sans nouveau paiement. Les outs doivent être propres et sans doublons.' },
+  { id: 'outs', title: 'Outs et probabilités', description: 'Transformer tes outs en chances de toucher.', formula: 'Sur une carte : ≈ outs × 2 ; sur deux cartes : repères du cours', rule: 'Utilise les repères du cours, notamment 15 outs → 30 % sur une carte et 54 % sur deux cartes. Deux cartes supposent de voir turn ET river sans nouveau paiement. Les outs doivent être propres et sans doublons.' },
   { id: 'bluff', title: 'Rentabilité d’un bluff', description: 'Combien de folds faut-il pour rentrer dans ses frais ?', formula: 'Mise ÷ (pot avant la mise + mise)', rule: 'Bluff pur, sans équité ni investissement futur : le seuil est une fréquence de fold, pas une équité de call.' },
   { id: 'ratio', title: 'Ratio value / bluff', description: 'Construire une mise polarisée à la river.', formula: 'Value par bluff = (pot avant la mise + mise) ÷ mise', rule: 'Modèle river polarisé : la value gagne toujours, les bluffs perdent toujours si payés. ½ pot → 3 values pour 1 bluff, soit 25 % de bluffs parmi les mises.' },
   { id: 'implied', title: 'Cote implicite', description: 'Ce qu’il reste à gagner après avoir touché.', formula: 'Gain supplémentaire = max(0, call ÷ probabilité − pot final après call)', rule: 'Modèle sur la prochaine carte : outs propres, aucun paiement supplémentaire si tu rates, et gain futur estimé chez vilain lorsque tu touches. Ce gain n’est jamais garanti.' },
@@ -33,12 +33,12 @@ export const BET_SIZES = [
   { label: '⅓ pot', fraction: 1 / 3 }, { label: '¼ pot', fraction: 1 / 4 },
 ];
 export const DRAW_TYPES = [
-  { label: 'Flush draw + 2 overcards', outs: 15, note: 'Suppose les 6 outs d’overcards gagnants et distincts des 9 outs couleur.' },
-  { label: 'Flush draw + gutshot', outs: 12, note: '9 + 4 − 1 out commun = 12. Un flush draw + OESD donne généralement 15 outs, pas 12.' },
-  { label: 'Flush draw', outs: 9, note: 'Suppose les 9 cartes de couleur gagnantes.' },
-  { label: 'OESD', outs: 8, note: 'Tirage quinte ouvert aux deux extrémités.' },
-  { label: '2 overcards', outs: 6, note: 'Suppose qu’une paire suffit pour gagner.' },
-  { label: 'Gutshot', outs: 4, note: 'Un seul rang permet de compléter la quinte.' },
+  { label: 'Flush draw + 2 overcards', outs: 15, oneStreet: 30, twoStreets: 54, note: 'Suppose les 6 outs d’overcards gagnants et distincts des 9 outs couleur.' },
+  { label: 'Flush draw + gutshot', outs: 12, oneStreet: 24, twoStreets: 48, note: '9 + 4 − 1 out commun = 12. Un flush draw + OESD donne généralement 15 outs, pas 12.' },
+  { label: 'Flush draw', outs: 9, oneStreet: 18, twoStreets: 36, note: 'Suppose les 9 cartes de couleur gagnantes.' },
+  { label: 'OESD', outs: 8, oneStreet: 16, twoStreets: 32, note: 'Tirage quinte ouvert aux deux extrémités.' },
+  { label: '2 overcards', outs: 6, oneStreet: 12, twoStreets: 24, note: 'Suppose qu’une paire suffit pour gagner.' },
+  { label: 'Gutshot', outs: 4, oneStreet: 8, twoStreets: 16, note: 'Un seul rang permet de compléter la quinte.' },
 ];
 export function formatMath(value: number, digits = 1) {
   return value.toLocaleString('fr-FR', { maximumFractionDigits: digits });
@@ -95,13 +95,13 @@ export function buildMathQuestions(): MathQuestion[] {
   }
   for (const draw of DRAW_TYPES) for (const cards of [1, 2] as const) {
     const exact = hitProbability(draw.outs, cards) * 100;
-    const approximate = draw.outs * (cards === 1 ? 2 : 4);
+    const approximate = cards === 1 ? draw.oneStreet : draw.twoStreets;
     questions.push({ id: `outs-${draw.outs}-${cards}`, topic: 'outs', context: `${draw.note} ${cards === 2 ? 'Tu vois les deux cartes restantes sans nouveau paiement.' : 'Tu es au flop et tu ne considères que la turn.'}`,
-      prompt: `Avec la règle ×${cards === 1 ? 2 : 4}, quelle chance approximative de toucher ?`,
+      prompt: `Selon les repères du cours, quelle chance de toucher sur ${cards === 1 ? 'une carte' : 'deux cartes'} ?`,
       facts: [{ label: 'Tirage', value: draw.label }, { label: 'Outs propres', value: String(draw.outs) }, { label: 'Cartes à venir', value: String(cards) }],
       answer: approximate, unit: '%', tolerance: .1, formula: MATH_TOPICS[1].formula,
-      calculation: `${draw.outs} × ${cards === 1 ? 2 : 4} = ${approximate} % (approximation). Probabilité exacte : ${formatMath(exact)} %.`,
-      lesson: 'Toucher un out n’est pas une garantie de gagner si les outs sont sales ou si vilain peut encore te dépasser. La règle ×4 devient moins précise avec beaucoup d’outs.' });
+      calculation: `Repère du cours : ${draw.outs} outs → ${approximate} % sur ${cards === 1 ? 'une carte' : 'deux cartes'}. Probabilité exacte : ${formatMath(exact)} %.`,
+      lesson: 'La réponse attendue est le repère du cours. Toucher un out n’est pas une garantie de gagner si les outs sont sales ou si vilain peut encore te dépasser.' });
   }
   for (const pot of [6, 10, 20, 30]) for (const fraction of [.5, .75, 1]) for (const outs of [4, 8, 9]) {
     const call = pot * fraction;

@@ -36,7 +36,13 @@ for(const q of questions) {
   assert.equal(math.checkMathAnswer(q,NaN),false);
   assert.equal(math.checkMathAnswer(q,q.answer+2),false);
 }
-assert.equal(questions.find(q=>q.id==='outs-15-2').answer,60, 'Approximate rule must not masquerade as exact 54%');
+assert.equal(questions.find(q=>q.id==='outs-15-2').answer,54, 'Preserve the user course reference');
+assert.ok(math.checkMathAnswer(questions.find(q=>q.id==='outs-15-2'),54));
+assert.equal(math.checkMathAnswer(questions.find(q=>q.id==='outs-15-2'),60),false);
+for (const [outs,one,two] of [[15,30,54],[12,24,48],[9,18,36],[8,16,32],[6,12,24],[4,8,16]]) {
+  assert.equal(questions.find(q=>q.id===`outs-${outs}-1`).answer,one);
+  assert.equal(questions.find(q=>q.id===`outs-${outs}-2`).answer,two);
+}
 assert.equal(questions.find(q=>q.id==='outs-12-2').answer,48);
 assert.ok(questions.find(q=>q.id==='implied-10-0.75-9').calculation.includes('14,2'));
 let progress = math.emptyMathProgress();

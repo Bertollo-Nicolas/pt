@@ -13,7 +13,7 @@ La correction comprend la réponse attendue, le calcul et l’interprétation. L
 - Le pot affiché est toujours le pot **avant** la mise adverse. Call : `C / (P + 2C)`. La formule `C / (pot + C)` n’est équivalente que si ce pot inclut déjà la mise adverse.
 - Bluff pur sans équité : folds requis `B / (P + B)`.
 - River polarisée : value par bluff `(P + B) / B`. Une mise de demi-pot correspond à trois values pour un bluff, soit 25 % de bluffs **parmi les mises**, sans généraliser à la range totale.
-- Les probabilités de toucher sont séparées des approximations ×2 et ×4. Quinze outs donnent 60 % avec ×4, mais environ 54,1 % exactement sur turn + river. Douze outs donnent 48 % avec ×4, mais environ 45 % exactement. Voir deux cartes suppose l’absence de nouveau paiement. Les outs sont supposés propres.
+- Les réponses attendues suivent les repères du cours fournis par l’utilisateur : 15 outs → 30 % sur une street, 54 % sur deux ; 12 → 24/48 ; 9 → 18/36 ; 8 → 16/32 ; 6 → 12/24 ; 4 → 8/16. La probabilité exacte reste présentée séparément. Voir deux cartes suppose l’absence de nouveau paiement. Les outs sont supposés propres.
 - « Flush draw + straight » est précisé : flush draw + gutshot donne généralement 12 outs (9 + 4 − 1) ; flush draw + OESD en donne généralement 15 (9 + 8 − 2).
 - Implicites sur la prochaine carte : `max(0, C/p − (P + 2C))`, gain futur conditionnel pris à vilain, sans nouveaux frais si le tirage rate. Pour P=10, C=7,5 et p=9/47 : environ 14,2 bb supplémentaires. Aucun gain futur n’est garanti.
 
