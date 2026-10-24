@@ -10,8 +10,8 @@ export const VALUE_RULES: ValueRule[] = [
   {id:'ph-small',family:'paired_high',hand:'Petite PP',line:[['B33'],['CHECK'],['CHECK']]},
   {id:'pl-top',family:'paired_low',hand:'Trips · kicker fort',line:[['B80'],['B80'],['B80','SHOVE']]},
   {id:'pl-low',family:'paired_low',hand:'Trips · kicker faible',line:[['B50'],['B50'],['B50']]},
-  {id:'pl-over',family:'paired_low',hand:'PP forte · TT+',line:[['B33'],['B50'],['B33']]},
-  {id:'pl-mid',family:'paired_low',hand:'PP moyenne',line:[['B33'],['CHECK'],['CHECK']]},
+  {id:'pl-over',family:'paired_low',hand:'Overpaire',line:[['B33'],['B50'],['B33']]},
+  {id:'pl-mid',family:'paired_low',hand:'Paire moyenne',line:[['B33'],['CHECK'],['CHECK']]},
   {id:'hc-top',family:'high_connected',hand:'Top paire · top kicker',line:[['POT'],['OVERBET'],['SHOVE']]},
   {id:'hc-mid',family:'high_connected',hand:'Top paire · kicker Q à 9',line:[['B80'],['B80'],['CHECK']]},
   {id:'hc-pair',family:'high_connected',hand:'Paire moyenne',line:[['B50'],['B33','B50'],['CHECK']]},
@@ -40,7 +40,9 @@ const samples: [string,string,string][] = [
   ['ph-top','AS QH','QS QD 4C 2H 8S'], ['ph-low','5S QH','QS QD 4C 2H 8S'],
   ['ph-over','AS AH','QS QD 4C 2H 8S'], ['ph-mid','9S 9H','QS QD 4C 2H 8S'], ['ph-small','3S 3H','QS QD 4C 2H 8S'],
   ['pl-top','AS 5H','5S 5D 2C 3H 7S'], ['pl-low','6S 5H','5S 5D 2C 3H 7S'],
-  ['pl-over','KS KH','5S 5D 2C 3H 7S'], ['pl-mid','8S 8H','5S 5D 2C 3H 7S'],
+  ['pl-over','KS KH','5S 5D 2C 6H 7S'], ['pl-over','8S 8H','5S 5D 2C 6H 7S'],
+  ['pl-mid','3S 3H','5S 5D 2C 6H 7S'], ['pl-mid','4S 4H','5S 5D 2C 6H 7S'],
+  ['pl-mid','AS 6H','5S 5D 6C 2H 7S'], ['pl-mid','KS 6H','5S 5D 6C 2H 7S'],
   ['hc-top','AS KH','KS JD TC 2H 4S'], ['hc-mid','QS KH','KS JD TC 2H 4S'],
   ['hc-pair','QS JH','KS JD TC 2H 4S'], ['hc-small','9S 9H','KS JD TC 2H 4S'],
   ['lc-nuts','TS 9H','8S 7D 6C 2H 3S'], ['lc-set','8H 8D','8S 7D 6C 2H 3S'],
@@ -61,6 +63,19 @@ export const VALUE_CASES: ValueCase[] = samples.map(([ruleId,hero,runout])=>{
     title:'Ligne de value du cours',context:'Hero IP contre un joueur récréatif passif. Vilain checke à chaque street ; il paie les mises précédentes. Pas de relance. Suis la ligne de référence du cours.',
     steps:rule.line.map((expected,index)=>({street:(['Flop','Turn','River'] as const)[index],board:cards.slice(0,3+index),expected,
       explanation:`${rule.hand} : ${expected.map(actionLabel).join(' ou ')} à cette street.${index===0 && rule.note ? ` ${rule.note}` : ''}`}))};
+});
+
+// The course specifies a fallback only at the flop. Do not invent turn/river lines.
+const fallbackSamples: [Exclude<ValueFamily,'adaptations'>,string,string][] = [
+  ['paired_high','AS KH','QS QD 4C'], ['paired_low','AS KH','5S 5D 2C'],
+  ['high_connected','4S 3H','KS JD TC'], ['low_connected','AS KH','8S 7D 6C'],
+  ['ace_dry','KS QH','AS 7D 4C'], ['ace_drawy','KS QH','AS 8S 6D'],
+];
+for(const [family,hero,flop] of fallbackSamples) VALUE_CASES.push({
+  id:`fallback-${family}`,ruleId:'fallback',family,hero:hero.split(' ') as [string,string],
+  handLabel:'Hors des branches de value',title:'C-bet par défaut au flop',
+  context:'Hero IP contre un joueur récréatif passif. Vilain checke. Quelle mise prévoit le cours quand ta main ne correspond à aucune branche ?',
+  steps:[{street:'Flop',board:flop.split(' '),expected:['B33'],explanation:'Aucune branche de value ne correspond à cette main : c-bet ⅓ pot au flop. Cette règle ne prescrit pas de ligne turn ou river.'}],
 });
 
 VALUE_CASES.push(

@@ -3,7 +3,7 @@ require.extensions['.ts']=(module,filename)=>module._compile(ts.transpileModule(
 const {VALUE_CASES,VALUE_RULES}=require('../lib/value-drill/dataset.ts');
 const {VALUE_ACTIONS,VALUE_FAMILIES}=require('../lib/value-drill/types.ts');
 const {emptyValueProgress,recordValueAttempt,selectValueCase}=require('../lib/value-drill/engine.ts');
-assert.equal(VALUE_RULES.length,29);assert.equal(VALUE_CASES.length,40);
+assert.equal(VALUE_RULES.length,29);assert.equal(VALUE_CASES.length,50);
 assert.equal(new Set(VALUE_CASES.map(item=>item.id)).size,VALUE_CASES.length);
 for(const scenario of VALUE_CASES){
   assert.equal(scenario.hero.length,2);
@@ -16,7 +16,7 @@ for(const scenario of VALUE_CASES){
     assert.ok(step.expected.every(action=>VALUE_ACTIONS.some(item=>item.id===action)));
     if(index)assert.deepEqual(step.board.slice(0,-1),scenario.steps[index-1].board,'Runout must reveal one card at a time');
   }
-  if(scenario.family!=='adaptations')assert.equal(scenario.steps.length,3);
+  if(scenario.family!=='adaptations'&&scenario.ruleId!=='fallback')assert.equal(scenario.steps.length,3);
 }
 const line=id=>VALUE_RULES.find(item=>item.id===id).line;
 assert.deepEqual(line('hc-top'),[['POT'],['OVERBET'],['SHOVE']],'User correction: high connected is pot, overbet, shove');
@@ -29,7 +29,26 @@ assert.deepEqual(line('ad-topset'),[['B50'],['POT'],['SHOVE']]);
 assert.deepEqual(line('aw-topset'),[['B80'],['OVERBET'],['SHOVE']]);
 assert.deepEqual(line('pl-mid'),[['B33'],['CHECK'],['CHECK']]);
 assert.ok(VALUE_CASES.filter(item=>item.ruleId==='hc-mid').every(item=>item.hero.some(card=>'QJT9'.includes(card[0]))));
-assert.ok(VALUE_CASES.filter(item=>item.ruleId==='pl-over').every(item=>'AKQJT'.includes(item.hero[0][0])));
+const rank=card=>'23456789TJQKA'.indexOf(card[0]);
+for(const scenario of VALUE_CASES.filter(item=>['pl-over','ph-over','lc-over'].includes(item.ruleId))){
+  assert.equal(rank(scenario.hero[0]),rank(scenario.hero[1]));
+  for(const step of scenario.steps)assert.ok(step.board.every(card=>rank(card)<rank(scenario.hero[0])),`Not an overpair: ${scenario.id} ${step.street}`);
+}
+const eights=VALUE_CASES.find(item=>item.hero.join(' ')==='8S 8H'&&item.family==='paired_low');
+assert.equal(eights.ruleId,'pl-over');
+assert.deepEqual(eights.steps.map(step=>step.expected),[['B33'],['B50'],['B33']]);
+assert.deepEqual(eights.steps.at(-1).board.map(card=>card[0]),['5','5','2','6','7']);
+for(const hero of ['3S 3H','4S 4H','AS 6H','KS 6H'])assert.ok(VALUE_CASES.some(item=>item.ruleId==='pl-mid'&&item.hero.join(' ')===hero));
+for(const scenario of VALUE_CASES.filter(item=>['pl-mid','ph-mid'].includes(item.ruleId))){
+  const flop=scenario.steps[0].board;
+  const paired=flop.find(card=>flop.filter(other=>rank(other)===rank(card)).length===2);
+  assert.ok(paired);
+  if(rank(scenario.hero[0])===rank(scenario.hero[1]))assert.ok(rank(scenario.hero[0])<rank(paired),'A medium PP must not be an overpair');
+  else assert.ok(scenario.hero.some(card=>flop.some(other=>rank(other)===rank(card))),'Unpaired hand must connect with the board');
+}
+const fallbacks=VALUE_CASES.filter(item=>item.ruleId==='fallback');
+assert.equal(fallbacks.length,6);
+for(const scenario of fallbacks){assert.equal(scenario.steps.length,1);assert.equal(scenario.steps[0].street,'Flop');assert.deepEqual(scenario.steps[0].expected,['B33']);}
 assert.deepEqual(VALUE_CASES.find(item=>item.id==='adapt-four-straight').steps[0].expected,['B75']);
 assert.deepEqual(VALUE_CASES.find(item=>item.id==='adapt-board-straight').steps[0].expected,['OVERBET']);
 assert.ok(VALUE_CASES.filter(item=>item.ruleId==='flush').every(item=>item.steps[0].expected.includes('REDUCE')));
@@ -59,4 +78,4 @@ const related=selectValueCase('mixed',emptyValueProgress(),[first.id,VALUE_CASES
 assert.equal(related.family,first.family);assert.notEqual(related.id,first.id);
 for(const family of VALUE_FAMILIES)assert.equal(selectValueCase(family.id,progress,[],[],()=>.5).family,family.id);
 const small=[];for(let i=0;i<20;i++){const scenario=selectValueCase('paired_low',progress,small,[],()=>.2);assert.ok(!small.slice(-2).includes(scenario.id));small.push(scenario.id);}
-console.log('Value drill: 29 course lines, 40 legal examples, street progression, alternatives, adaptations, persistence and selection passed.');
+console.log('Value drill: 29 course lines, 50 legal examples, overpair classification, flop fallback, street progression, alternatives, adaptations, persistence and selection passed.');
