@@ -44,7 +44,7 @@ export default function RangeTrainer() {
     if (currentMode === 'grille') return <GrilleView />;
     return <Dashboard onLibrary={openLibrary}/>;
   };
-  return <div className={`app-shell ${currentMode === 'review' ? 'is-review-mode' : ''}`}>
+  return <div className={`app-shell ${currentMode === 'review' ? 'is-review-mode' : currentMode === 'drill' ? 'is-drill-mode' : ''}`}>
     <div className="hidden md:block w-[236px] xl:w-[252px] flex-shrink-0 h-full"><Navigation onSettings={openSettings} onLibrary={openLibrary} onLogout={logout}/></div>
     <div className="workspace-main"><Header onOpenSidebar={() => setNavigationOpen(true)} onOpenLibrary={openLibrary} syncState={syncState}/><main id="main-content" className="flex-1 overflow-hidden flex flex-col min-h-0">{renderMain()}</main></div>
     <Modal open={navigationOpen} onClose={closeNavigation} className="navigation-dialog"><Navigation onSettings={openSettings} onLibrary={openLibrary} onClose={closeNavigation} onLogout={logout}/></Modal>
