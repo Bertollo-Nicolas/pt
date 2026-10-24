@@ -4,7 +4,7 @@ Accès : **Drill → Value vs passif**, ou carte **Value vs fish passif** du cat
 
 ## Déroulement
 
-Une session comprend six situations. Les lignes de base se jouent **street par street** : main de Hero connue, flop visible, turn puis river révélées seulement après la décision précédente. Chaque réponse est verrouillée, corrigée et sauvegardée. Même après une erreur, la suite suit la ligne de référence du cours ; l’historique indique les étapes corrigées.
+Le nombre de situations est saisi manuellement avant la session (six par défaut). Une situation conserve toutes ses streets, quel que soit le nombre choisi. Les lignes de base se jouent **street par street** : main de Hero connue, flop visible, turn puis river révélées seulement après la décision précédente. Chaque réponse est verrouillée, corrigée et sauvegardée. Même après une erreur, la suite suit la ligne de référence du cours ; l’historique indique les étapes corrigées.
 
 L’option d’apprentissage affiche la catégorie de main avant de répondre. Par défaut, elle n’est révélée qu’après la réponse. On peut cibler une texture, les adaptations seules ou le mélange complet. Les erreurs favorisent un autre exemple de la même famille ; les situations déjà vues sont évitées tant que le pool le permet.
 

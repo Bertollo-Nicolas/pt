@@ -5,6 +5,7 @@ import { BET_SIZES, DRAW_TYPES, MATH_TOPICS, callEquity, bluffFolds, valuePerBlu
   emptyMathProgress, parseMathAnswer, checkMathAnswer, selectMathQuestion,
   type MathAttempt, type MathFilter, type MathProgress, type MathQuestion, type MathTopic } from '@/lib/math-drill';
 import { Button } from '../ui/Button';
+import { DrillLengthField, useDrillLength } from './DrillLengthField';
 import { Icon } from '../ui/Icon';
 
 function MathStats({ progress }: { progress: MathProgress }) {
@@ -43,6 +44,7 @@ export function MathDrillView() {
   const progress = useAppStore(state => state.config.mathDrill) ?? emptyMathProgress();
   const record = useAppStore(state => state.recordMathAttempt);
   const [filter, setFilter] = useState<MathFilter>('call');
+  const length = useDrillLength(filter === 'mixed' ? 20 : 10);
   const [session, setSession] = useState<Session | null>(null);
   const [input, setInput] = useState('');
   const [error, setError] = useState('');
@@ -56,8 +58,10 @@ export function MathDrillView() {
   useEffect(() => { scroller.current?.scrollTo({ top: 0 }); if (activeId && !done) inputRef.current?.focus({ preventScroll: true }); }, [activeId, done]);
   const clearAnswer = () => { setInput(''); setError(''); setHint(false); locked.current = false; };
   const start = (target = filter) => {
+    const count = length.getCount(target === 'mixed' ? 20 : 10);
+    if (count === null) return;
     clearAnswer();
-    setSession({ question: selectMathQuestion(target, progress, []), attempts: [], answer: null, startedAt: performance.now(), done: false, filter: target, length: target === 'mixed' ? 20 : 10 });
+    setSession({ question: selectMathQuestion(target, progress, []), attempts: [], answer: null, startedAt: performance.now(), done: false, filter: target, length: count });
   };
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -83,7 +87,7 @@ export function MathDrillView() {
     <header className="cbet-heading"><div><span className="eyebrow text-signal">MATHS / LES FONDAMENTAUX DU POKER</span><h1>Moins d’hésitation.<br className="sm:hidden"/> Plus de repères.</h1><p>Calcule, vérifie et comprends ce que le résultat signifie.</p></div><span className="cbet-spot"><Icon name="chart"/>Maths</span></header>
     {!session ? <>
       <div className="math-topic-grid" role="group" aria-label="Choisir un thème de maths">{MATH_TOPICS.map((topic, index) => <button key={topic.id} aria-pressed={filter === topic.id} className={`math-topic ${filter === topic.id ? 'is-selected' : ''}`} onClick={() => setFilter(topic.id)}><span>0{index + 1}</span><strong>{topic.title}</strong><p>{topic.description}</p></button>)}<button className={`math-topic ${filter === 'mixed' ? 'is-selected' : ''}`} aria-pressed={filter === 'mixed'} onClick={() => setFilter('mixed')}><span>↗</span><strong>Mode mixte</strong><p>Les cinq thèmes, avec un retour sur tes erreurs.</p></button></div>
-      <div className="cbet-setup-grid mt-6"><section className="cbet-panel"><span className="section-label text-signal">{filter === 'mixed' ? 'CONSOLIDER' : 'APPRENDRE UN REPÈRE'}</span><h2>{selected?.title ?? 'Mélange les situations.'}</h2><p className="text-muted text-sm leading-relaxed mt-3">{selected?.rule ?? '20 calculs qui alternent les cinq thèmes. Les thèmes ratés reviennent sur un autre exemple pendant la session.'}</p><div className="cbet-start"><Button variant="primary" onClick={() => start()}>Lancer {filter === 'mixed' ? 20 : 10} calculs →</Button><span>Réponse libre · Correction détaillée · Sans limite de temps</span></div></section><MathStats progress={progress}/></div><MathMemo filter={filter}/>
+      <div className="cbet-setup-grid mt-6"><section className="cbet-panel"><span className="section-label text-signal">{filter === 'mixed' ? 'CONSOLIDER' : 'APPRENDRE UN REPÈRE'}</span><h2>{selected?.title ?? 'Mélange les situations.'}</h2><p className="text-muted text-sm leading-relaxed mt-3">{selected?.rule ?? 'Des calculs qui alternent les cinq thèmes. Les thèmes ratés reviennent sur un autre exemple pendant la session.'}</p><DrillLengthField input={length.input} onChange={length.setInput} valid={length.count !== null} label="Nombre de calculs"/><div className="cbet-start"><Button variant="primary" onClick={() => start()} disabled={length.count === null}>Lancer {length.count ?? "…"} calcul{length.count === 1 ? "" : "s"} →</Button><span>Réponse libre · Correction détaillée · Sans limite de temps</span></div></section><MathStats progress={progress}/></div><MathMemo filter={filter}/>
     </> : session.done ? <section className="cbet-panel cbet-summary"><span className="section-label text-signal">SESSION TERMINÉE</span><h2>{score} / {session.length}<span> calculs justes</span></h2><p className="text-muted mt-3">{weak.length ? 'Les repères à retravailler :' : 'Tous les calculs sont justes. Passe au mode mixte pour varier les situations.'}</p><div className="math-summary-topics">{weak.map(topic => <Button key={topic.id} onClick={() => { setFilter(topic.id); start(topic.id); }}>{topic.title} · {topic.wrong} erreur{topic.wrong > 1 ? 's' : ''} →</Button>)}</div><MathStats progress={progress}/><div className="flex flex-wrap gap-3 mt-6"><Button variant="primary" onClick={() => start(session.filter)}>Recommencer →</Button><Button onClick={() => setSession(null)}>Thèmes et fiches mémo</Button></div></section> : question && <>
       <div className="cbet-session-top"><span>{MATH_TOPICS.find(topic => topic.id === question.topic)?.title} <span className="text-muted">/ Calcul {session.attempts.length + (session.answer ? 0 : 1)} sur {session.length}</span></span><span className="text-signal">{score} justes</span><Button size="sm" onClick={() => setSession(null)}>Quitter la session</Button></div>
       <div className="cbet-session-track" role="progressbar" aria-label="Avancement des calculs" aria-valuenow={session.attempts.length} aria-valuemin={0} aria-valuemax={session.length}><span style={{ width: `${session.attempts.length / session.length * 100}%` }}/></div>

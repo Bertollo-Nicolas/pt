@@ -4,7 +4,7 @@ Le menu principal conserve une entrée **Drill**. Elle ouvre le catalogue : **C-
 
 ## Organisation
 
-Maths propose cinq thèmes : cote de call, outs/probabilités, rentabilité d’un bluff, ratio value/bluff river et cote implicite. Un thème se travaille en dix calculs à réponse libre ; le mode mixte alterne les thèmes en vingt calculs, et revient sur les thèmes ratés avec un exemple différent. Une fiche mémo par thème présente formules, tables et limites des modèles.
+Maths propose cinq thèmes : cote de call, outs/probabilités, rentabilité d’un bluff, ratio value/bluff river et cote implicite. Le nombre de calculs est saisi manuellement avant chaque session (dix par défaut pour un thème, vingt pour le mode mixte). Le mode mixte alterne les thèmes et revient sur les thèmes ratés avec un exemple différent. Une fiche mémo par thème présente formules, tables et limites des modèles.
 
 La correction comprend la réponse attendue, le calcul et l’interprétation. La virgule et le point sont acceptés ; la consigne précise l’arrondi. Les réponses sont verrouillées après validation. Le bilan donne le score et permet de retravailler directement un thème raté.
 
