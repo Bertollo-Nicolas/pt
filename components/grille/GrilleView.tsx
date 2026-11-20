@@ -224,6 +224,7 @@ export function GrilleView() {
   const [selected,      setSelected]      = useState<Selection>(() => initAllFold());
   const [checkResult,   setCheckResult]   = useState<CheckResult | null>(null);
   const [revealed,      setRevealed]      = useState(false);
+  const [showHint,      setShowHint]      = useState(false);
   const [cellSize,      setCellSize]      = useState(32);
   const [resCellSize,   setResCellSize]   = useState(18);
   const [freqPerAction, setFreqPerAction] = useState<Record<string, number>>({});
@@ -287,6 +288,7 @@ export function GrilleView() {
     setSelected(initAllFold());
     setCheckResult(null);
     setRevealed(false);
+    setShowHint(false);
     setHoveredHand(null);
     setHoveredState(null);
     const init: Record<string, number> = {};
@@ -381,6 +383,7 @@ export function GrilleView() {
     setSelected(initAllFold());
     setCheckResult(null);
     setRevealed(false);
+    setShowHint(false);
     setHoveredHand(null);
     setHoveredState(null);
     const init: Record<string, number> = {};
@@ -390,6 +393,7 @@ export function GrilleView() {
 
   const hands = allHands();
   const inRangeCount = selectedTab ? hands.filter(h => getNonFoldActions(h.hand, selectedTab.rangeMap).length > 0).length : 0;
+  const selectedCount = Object.values(selected).filter(freqs => Object.entries(freqs).some(([action, freq]) => action !== 'Fold' && freq > 0)).length;
   const fontSize = Math.max(7, Math.floor(cellSize * 0.38));
   const isSrsReview = srsReviewKey === selectedTabKey;
 
@@ -415,8 +419,11 @@ export function GrilleView() {
 
           {/* Range info */}
           {selectedTab && (
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <span className="text-xs text-muted flex-shrink-0">{inRangeCount} mains · {Math.round(inRangeCount / 169 * 100)}% de la grille</span>
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+              <div className="flex items-center flex-wrap gap-2">
+                <button onClick={() => setShowHint(value => !value)} aria-expanded={showHint} aria-controls="builder-range-hint" className="min-h-8 px-2.5 rounded-lg border border-border text-[11px] text-muted hover:text-text hover:border-border2">Hint {showHint ? '−' : '+'}</button>
+                <span id="builder-range-hint" hidden={!showHint} className="text-xs text-muted">{inRangeCount} mains · {Math.round(inRangeCount / 169 * 100)}% de la grille · {selectedCount} main{selectedCount === 1 ? '' : 's'} sélectionnée{selectedCount === 1 ? '' : 's'}</span>
+              </div>
               <button onClick={toggleFullscreen} className="min-h-8 px-2.5 rounded-lg border border-border text-[11px] text-muted hover:text-text hover:border-border2 inline-flex items-center gap-1.5" title="Agrandir la grille"><Icon name="maximize" size={14}/>{isFullscreen ? 'Réduire' : 'Plein écran'}</button>
             </div>
           )}
