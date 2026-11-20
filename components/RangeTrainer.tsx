@@ -17,6 +17,7 @@ import { RoadmapView } from './roadmap/RoadmapView';
 import { SrsToast } from './ui/SrsToast';
 import { SettingsModal } from './modals/SettingsModal';
 import { DrillView } from './drill/DrillView';
+import { getRangeGroups } from '@/lib/range-options';
 
 export default function RangeTrainer() {
   const { rehydrateRmData, selectedTab, currentMode, lastSpot, selectTab } = useAppStore();
@@ -55,6 +56,6 @@ export default function RangeTrainer() {
 
 function ChooseRange({ onLibrary }: { onLibrary: () => void }) {
   const { currentMode, rmData, selectTab } = useAppStore();
-  const spots = rmData ? Object.entries(rmData.categories).flatMap(([catId, cat]) => (cat.tabList ?? []).filter(tabId => cat.tabs?.[tabId]).map(tabId => ({ catId, tabId, name: cat.tabs![tabId].name, category: cat.name }))) : [];
+  const spots = getRangeGroups(rmData).flatMap(group => group.tabs.map(tab => ({ catId: group.catId, tabId: tab.id, name: tab.name, category: group.path })));
   return <div className="dashboard-scroll"><div className="choose-range"><span className="eyebrow">{currentMode === 'flash' ? 'FLASHCARDS / DÉCISION PAR DÉCISION' : 'RANGE BUILDER / VUE D’ENSEMBLE'}</span><h1>{currentMode === 'flash' ? 'Travaille tes réflexes.' : 'Reconstruis ta range.'}</h1><p>Choisis une range pour commencer ton entraînement.</p>{spots.length ? <div className="range-picker-grid">{spots.map(spot => <button key={`${spot.catId}-${spot.tabId}`} onClick={() => selectTab(spot.catId, spot.tabId)} className="range-picker-card"><Icon name="grid" size={20}/><span><small>{spot.category}</small><strong>{spot.name}</strong></span><Icon name="chevron" size={16}/></button>)}</div> : <div className="onboarding-panel"><Icon name="folder" size={32}/><h2>Tout commence avec tes ranges.</h2><p>Importe un fichier Range Manager pour retrouver tes positions et démarrer tes exercices.</p><button className="focus-cta" onClick={onLibrary}>Importer mes ranges<Icon name="upload" size={16}/></button></div>}</div></div>;
 }

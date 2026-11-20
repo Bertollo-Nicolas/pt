@@ -2,6 +2,7 @@
 import { useAppStore } from '@/store/appStore';
 import type { Mode } from '@/lib/types';
 import { Icon, type IconName } from './ui/Icon';
+import { TrainingRangeSelect } from './TrainingRangeSelect';
 
 export const MODES: { id: Mode; label: string; icon: IconName }[] = [
   { id: 'home', label: 'Vue d’ensemble', icon: 'grid' },
@@ -19,12 +20,13 @@ export function Header({ onOpenSidebar, onOpenLibrary, syncState }: { onOpenSide
   const training = currentMode === 'flash' || currentMode === 'grille';
   return <header className="workspace-header">
     <button onClick={onOpenSidebar} className="icon-control md:hidden" aria-label="Ouvrir la navigation"><Icon name="menu" /></button>
-    <div className="flex items-center gap-3 min-w-0 text-sm">
+    <div className={`${training ? 'hidden sm:flex' : 'flex'} items-center gap-3 min-w-0 text-sm`}>
       <span className="text-muted hidden sm:inline">Espace personnel</span><span className="text-muted2 hidden sm:inline">/</span>
       <span className="truncate">{MODES.find(mode => mode.id === currentMode)?.label}</span>
       {training && selectedTab && <><span className="text-muted2">/</span><span className="truncate text-muted hidden lg:inline">{selectedTab.name}</span></>}
     </div>
-    <div className="ml-auto flex items-center gap-5">
+    {training && <div className="flex-1 min-w-0 max-w-[340px] mx-2"><TrainingRangeSelect/></div>}
+    <div className="ml-auto flex items-center gap-5 flex-shrink-0">
       <span className="hidden lg:flex items-center gap-2 text-xs text-muted" role="status"><span className={`h-1.5 w-1.5 rounded-full ${syncState === 'synced' ? 'bg-green' : syncState === 'offline' ? 'bg-orange' : 'bg-muted animate-pulse'}`} />{syncState === 'synced' ? 'À jour' : syncState === 'offline' ? 'Hors ligne' : 'Synchronisation…'}</span>
       <button className="library-trigger" onClick={onOpenLibrary}><Icon name="folder" size={16}/><span>Mes ranges</span><Icon name="chevron" size={13}/></button>
     </div>
