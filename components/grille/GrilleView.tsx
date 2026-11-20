@@ -119,7 +119,7 @@ function ResultGrid({ hands, selection, actionButtons, selectedTab, label, hover
   hoveredState: CheckState | null;
   cellSize: number;
 }) {
-  const fontSize = Math.max(4, Math.floor(cellSize * 0.35));
+  const fontSize = Math.max(7, Math.floor(cellSize * 0.35));
 
   return (
     <div className="flex flex-col items-center">
@@ -223,6 +223,7 @@ export function GrilleView() {
 
   const [selected,      setSelected]      = useState<Selection>(() => initAllFold());
   const [checkResult,   setCheckResult]   = useState<CheckResult | null>(null);
+  const hasResult = Boolean(checkResult);
   const [revealed,      setRevealed]      = useState(false);
   const [showHint,      setShowHint]      = useState(false);
   const [cellSize,      setCellSize]      = useState(32);
@@ -234,6 +235,7 @@ export function GrilleView() {
 
   const containerRef   = useRef<HTMLDivElement>(null);
   const midRef         = useRef<HTMLDivElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
   const isDraggingRef  = useRef(false);
   const pointerDownRef = useRef<string | null>(null);
   const dragMovedRef   = useRef(false);
@@ -249,7 +251,6 @@ export function GrilleView() {
   // Resize observer for grids
   const updateSizes = useCallback(() => {
     if (!containerRef.current) return;
-    const { clientWidth: w, clientHeight: h } = containerRef.current;
     
     // Main grid sizing
     if (midRef.current) {
@@ -257,19 +258,20 @@ export function GrilleView() {
       setCellSize(Math.max(16, Math.floor((Math.min(mw, mh) - 34) / 13)));
     }
 
-    // Result grids sizing (2 grids side by side)
-    // Non-grid height estimates: Score (~65), Stats (~55), Button (~45), Banner (~40), Spacings (~60)
-    const fixedH = 265; 
-    const maxResH = Math.max(10, Math.floor((h - fixedH) / 13));
-    const maxResW = Math.max(10, Math.floor((w - 40) / 2 / 13));
-    setResCellSize(Math.min(maxResH, maxResW));
+    if (resultsRef.current) {
+      const { clientWidth: rw, clientHeight: rh } = resultsRef.current;
+      setResCellSize(Math.max(8, Math.floor(Math.min((rw - 32) / 2 / 13, (rh - 40) / 13))));
+    }
+
   }, []);
 
   useEffect(() => {
     const obs = new ResizeObserver(updateSizes);
     if (containerRef.current) obs.observe(containerRef.current);
+    if (resultsRef.current) obs.observe(resultsRef.current);
+    updateSizes();
     return () => obs.disconnect();
-  }, [updateSizes]);
+  }, [updateSizes, hasResult]);
 
   useEffect(() => {
     const onFullscreen = () => setIsFullscreen(document.fullscreenElement === containerRef.current);
@@ -507,7 +509,12 @@ export function GrilleView() {
 
       {/* ── Results view ─────────────────────────────────────────── */}
       {checkResult ? (
-        <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar space-y-2 py-0.5 w-full">
+        <div className="builder-results flex-1 min-h-0 overflow-y-auto py-0.5 w-full">
+          <div ref={resultsRef} className="builder-comparison grid grid-cols-2 gap-2">
+            <ResultGrid hands={hands} selection={selected} actionButtons={allActionButtons} selectedTab={selectedTab} label="Votre réponse" hoveredHand={hoveredHand} onHoverHand={setHoveredHand} checkResult={checkResult} hoveredState={hoveredState} cellSize={resCellSize} />
+            <ResultGrid hands={hands} selection={null} actionButtons={allActionButtons} selectedTab={selectedTab} label="Correct" hoveredHand={hoveredHand} onHoverHand={setHoveredHand} checkResult={checkResult} hoveredState={hoveredState} cellSize={resCellSize} />
+          </div>
+          <div className="builder-correction space-y-2">
           <div className="text-center">
             <div className="inline-flex flex-col items-center">
               <ScoreCircle score={checkResult.score} />
@@ -517,10 +524,7 @@ export function GrilleView() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <ResultGrid hands={hands} selection={selected} actionButtons={allActionButtons} selectedTab={selectedTab} label="Votre réponse" hoveredHand={hoveredHand} onHoverHand={setHoveredHand} checkResult={checkResult} hoveredState={hoveredState} cellSize={resCellSize} />
-            <ResultGrid hands={hands} selection={null} actionButtons={allActionButtons} selectedTab={selectedTab} label="Correct" hoveredHand={hoveredHand} onHoverHand={setHoveredHand} checkResult={checkResult} hoveredState={hoveredState} cellSize={resCellSize} />
-          </div>
+
 
           <div className="grid grid-cols-4 gap-1.5">
             {[
@@ -564,6 +568,7 @@ export function GrilleView() {
               </button>
             </div>
           )}
+          </div>
         </div>
       ) : (
         /* ── Main editing grid ──────────────────────────────────── */

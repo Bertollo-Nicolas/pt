@@ -749,3 +749,12 @@ button:disabled { cursor: not-allowed; }
   .drill-reference-dialog .math-table-scroll th,.drill-reference-dialog .math-table-scroll td { padding:7px 10px; }
   .drill-reference-dialog .math-memo-body>p { margin:8px 0; }
 }
+.builder-results { display:flex; flex-direction:column; gap:12px; }
+.builder-comparison { min-height:240px; flex-shrink:0; }
+.builder-correction { min-width:0; }
+@media(min-width:1024px) {
+  .builder-results { display:grid; grid-template-columns:minmax(0,1fr) 250px; grid-template-rows:minmax(0,1fr); gap:20px; }
+  .builder-comparison { min-height:0; height:100%; align-items:center; }
+  .builder-correction { display:flex; flex-direction:column; justify-content:center; gap:6px; }
+  .builder-correction > * { margin-top:0 !important; flex-shrink:0; }
+}
