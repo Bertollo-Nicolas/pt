@@ -217,9 +217,7 @@ export function GrilleView() {
   const { selectedTab, selectedTabKey, addSession, srs, setPendingSrsKey, pendingSrsKey, srsReviewKey, finishSrsReview } = store;
   const cfg = getCfg(store);
   const colorOverrides = store.colorOverrides;
-  const roadmapEntry = selectedTabKey ? store.config.roadmapProgress?.[selectedTabKey] : undefined;
-  const isRoadmapGrille = Boolean(roadmapEntry && (roadmapEntry.phase === 'validate' || (roadmapEntry.flashScore ?? 0) >= 80) && roadmapEntry.phase !== 'retention');
-  const [roadmapGrilleSession] = useState(isRoadmapGrille);
+  const roadmapGrilleSession = false;
 
   const [selected,      setSelected]      = useState<Selection>(() => initAllFold());
   const [checkResult,   setCheckResult]   = useState<CheckResult | null>(null);
