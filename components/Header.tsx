@@ -9,7 +9,6 @@ export const MODES: { id: Mode; label: string; icon: IconName }[] = [
   { id: 'flash', label: 'Flashcards', icon: 'flash' },
   { id: 'grille', label: 'Range builder', icon: 'target' },
   { id: 'srs', label: 'Révisions', icon: 'calendar' },
-  { id: 'review', label: 'Revue de mains', icon: 'search' },
 ];
 
 export function Header({ onOpenSidebar, onOpenLibrary, syncState }: { onOpenSidebar: () => void; onOpenLibrary: () => void; syncState: 'loading' | 'saving' | 'synced' | 'offline' }) {

@@ -11,7 +11,6 @@ import { Modal } from './ui/Modal';
 import { FlashView } from './flash/FlashView';
 import { GrilleView } from './grille/GrilleView';
 import { SrsView } from './srs/SrsView';
-import { ReviewView } from './review/ReviewView';
 import { SrsToast } from './ui/SrsToast';
 import { SettingsModal } from './modals/SettingsModal';
 import { getRangeGroups } from '@/lib/range-options';
@@ -31,18 +30,17 @@ export default function RangeTrainer() {
     if (!selectedTab && lastSpot) selectTab(lastSpot.catId, lastSpot.tabId);
   }, [lastSpot, selectedTab, selectTab]);
   useEffect(() => {
-    if (currentMode === 'roadmap' || currentMode === 'drill' || currentMode === 'tracker') useAppStore.getState().setMode('home');
+    if (currentMode === 'roadmap' || currentMode === 'drill' || currentMode === 'tracker' || currentMode === 'review') useAppStore.getState().setMode('home');
   }, [currentMode]);
   const renderMain = () => {
     if (currentMode === 'home') return <Dashboard onLibrary={openLibrary}/>;
     if (currentMode === 'srs') return <SrsView />;
-    if (currentMode === 'review') return <ReviewView />;
     if (!selectedTab) return <ChooseRange onLibrary={openLibrary}/>;
     if (currentMode === 'flash') return <FlashView />;
     if (currentMode === 'grille') return <GrilleView />;
     return <Dashboard onLibrary={openLibrary}/>;
   };
-  return <div className={`app-shell ${currentMode === 'review' ? 'is-review-mode' : ''}`}>
+  return <div className="app-shell">
     <div className="hidden md:block w-[236px] xl:w-[252px] flex-shrink-0 h-full"><Navigation onSettings={openSettings} onLibrary={openLibrary} onLogout={logout}/></div>
     <div className="workspace-main"><Header onOpenSidebar={() => setNavigationOpen(true)} onOpenLibrary={openLibrary} syncState={syncState}/><main id="main-content" className="flex-1 overflow-hidden flex flex-col min-h-0">{renderMain()}</main></div>
     <Modal open={navigationOpen} onClose={closeNavigation} className="navigation-dialog"><Navigation onSettings={openSettings} onLibrary={openLibrary} onClose={closeNavigation} onLogout={logout}/></Modal>
