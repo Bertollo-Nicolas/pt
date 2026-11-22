@@ -155,6 +155,8 @@ export interface SrsEntry {
 
 // ── Settings ──────────────────────────────────────────────
 export interface AppConfig {
+  workspaceNavigation?: {path:string;updatedAt:number};
+  drillWorkspace?: import('./scenario-workspace').DrillWorkspace;
   scenarioDrill?: import('./scenario-drill').ScenarioDrillData;
   cbetDrill?: import('./cbet-drill/types').DrillProgress;
   mathDrill?: import('./math-drill').MathProgress;

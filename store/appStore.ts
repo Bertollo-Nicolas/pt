@@ -37,6 +37,7 @@ interface Ephemeral {
   selectedTab: SelectedTab | null;
   selectedTabKey: string | null;
   currentMode: Mode;
+  workspacePath: string;
   pendingSrsKey: string | null;
   srsReviewKey: string | null;   // which entry is currently being reviewed
   calYear: number;
@@ -183,6 +184,7 @@ export const useAppStore = create<AppStore>()(
       selectedTab: null,
       selectedTabKey: null,
       currentMode: 'home',
+      workspacePath: '/',
       pendingSrsKey: null,
       srsReviewKey: null,
       calYear: new Date().getFullYear(),
@@ -336,7 +338,7 @@ export const useAppStore = create<AppStore>()(
 
       setMode: (mode) => set({ currentMode: mode }),
 
-      saveConfig: (cfg) => set((s) => ({ config: { ...s.config, ...cfg } })),
+      saveConfig: (cfg) => set((s) => ({ config: { ...s.config, ...cfg, ...(cfg.scenarioDrill?{scenarioDrill:{...cfg.scenarioDrill,updatedAt:Date.now()}}:{}) } })),
 
       addSession: (session) =>
         set((s) => {

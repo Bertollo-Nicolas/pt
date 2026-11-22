@@ -12,7 +12,7 @@ export interface TrainingScenario {
   players: number; hero: Position; stack: number; moves: ScenarioMove[]; correct?: Decision; explanation?: string; version?: 2; steps?: ScenarioStep[];
 }
 export interface ScenarioAttempt { id: string; scenarioId: string; hand: string; answer: string; correct: boolean; date: string; step?: number; expected?: string }
-export interface ScenarioDrillData { scenarios: TrainingScenario[]; attempts: ScenarioAttempt[]; total: number; correct: number }
+export interface ScenarioDrillData { scenarios: TrainingScenario[]; attempts: ScenarioAttempt[]; total: number; correct: number; updatedAt?:number }
 export const emptyScenarioData = (): ScenarioDrillData => ({ scenarios: [], attempts: [], total: 0, correct: 0 });
 export const ACTION_LABELS: Record<ScenarioAction, string> = { fold:'Fold', check:'Check', limp:'Limp', call:'Call', raise:'Raise' };
 export const positionsFor = (count: number): Position[] => count === 2 ? ['SB','BB'] : (['UTG','HJ','CO','BTN','SB','BB'] as Position[]).slice(6-count);

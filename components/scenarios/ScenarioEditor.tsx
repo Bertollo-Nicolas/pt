@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAppStore } from '@/store/appStore';
 import { getRangeGroups } from '@/lib/range-options';
 import { buildRangeMap, getRangeActionDefs } from '@/lib/poker';
@@ -14,8 +14,21 @@ export function RangeField({value,onChange,data}:{value:string;onChange:(value:s
 }
 export function ScenarioEditor({initial,data,onClose}:{initial:TrainingScenario;data:RmData|null;onClose:()=>void}){
   const [draft,setDraft]=useState(()=>migrateScenario(initial));
-  const [selected,setSelected]=useState(0),[dirty,setDirty]=useState(false),[confirmClose,setConfirmClose]=useState(false);
-  const patch=(value:Partial<TrainingScenario>)=>{setDirty(true);setDraft(previous=>({...previous,...value}));};
+  const [selected,applySelected]=useState(()=>useAppStore.getState().config.drillWorkspace?.draft?.id===initial.id?useAppStore.getState().config.drillWorkspace?.editorStep??0:0),[dirty,setDirty]=useState(false),[touched,setTouched]=useState(false),[confirmClose,setConfirmClose]=useState(false);
+  const setSelected=(value:number)=>{setTouched(true);applySelected(value);};
+  useEffect(()=>{
+    if(touched)return;
+    setDraft(migrateScenario(initial));
+    const workspace=useAppStore.getState().config.drillWorkspace;
+    if(workspace?.draft?.id===initial.id)applySelected(workspace.editorStep??0);
+  },[initial,touched]);
+  useEffect(()=>{
+    const store=useAppStore.getState(),workspace=store.config.drillWorkspace;
+    if(!touched)return;
+    if(JSON.stringify(workspace?.draft)===JSON.stringify(draft)&&workspace?.editorStep===selected)return;
+    store.saveConfig({drillWorkspace:{...workspace,updatedAt:Date.now(),draft,editorStep:selected}});
+  },[draft,touched,selected]);
+  const patch=(value:Partial<TrainingScenario>)=>{setTouched(true);setDirty(true);setDraft(previous=>({...previous,...value}));};
   const steps=sequenceSteps(draft);
   const index=Math.min(selected,steps.length-1),step=steps[index];
   const prefix=steps.slice(0,Math.max(0,index)).map(moveOf);
@@ -33,7 +46,7 @@ export function ScenarioEditor({initial,data,onClose}:{initial:TrainingScenario;
     const item:ScenarioStep=actor===draft.hero?{actor,action:'check',amount:0,options,correctId:options[0]?.id}:{actor,action:state.currentBet>1?'call':'check',amount:0};
     patch({steps:[...steps,item]});setSelected(steps.length);
   };
-  return <div className="studio-editor"><header className="page-titlebar"><div><span className="overline">DRILLS / ÉDITEUR</span><h1>Construire une séquence</h1></div><div className="title-actions"><Button onClick={close}>Retour</Button><Button variant="primary" disabled={Boolean(error)} onClick={()=>{const store=useAppStore.getState(),saved=store.config.scenarioDrill??emptyScenarioData();store.saveConfig({scenarioDrill:{...saved,scenarios:[...saved.scenarios.filter(item=>item.id!==draft.id),{...draft,name:draft.name.trim()}]}});onClose();}}>Enregistrer</Button></div></header>
+  return <div className="studio-editor"><header className="page-titlebar"><div><span className="overline">DRILLS / ÉDITEUR</span><h1>Construire une séquence</h1></div><div className="title-actions"><Button onClick={close}>Retour</Button><Button variant="primary" disabled={Boolean(error)} onClick={()=>{const store=useAppStore.getState(),saved=store.config.scenarioDrill??emptyScenarioData();store.saveConfig({drillWorkspace:{...store.config.drillWorkspace,updatedAt:Date.now(),draft:null,editorStep:0},scenarioDrill:{...saved,scenarios:[...saved.scenarios.filter(item=>item.id!==draft.id),{...draft,name:draft.name.trim()}]}});onClose();}}>Enregistrer</Button></div></header>
     <div className="studio-editor-layout">
       <aside className="studio-context"><div className="panel-heading"><span className="step-number">01</span><h2>Le contexte</h2></div>
         <label className="studio-field">Nom du scénario<input aria-label="Nom du scénario" maxLength={100} value={draft.name} onChange={event=>patch({name:event.target.value})}/></label>
@@ -53,6 +66,6 @@ export function ScenarioEditor({initial,data,onClose}:{initial:TrainingScenario;
           </div>}
         </article>;})}</div><button className="add-step" disabled={steps.length>=20} onClick={add}>+ Ajouter une étape</button><div className="auto-next-note">Dernière décision → juste / faux → main suivante automatiquement.</div>
       </section>
-    </div><Modal open={confirmClose} onClose={()=>setConfirmClose(false)}><h2 className="text-lg font-bold mb-3">Quitter sans enregistrer ?</h2><p className="text-muted text-sm mb-5">Les modifications de ce scénario seront perdues.</p><div className="flex gap-3"><Button onClick={()=>setConfirmClose(false)}>Continuer l’édition</Button><Button variant="danger" onClick={onClose}>Quitter</Button></div></Modal>
+    </div><Modal open={confirmClose} onClose={()=>setConfirmClose(false)}><h2 className="text-lg font-bold mb-3">Quitter sans enregistrer ?</h2><p className="text-muted text-sm mb-5">Le brouillon est conservé. Tu pourras reprendre les modifications plus tard.</p><div className="flex gap-3"><Button onClick={()=>setConfirmClose(false)}>Continuer l’édition</Button><Button variant="danger" onClick={onClose}>Quitter</Button></div></Modal>
   </div>;
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import './redesign.css';
+import './training.css';
 
 export const metadata: Metadata = {
   title: 'Range — Entraînement poker',

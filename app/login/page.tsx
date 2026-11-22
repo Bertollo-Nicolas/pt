@@ -2,6 +2,7 @@
 export const dynamic = 'force-dynamic';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { parseWorkspacePath } from '@/lib/workspace-navigation';
 
 export default function LoginPage() {
   const router   = useRouter();
@@ -21,7 +22,8 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) { setError(error.message); setLoading(false); return; }
-    router.push('/');
+    const destination=parseWorkspacePath(new URLSearchParams(window.location.search).get('next')??'/');
+    router.push(destination?.path??'/');
     router.refresh();
   };
 

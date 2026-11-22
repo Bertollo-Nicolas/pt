@@ -1,0 +1,64 @@
+/* Focused training: one thin control rail, then only tables and decisions. */
+.is-focused-training .app-topbar,.is-focused-training .active-range-bar { display:none; }
+.drill-studio.is-live { display:grid; grid-template-columns:48px minmax(0,1fr); grid-template-rows:minmax(0,1fr); padding:0; gap:0; max-width:none; overflow:hidden; position:relative; background:#111214; }
+.drill-studio.is-live > .page-titlebar,.drill-studio.is-live > .live-session-toolbar { display:none; }
+.trainer-rail { grid-column:1; grid-row:1; display:flex; flex-direction:column; align-items:center; gap:7px; padding:12px 4px; border-right:1px solid #2e3035; background:#1b1c20; min-height:0; }
+.trainer-rail > button { display:grid; place-items:center; width:36px; height:36px; color:#a2a7b0; background:#27292f; border:1px solid #30333b; border-radius:5px; font-size:17px; }
+.trainer-rail > button:hover { background:#3a3e48; color:#f1f3f9; }
+.trainer-rail-stats { margin-top:auto; border-top:1px solid #3a3d45; padding-top:12px; text-align:center; width:100%; display:flex; flex-direction:column; gap:2px; }
+.trainer-rail-stats strong { font-size:14px; color:#d7dce8; }.trainer-rail-stats span { font-size:9px; color:#878d9c; }.trainer-rail-stats small { font-size:8px; color:#8492ac; margin-top:8px; }
+.trainer-pause { position:absolute; z-index:20; top:12px; left:calc(50% + 24px); transform:translateX(-50%); display:flex; align-items:center; gap:10px; background:#23262df2; border:1px solid #4a5261; border-radius:7px; padding:5px 5px 5px 12px; box-shadow:0 4px 18px #0005; }
+.trainer-pause > span { font-size:11px; color:#bac7df; }.trainer-pause button { min-height:29px; padding:4px 12px; font-size:11px; }
+.drill-studio.is-live > p[role=alert] { position:absolute; bottom:12px; left:60px; z-index:20; background:#382e27; padding:9px; border-radius:5px; }
+.drill-studio.is-live .live-tables { grid-column:2; grid-row:1; gap:0; min-height:0; height:100%; align-items:stretch; }
+.drill-studio.is-live .live-table { height:100%; max-height:none; min-height:0; background:transparent; border:0; border-right:1px solid #27292e; border-bottom:1px solid #27292e; border-radius:0; padding:12px 24px 14px; }
+.drill-studio.is-live .live-table-heading { display:none; }
+.drill-studio.is-live .live-history { margin:0; min-height:23px; max-height:23px; overflow:hidden; flex-wrap:nowrap; gap:4px; white-space:nowrap; }
+.drill-studio.is-live .live-history > span { border:0; border-radius:3px; background:#222429; color:#8b909a; padding:3px 5px; font-size:9px; }
+.drill-studio.is-live .live-history b { color:#d2d5dd; font-weight:500; }
+.drill-studio.is-live .live-table .live-decision { width:min(80%,760px); margin:0 auto; min-height:67px; gap:5px; flex-shrink:0; }
+.drill-studio.is-live .decision-caption { min-height:10px; justify-content:end; }
+.drill-studio.is-live .decision-caption > span { display:none; }
+.drill-studio.is-live .decision-caption b { color:#747c8d; font-size:9px; }
+.drill-studio.is-live .live-answer-buttons { flex-wrap:nowrap; gap:5px; }
+.drill-studio.is-live .live-answer-buttons button { min-height:42px; border:0; border-radius:4px; padding:7px; background:#454951; color:#f4f5f8; gap:2px; }
+.drill-studio.is-live .live-answer-buttons button[data-action=limp],.drill-studio.is-live .live-answer-buttons button[data-action=call],.drill-studio.is-live .live-answer-buttons button[data-action=check] { background:#4b9954; }
+.drill-studio.is-live .live-answer-buttons button[data-action=raise] { background:#a334b3; }
+.drill-studio.is-live .live-answer-buttons button:hover { filter:brightness(1.18); color:white; }
+.drill-studio.is-live .live-answer-buttons button:disabled { opacity:.4; filter:none; }
+.drill-studio.is-live .live-answer-buttons strong { font-size:12px; font-weight:600; }.drill-studio.is-live .live-answer-buttons small { font-size:9px; color:#fff; opacity:.75; }
+.drill-studio.is-live .live-feedback { min-height:55px; padding:6px; gap:3px 9px; align-content:center; }
+.drill-studio.is-live .live-feedback > strong,.drill-studio.is-live .live-feedback > span { font-size:12px; }
+.drill-studio.is-live .live-opponent-turn { min-height:55px; font-size:11px; color:#737e93; }
+/* Low-profile horizontal capsule; player badges and cards share one baseline. */
+.poker-stage.is-trainer { --seat-size:48px; --card-width:34px; --card-height:46px; }
+.poker-stage.is-trainer .poker-rail { background:transparent; border:2px solid #4b4c50; box-shadow:none; }
+.poker-stage.is-trainer .poker-rail:after { display:none; }
+.poker-stage.is-trainer .poker-seat { display:flex; flex-direction:row; align-items:center; gap:5px; width:auto; transform:translate(calc(var(--seat-size) / -2),-50%); }
+.poker-stage.is-trainer .poker-player { order:-1; flex-shrink:0; border-radius:50%; width:var(--seat-size); height:var(--seat-size); padding:0; border:2px solid #776d56; background:#151619; box-shadow:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; }
+.poker-stage.is-trainer .poker-player > span { font-size:10px; line-height:12px; letter-spacing:0; color:#d0d3db; }
+.poker-stage.is-trainer .poker-player > strong { font-size:13px; line-height:15px; color:#e9edf6; }
+.poker-stage.is-trainer .poker-player > strong small { display:none; }
+.poker-stage.is-trainer .poker-seat.is-hero .poker-player { background:#151619; border-color:#1eb5a0; }
+.poker-stage.is-trainer .poker-seat.is-active:not(.is-hero) .poker-player { border-color:#e9a126; }
+.poker-stage.is-trainer .poker-seat.is-active.is-hero .poker-player { border-color:#21d4ba; }
+.poker-stage.is-trainer .poker-seat.is-correct .poker-player { border-color:#8be0b1; }
+.poker-stage.is-trainer .poker-seat.is-wrong .poker-player { border-color:#ee617d; }
+.poker-stage.is-trainer .poker-cards { display:flex; align-items:center; gap:3px; height:auto; }
+.poker-stage.is-trainer .poker-card { width:var(--card-width); height:var(--card-height); padding:4px; border-radius:4px; flex-direction:column; }
+.poker-stage.is-trainer .poker-card b { font-size:22px; letter-spacing:-1px; }.poker-stage.is-trainer .poker-card span { font-size:17px; }
+.poker-stage.is-trainer .poker-card.card-back { width:19px; height:31px; border:1px solid #34363c; background:repeating-linear-gradient(45deg,#292b30,#292b30 4px,#33363e 4px,#33363e 5px); }
+.poker-stage.is-trainer .poker-pot { gap:3px; }
+.poker-stage.is-trainer .poker-pot > span { font-size:10px; color:#6e7789; letter-spacing:0; }
+.poker-stage.is-trainer .poker-pot > strong { font-size:20px; line-height:1.2; font-weight:600; letter-spacing:0; }.poker-stage.is-trainer .poker-pot > strong small { font-size:12px; }
+.poker-stage.is-trainer .poker-pot > small { display:none; }
+.poker-stage.is-trainer .poker-center-chips { padding:0; }.poker-stage.is-trainer .poker-center-chips i { width:11px; height:7px; border:1px solid #2e83bd; background:#18567d; box-shadow:0 2px 0 #123d59; }.poker-stage.is-trainer .poker-center-chips i+i { display:none; }
+.poker-stage.is-trainer .poker-wager { font-size:9px; color:#999da8; }.poker-stage.is-trainer .poker-wager i { width:10px; height:6px; border:1px solid #2e83bd; background:#18567d; box-shadow:0 2px 0 #123d59; }
+.poker-stage.is-trainer.is-mini { --seat-size:32px; --card-width:23px; --card-height:31px; }
+.poker-stage.is-trainer.is-mini .poker-player > span { font-size:7px; line-height:9px; }.poker-stage.is-trainer.is-mini .poker-player > strong { font-size:9px; line-height:11px; }
+.poker-stage.is-trainer.is-mini .poker-card b { font-size:15px; }.poker-stage.is-trainer.is-mini .poker-card span { font-size:11px; }.poker-stage.is-trainer.is-mini .poker-card.card-back { width:12px; height:23px; }
+.poker-stage.is-trainer.is-mini .poker-pot > span { font-size:7px; }.poker-stage.is-trainer.is-mini .poker-pot > strong { font-size:14px; }.poker-stage.is-trainer.is-mini .poker-pot > strong small { font-size:8px; }
+.workspace-resume { display:flex; justify-content:space-between; align-items:center; gap:14px; padding:10px 14px; background:#202635; border:1px solid #414d66; border-radius:7px; font-size:12px; color:#bccbe7; flex-shrink:0; }.workspace-resume button { font-size:11px; min-height:32px; padding:4px 12px; }
+@media(min-width:1600px) { .poker-stage.is-trainer { --seat-size:54px; --card-width:39px; --card-height:53px; }.poker-stage.is-trainer .poker-player > span { font-size:11px; }.poker-stage.is-trainer .poker-player > strong { font-size:15px; line-height:17px; }.poker-stage.is-trainer .poker-card b { font-size:25px; }.poker-stage.is-trainer .poker-card span { font-size:19px; } }
+@media(min-width:768px) and (max-height:760px) { .drill-studio.is-live .live-table { padding:8px 14px; }.drill-studio.is-live .live-table .live-decision { min-height:51px; width:85%; gap:3px; }.drill-studio.is-live .live-answer-buttons button { min-height:32px; padding:4px; }.drill-studio.is-live .live-answer-buttons strong { font-size:10px; }.drill-studio.is-live .live-history { min-height:19px; max-height:19px; }.drill-studio.is-live .live-history > span { font-size:8px; } }
+@media(max-width:767px) { .drill-studio.is-live { grid-template-columns:38px minmax(0,1fr); }.trainer-rail { padding:7px 3px; }.trainer-rail > button { width:29px; height:31px; font-size:14px; }.trainer-rail-stats small { font-size:7px; }.drill-studio.is-live .live-tables { display:flex; flex-direction:column; overflow:auto; height:100%; }.drill-studio.is-live .live-table { min-height:340px; height:340px; flex-shrink:0; padding:9px 10px; }.drill-studio.is-live .live-table .live-decision { width:100%; min-height:55px; }.drill-studio.is-live .live-answer-buttons button { min-height:36px; }.drill-studio.is-live .live-answer-buttons strong { font-size:11px; }.trainer-pause { left:calc(50% + 19px); }.workspace-resume { flex-wrap:wrap; font-size:11px; } }

@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAppStore } from '@/store/appStore';
 import { useSync } from '@/hooks/useSync';
+import { useWorkspaceNavigation } from '@/hooks/useWorkspaceNavigation';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { Navigation } from './Navigation';
@@ -15,9 +16,11 @@ import { SrsToast } from './ui/SrsToast';
 import { SettingsModal } from './modals/SettingsModal';
 import { getRangeGroups } from '@/lib/range-options';
 import { ScenarioDrillView } from './scenarios/ScenarioDrillView';
+import { parseWorkspacePath } from '@/lib/workspace-navigation';
 
 export default function RangeTrainer() {
-  const { rehydrateRmData, selectedTab, currentMode, lastSpot, selectTab } = useAppStore();
+  useWorkspaceNavigation();
+  const { rehydrateRmData, selectedTab, currentMode, lastSpot, selectTab, rmData,workspacePath,config } = useAppStore();
   const { logout, syncState } = useSync();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [navigationOpen, setNavigationOpen] = useState(false);
@@ -29,7 +32,7 @@ export default function RangeTrainer() {
   useEffect(() => { rehydrateRmData(); }, [rehydrateRmData]);
   useEffect(() => {
     if (!selectedTab && lastSpot) selectTab(lastSpot.catId, lastSpot.tabId);
-  }, [lastSpot, selectedTab, selectTab]);
+  }, [lastSpot, selectedTab, selectTab, rmData]);
   useEffect(() => {
     if (currentMode === 'roadmap' || currentMode === 'tracker' || currentMode === 'review') useAppStore.getState().setMode('home');
   }, [currentMode]);
@@ -42,7 +45,8 @@ export default function RangeTrainer() {
     if (currentMode === 'grille') return <GrilleView />;
     return <Dashboard onLibrary={openLibrary}/>;
   };
-  return <div className="app-shell">
+  const focus=currentMode==='drill'&&Boolean(parseWorkspacePath(workspacePath)?.sessionId)&&!config.drillWorkspace?.checkpoint?.session.done;
+  return <div className={`app-shell ${focus?'is-focused-training':''}`}>
     <div className="workspace-main"><Header onOpenSidebar={() => setNavigationOpen(true)} onOpenLibrary={openLibrary} onSettings={openSettings} onLogout={logout} syncState={syncState}/><main id="main-content" className="flex-1 overflow-hidden flex flex-col min-h-0">{renderMain()}</main></div>
     <Modal open={navigationOpen} onClose={closeNavigation} className="navigation-dialog"><Navigation onSettings={openSettings} onLibrary={openLibrary} onClose={closeNavigation} onLogout={logout}/></Modal>
     <Modal open={libraryOpen} onClose={closeLibrary} className="library-dialog"><Sidebar onOpenSettings={openSettings} onClose={closeLibrary}/></Modal>

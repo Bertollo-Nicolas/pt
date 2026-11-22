@@ -26,7 +26,7 @@ L’entrée **Drills** ouvre le nouveau système de scénarios. Les anciens modu
 
 ## Sauvegarde
 
-`AppConfig.scenarioDrill` contient les scénarios, les compteurs cumulés et les 200 dernières décisions. Sauvegarde locale via le store existant et synchronisation du compte via `/api/sync` (config JSON existante, aucune migration SQL). La remise à zéro des préférences conserve ces données. La session en cours est temporaire ; chaque réponse validée est enregistrée immédiatement.
+`AppConfig.scenarioDrill` contient les scénarios, les compteurs cumulés et les 200 dernières décisions. Sauvegarde locale via le store existant et synchronisation du compte via `/api/sync` (config JSON existante, aucune migration SQL). La remise à zéro des préférences conserve ces données. La session, la préparation et le brouillon sont désormais conservés dans `config.drillWorkspace` ; chaque réponse et son checkpoint sont enregistrés ensemble. Voir [la mémoire du workspace](workspace-memory.md).
 
 Les scénarios v2 utilisent `steps`, avec `options` et `correctId` sur chaque étape Hero. Les anciens scénarios `moves` + `correct` sont convertis à la lecture : les actions Hero déjà scriptées deviennent des questions, les actions adverses restent automatiques, et la décision finale est ajoutée à la séquence. La conversion est enregistrée lors de l’édition ; les ranges et anciennes statistiques sont conservées.
 

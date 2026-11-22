@@ -32,9 +32,10 @@ export async function saveUserData(
   userId: string,
   payload: Partial<UserDataRow>,
 ): Promise<void> {
-  await supabase
+  const {error}=await supabase
     .from('user_data')
     .upsert({ user_id: userId, ...payload }, { onConflict: 'user_id' });
+  if(error)throw error;
 }
 
 // ── rm_files ──────────────────────────────────────────────────
