@@ -9,7 +9,7 @@ import { hexRgba, todayStr } from '@/lib/utils';
 import { scoreGrille, type GrilleCheckResult, type GrilleCheckState } from '@/lib/grille-score';
 import type { HandItem, SelectedTab } from '@/lib/types';
 
-const FOLD_COLOR = '#626b7c';
+const FOLD_COLOR = '#447fb7';
 
 type CellFreqs = Record<string, number>;
 type Selection = Record<string, CellFreqs>;
@@ -74,14 +74,14 @@ function buildGradient(freqs: CellFreqs, buttons: [string, string][]): React.CSS
   if (entries.length === 0) return {};
   const total = entries.reduce((a, e) => a + e.v, 0);
   if (entries.length === 1) {
-    return { background: hexRgba(entries[0].c, 0.5), borderColor: entries[0].c, color: entries[0].c };
+    return { background: hexRgba(entries[0].c, 0.78), borderColor: '#151518', color: '#f7f7fa' };
   }
   let pos = 0;
   const stops: string[] = [];
   for (const { c, v } of entries) {
     const pct = (v / total) * 100;
-    stops.push(`${hexRgba(c, 0.5)} ${pos.toFixed(1)}%`);
-    stops.push(`${hexRgba(c, 0.5)} ${(pos + pct).toFixed(1)}%`);
+    stops.push(`${hexRgba(c, 0.78)} ${pos.toFixed(1)}%`);
+    stops.push(`${hexRgba(c, 0.78)} ${(pos + pct).toFixed(1)}%`);
     pos += pct;
   }
   const dominant = entries.reduce((a, b) => b.v > a.v ? b : a);
@@ -398,7 +398,7 @@ export function GrilleView() {
   const isSrsReview = srsReviewKey === selectedTabKey;
 
   return (
-    <div ref={containerRef} className="exercise-workspace flex-1 flex flex-col overflow-hidden min-h-0 px-3 md:px-6 pb-4">
+    <div ref={containerRef} className={clsx("exercise-workspace builder-workspace flex-1 flex flex-col overflow-hidden min-h-0 px-3 md:px-6 pb-4",(isSrsReview||roadmapGrilleSession)&&"is-review")}>
       <ExerciseHeading mode="grille"/>
 
       {/* SRS banner */}
@@ -415,7 +415,7 @@ export function GrilleView() {
 
       {/* ── Editing UI ──────────────────────────────────────────── */}
       {!checkResult && (
-        <div className="flex-shrink-0">
+        <div className="builder-controls flex-shrink-0">
 
           {/* Range info */}
           {selectedTab && (
@@ -430,7 +430,7 @@ export function GrilleView() {
 
           {/* Action cards — always fully expanded, no selection */}
           {selectedTab && !revealed && (
-            <div className="flex gap-1.5 mb-2 overflow-x-auto no-scrollbar pb-0.5">
+            <div className="builder-action-palette flex gap-1.5 mb-2 overflow-x-auto no-scrollbar pb-0.5">
               {allActionButtons.map(([name, color]) => {
                 const freq = freqPerAction[name] ?? 0;
                 const distPct = Math.round((actionDist[name] ?? 0) / 169 * 100);
@@ -570,7 +570,7 @@ export function GrilleView() {
         </div>
       ) : (
         /* ── Main editing grid ──────────────────────────────────── */
-        <div ref={midRef} className="flex-1 min-h-0 flex items-center justify-center overflow-hidden">
+        <div ref={midRef} className="builder-matrix flex-1 min-h-0 flex items-center justify-center overflow-hidden">
           <div style={{
             display: 'grid',
             gridTemplateColumns: `repeat(13, ${cellSize}px)`,

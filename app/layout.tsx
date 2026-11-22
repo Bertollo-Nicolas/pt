@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import './redesign.css';
 import './training.css';
+import './workspace.css';
 
 export const metadata: Metadata = {
   title: 'Range — Entraînement poker',

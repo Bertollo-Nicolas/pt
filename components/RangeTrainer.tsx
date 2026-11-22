@@ -4,7 +4,7 @@ import { useAppStore } from '@/store/appStore';
 import { useSync } from '@/hooks/useSync';
 import { useWorkspaceNavigation } from '@/hooks/useWorkspaceNavigation';
 import { Sidebar } from './Sidebar';
-import { Header } from './Header';
+import { Header, WorkspaceRail } from './Header';
 import { Navigation } from './Navigation';
 import { Dashboard } from './Dashboard';
 import { Icon } from './ui/Icon';
@@ -47,7 +47,7 @@ export default function RangeTrainer() {
   };
   const focus=currentMode==='drill'&&Boolean(parseWorkspacePath(workspacePath)?.sessionId)&&!config.drillWorkspace?.checkpoint?.session.done;
   return <div className={`app-shell ${focus?'is-focused-training':''}`}>
-    <div className="workspace-main"><Header onOpenSidebar={() => setNavigationOpen(true)} onOpenLibrary={openLibrary} onSettings={openSettings} onLogout={logout} syncState={syncState}/><main id="main-content" className="flex-1 overflow-hidden flex flex-col min-h-0">{renderMain()}</main></div>
+    <div className="workspace-main"><Header onOpenSidebar={() => setNavigationOpen(true)} onOpenLibrary={openLibrary} onSettings={openSettings} onLogout={logout} syncState={syncState}/><div className="workspace-body"><WorkspaceRail/><main id="main-content" className="flex-1 overflow-hidden flex flex-col min-h-0">{renderMain()}</main></div></div>
     <Modal open={navigationOpen} onClose={closeNavigation} className="navigation-dialog"><Navigation onSettings={openSettings} onLibrary={openLibrary} onClose={closeNavigation} onLogout={logout}/></Modal>
     <Modal open={libraryOpen} onClose={closeLibrary} className="library-dialog"><Sidebar onOpenSettings={openSettings} onClose={closeLibrary}/></Modal>
     <SrsToast/><SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)}/>
