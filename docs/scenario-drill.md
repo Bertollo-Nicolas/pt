@@ -36,3 +36,13 @@ Les scénarios v2 utilisent `steps`, avec `options` et `correctId` sur chaque é
 - Vérification navigateur sur une route temporaire isolée, sans synchronisation ni données utilisateur : première décision avant le limp, erreur initiale puis suite corrigée, réponse finale et main suivante automatiques, pause, trois tables simultanées, bilan, sauvegarde et modification du bon bouton dans la séquence.
 - Nouvelle navigation et pages Accueil/Builder/Flashcards/Révisions vérifiées sur desktop et mobile, avec bibliothèque, paramètres et navigation mobile accessibles.
 - Éditeur desktop vérifié sans scroll de page à 1024×768, 1280×640 et 1440×900 (la liste des étapes défile si nécessaire). Entraînement trois tables vérifié sans scroll à 1024×768, 1280×640, 1366×768, 1440×900 et 1920×1080 ; mobile 390×844 sans débordement horizontal. Ratio des tables mesuré à 2,2:1 sur tous ces formats.
+
+## Timer et sons
+
+Le timer est optionnel (0 = sans limite, jusqu’à 3600 secondes) et recommence à chaque décision de Hero. La pause suspend le chrono. Le checkpoint conserve le temps restant et les alertes déjà jouées ; une session restaurée attend une reprise explicite.
+
+À 10 secondes : fond orange pendant une seconde et son 1 deux fois. À 5 secondes : fond rouge pendant une seconde et son 2 une fois. Le son 0 accompagne limp, call et raise de Hero ou des adversaires. Les sons simultanés des tables sont regroupés, et un bouton permet de les couper. Les fichiers originaux sont servis depuis public/audio.
+
+À zéro, la décision est enregistrée comme manquée (sans inventer de fold), puis le drill poursuit la ligne de référence. Une réponse au même instant ne peut pas compter deux fois. Les anciens checkpoints restent compatibles, sans timer.
+
+Validation : npm run test:timer, test:scenarios et test:workspace.

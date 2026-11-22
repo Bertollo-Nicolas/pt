@@ -11,7 +11,7 @@ export interface TrainingScenario {
   id: string; name: string; catId: string; tabId: string; sourceAction: string;
   players: number; hero: Position; stack: number; moves: ScenarioMove[]; correct?: Decision; explanation?: string; version?: 2; steps?: ScenarioStep[];
 }
-export interface ScenarioAttempt { id: string; scenarioId: string; hand: string; answer: string; correct: boolean; date: string; step?: number; expected?: string }
+export interface ScenarioAttempt { id: string; scenarioId: string; hand: string; answer: string; correct: boolean; date: string; step?: number; expected?: string;timedOut?:boolean }
 export interface ScenarioDrillData { scenarios: TrainingScenario[]; attempts: ScenarioAttempt[]; total: number; correct: number; updatedAt?:number }
 export const emptyScenarioData = (): ScenarioDrillData => ({ scenarios: [], attempts: [], total: 0, correct: 0 });
 export const ACTION_LABELS: Record<ScenarioAction, string> = { fold:'Fold', check:'Check', limp:'Limp', call:'Call', raise:'Raise' };
@@ -196,4 +196,11 @@ export function recordStepAttempt(data: ScenarioDrillData, scenario: TrainingSce
   const correct=optionId===step.correctId;
   const expected=step.options!.find(item=>item.id===step.correctId)!.label;
   return {...data,total:data.total+1,correct:data.correct+Number(correct),attempts:[...data.attempts,{id,scenarioId:scenario.id,hand,step:stepIndex,answer:option.label,correct,date:new Date().toISOString(),expected}].slice(-200)};
+}
+
+export function recordStepTimeout(data:ScenarioDrillData,scenario:TrainingScenario,hand:string,stepIndex:number,ranges:RmData|null,id:string){
+  if(data.attempts.some(attempt=>attempt.id===id))return data;
+  const step=sequenceSteps(scenario)[stepIndex],expected=step?.options?.find(option=>option.id===step.correctId);
+  if(!expected||step.actor!==scenario.hero||validateScenario(scenario,ranges)||!sourceHands(ranges,scenario).includes(hand))throw new Error('Invalid timeout');
+  return {...data,total:data.total+1,attempts:[...data.attempts,{id,scenarioId:scenario.id,hand,step:stepIndex,answer:'Temps écoulé',correct:false,expected:expected.label,timedOut:true,date:new Date().toISOString()}].slice(-200)};
 }

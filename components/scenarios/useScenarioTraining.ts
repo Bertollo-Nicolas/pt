@@ -2,14 +2,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAppStore } from '@/store/appStore';
 import type { RmData } from '@/lib/types';
-import { drawScenarioHand, handCards, emptyScenarioData, migrateScenario, recordStepAttempt, sequenceSteps, validateScenario, type TrainingScenario, type ScenarioDrillData } from '@/lib/scenario-drill';
+import { drawScenarioHand, handCards, emptyScenarioData, migrateScenario, moveOf, recordStepAttempt, recordStepTimeout, sequenceSteps, validateScenario, type TrainingScenario, type ScenarioDrillData } from '@/lib/scenario-drill';
 import { validCheckpoint, type LiveSession, type LiveTable } from '@/lib/scenario-workspace';
+import { advanceDecisionClock,createDecisionClock,validDecisionSeconds,type DecisionClock,type ClockAlert } from '@/lib/drill-clock';
+import { drillAudio } from '@/lib/drill-audio';
 export type {LiveSession,LiveTable} from '@/lib/scenario-workspace';
-function deal(scenarios:TrainingScenario[],data:RmData|null,previous?:LiveTable):LiveTable{
+interface ClockAnchor {clock:DecisionClock;at:number;persistedAt:number;flash?:{kind:ClockAlert;until:number}}
+export interface ClockView {key:string;remainingMs:number;flash:ClockAlert|null}
+function deal(scenarios:TrainingScenario[],data:RmData|null,previous?:LiveTable,decisionSeconds=0):LiveTable{
   const candidates=scenarios.length>1?scenarios.filter(item=>item.id!==previous?.scenario.id):scenarios;
   const scenario=candidates[Math.floor(Math.random()*candidates.length)],hand=drawScenarioHand(data,scenario,previous?.hand);
   if(!hand)throw new Error('Source unavailable');
-  return {id:crypto.randomUUID(),scenario,hand,cards:handCards(hand),cursor:0,phase:sequenceSteps(scenario)[0].actor===scenario.hero?'question':'acting',chosen:null,correct:null};
+  const phase=sequenceSteps(scenario)[0].actor===scenario.hero?'question':'acting';
+  return {id:crypto.randomUUID(),scenario,hand,cards:handCards(hand),cursor:0,phase,clock:phase==='question'?createDecisionClock(decisionSeconds):undefined,chosen:null,correct:null};
 }
 export function useScenarioTraining(data:RmData|null){
   const checkpoint=useAppStore(state=>state.config.drillWorkspace?.checkpoint);
@@ -17,6 +22,8 @@ export function useScenarioTraining(data:RmData|null){
   const [session,setSession]=useState<LiveSession|null>(initial),[paused,setPausedState]=useState(Boolean(initial)),[notice,setNotice]=useState('');
   const live=useRef(session),pause=useRef(paused),interacted=useRef(false);live.current=session;pause.current=paused;
   const timers=useRef(new Map<string,ReturnType<typeof setTimeout>>());
+  const anchors=useRef(new Map<string,ClockAnchor>());
+  const [clocks,setClocks]=useState<Record<string,ClockView>>({});
   const dataRef=useRef(data);dataRef.current=data;
   const publish=useCallback((next:LiveSession|null,nextPaused=pause.current,stats?:ScenarioDrillData)=>{
     live.current=next;pause.current=nextPaused;setSession(next);setPausedState(nextPaused);
@@ -27,25 +34,58 @@ export function useScenarioTraining(data:RmData|null){
     if(interacted.current||!validCheckpoint(checkpoint))return;
     live.current=checkpoint.session;pause.current=true;setSession(checkpoint.session);setPausedState(true);
   },[checkpoint]);
-  const start=(scenarios:TrainingScenario[],length:number,count:number)=>{
+  const start=(scenarios:TrainingScenario[],length:number,count:number,decisionSeconds=0,soundEnabled=true)=>{
     const available=scenarios.map(migrateScenario).filter(item=>!validateScenario(item,data));
-    if(!available.length||!Number.isSafeInteger(length)||length<1||count<1||count>6)return null;
+    if(!available.length||!Number.isSafeInteger(length)||length<1||count<1||count>6||!validDecisionSeconds(decisionSeconds))return null;
     interacted.current=true;setNotice('');const slots=Math.min(length,count);
-    const next:LiveSession={id:crypto.randomUUID(),scenarios:structuredClone(available),length,allocated:slots,completed:0,tables:Array.from({length:slots},()=>deal(available,data)),attempts:[],done:false};
+    anchors.current.clear();setClocks({});drillAudio.stop();void drillAudio.prime(soundEnabled);
+    const next:LiveSession={id:crypto.randomUUID(),scenarios:structuredClone(available),length,allocated:slots,completed:0,tables:Array.from({length:slots},()=>deal(available,data,undefined,decisionSeconds)),attempts:[],done:false,decisionSeconds,soundEnabled};
     publish(next,false);return next.id;
   };
-  const answer=(table:LiveTable,optionId:string)=>{
+  const submit=(table:LiveTable,optionId:string|null)=>{
     const current=live.current,actual=current?.tables.find(item=>item.id===table.id);
     if(!current||!actual||actual.phase!=='question'||actual.cursor!==table.cursor||pause.current)return;
-    const step=sequenceSteps(actual.scenario)[actual.cursor],option=step.options?.find(item=>item.id===optionId);if(!option)return;
+    const key=actual.id+':'+actual.cursor,anchor=anchors.current.get(key);
+    const remaining=anchor?Math.max(0,anchor.clock.remainingMs-(performance.now()-anchor.at)):actual.clock?.remainingMs;
+    const timedOut=optionId===null||remaining===0;
+    const step=sequenceSteps(actual.scenario)[actual.cursor],option=step.options?.find(item=>item.id===optionId);if(!option&&!timedOut)return;
     try{
-      const key=actual.id+':'+actual.cursor,store=useAppStore.getState();
-      const stats=recordStepAttempt(store.config.scenarioDrill??emptyScenarioData(),actual.scenario,actual.hand,actual.cursor,optionId,data,key);
-      const correct=optionId===step.correctId,expected=step.options!.find(item=>item.id===step.correctId)!.label;
+      const store=useAppStore.getState();
+      const stats=timedOut?recordStepTimeout(store.config.scenarioDrill??emptyScenarioData(),actual.scenario,actual.hand,actual.cursor,data,key):recordStepAttempt(store.config.scenarioDrill??emptyScenarioData(),actual.scenario,actual.hand,actual.cursor,optionId!,data,key);
+      const correct=!timedOut&&optionId===step.correctId,expected=step.options!.find(item=>item.id===step.correctId)!.label;
       interacted.current=true;
-      publish({...current,tables:current.tables.map(item=>item.id===actual.id?{...item,phase:'feedback',chosen:optionId,correct}:item),attempts:[...current.attempts,{name:actual.scenario.name,hand:actual.hand,step:actual.cursor,given:option.label,expected,correct}]},false,stats);
+      anchors.current.delete(key);
+      if(['limp','call','raise'].includes(moveOf(step).action))void drillAudio.play('chips');
+      publish({...current,tables:current.tables.map(item=>item.id===actual.id?{...item,phase:'feedback',clock:undefined,chosen:timedOut?'__timeout__':optionId,correct}:item),attempts:[...current.attempts,{name:actual.scenario.name,hand:actual.hand,step:actual.cursor,given:timedOut?'Temps écoulé':option!.label,expected,correct,...(timedOut?{timedOut:true}:{})}]},false,stats);
     }catch{setNotice('La range source a change. Verifie tes scenarios.');publish(current,true);}
   };
+  const submitRef=useRef(submit);submitRef.current=submit;
+  const answer=(table:LiveTable,optionId:string)=>submit(table,optionId);
+  useEffect(()=>{
+    if(!live.current||live.current.done||paused||!live.current.decisionSeconds)return;
+    const tick=()=>{
+      const current=live.current;if(!current||current.done||pause.current)return;
+      const now=performance.now(),wanted=new Set<string>(),views:Record<string,ClockView>={},expired:LiveTable[]=[];
+      let persist=false;
+      const tables=current.tables.map(table=>{
+        if(table.phase!=='question')return table;
+        const key=table.id+':'+table.cursor;wanted.add(key);
+        let anchor=anchors.current.get(key);
+        if(!anchor){const clock=table.clock??createDecisionClock(current.decisionSeconds??0);if(!clock)return table;anchor={clock,at:now,persistedAt:now};anchors.current.set(key,anchor);}
+        const next=advanceDecisionClock(anchor.clock,now-anchor.at);anchor.clock=next.clock;anchor.at=now;
+        if(next.alert){anchor.flash={kind:next.alert,until:now+1000};void drillAudio.play(next.alert);persist=true;}
+        if(now-anchor.persistedAt>=1000){anchor.persistedAt=now;persist=true;}
+        views[table.id]={key,remainingMs:next.clock.remainingMs,flash:anchor.flash&&anchor.flash.until>now?anchor.flash.kind:null};
+        if(next.expired)expired.push(table);
+        return {...table,clock:{...next.clock}};
+      });
+      for(const key of anchors.current.keys())if(!wanted.has(key))anchors.current.delete(key);
+      setClocks(views);
+      if(persist||expired.length)publish({...current,tables});
+      for(const table of expired)submitRef.current(table,null);
+    };
+    tick();const interval=setInterval(tick,100);return()=>clearInterval(interval);
+  },[session?.id,session?.done,session?.decisionSeconds,paused,publish]);
   useEffect(()=>{
     const wanted=new Set<string>();
     if(session&&!session.done&&!paused)for(const table of session.tables){
@@ -54,17 +94,26 @@ export function useScenarioTraining(data:RmData|null){
         timers.current.delete(key);const previous=live.current,current=previous?.tables.find(item=>item.id===table.id);
         if(!previous||previous.done||!current||current.cursor!==table.cursor||current.phase!==table.phase||pause.current)return;
         interacted.current=true;const steps=sequenceSteps(current.scenario),index=current.cursor+1;
-        if(index<steps.length){publish({...previous,tables:previous.tables.map(item=>item.id===table.id?{...item,cursor:index,phase:steps[index].actor===current.scenario.hero?'question':'acting',chosen:null,correct:null}:item)});return;}
+        if(current.phase==='acting'&&['limp','call','raise'].includes(moveOf(steps[current.cursor]).action))void drillAudio.play('chips');
+        if(index<steps.length){const phase=steps[index].actor===current.scenario.hero?'question':'acting';publish({...previous,tables:previous.tables.map(item=>item.id===table.id?{...item,cursor:index,phase,clock:phase==='question'?createDecisionClock(previous.decisionSeconds??0):undefined,chosen:null,correct:null}:item)});return;}
         const remaining=previous.tables.filter(item=>item.id!==table.id);
-        if(previous.allocated<previous.length){const eligible=previous.scenarios.filter(item=>!validateScenario(item,dataRef.current));if(eligible.length){const replacement=deal(eligible,dataRef.current,current);publish({...previous,completed:previous.completed+1,allocated:previous.allocated+1,tables:previous.tables.map(item=>item.id===table.id?replacement:item)});return;}}
+        if(previous.allocated<previous.length){const eligible=previous.scenarios.filter(item=>!validateScenario(item,dataRef.current));if(eligible.length){const replacement=deal(eligible,dataRef.current,current,previous.decisionSeconds??0);publish({...previous,completed:previous.completed+1,allocated:previous.allocated+1,tables:previous.tables.map(item=>item.id===table.id?replacement:item)});return;}}
         publish({...previous,completed:previous.completed+1,tables:remaining,done:remaining.length===0});
       },table.phase==='feedback'?1000:450));
     }
     for(const [key,timer]of timers.current)if(!wanted.has(key)){clearTimeout(timer);timers.current.delete(key);}
   },[session,paused,publish]);
-  useEffect(()=>{const pending=timers.current;return()=>{for(const timer of pending.values())clearTimeout(timer);pending.clear();};},[]);
-  const setPaused=(value:boolean)=>{interacted.current=true;publish(live.current,value);};
-  const finish=()=>{if(live.current){interacted.current=true;publish({...live.current,done:true},false);}};
-  const reset=()=>{interacted.current=true;publish(null,false);};
-  return {session,start,answer,paused,setPaused,notice,finish,reset};
+  const hasSession=Boolean(session);
+  useEffect(()=>{drillAudio.setEnabled(session?.soundEnabled??true);if(paused||!hasSession||session?.done)drillAudio.stop();},[session?.soundEnabled,session?.done,paused,hasSession]);
+  useEffect(()=>{const pending=timers.current;return()=>{for(const timer of pending.values())clearTimeout(timer);pending.clear();drillAudio.stop();};},[]);
+  const setPaused=(value:boolean)=>{
+    interacted.current=true;let current=live.current;
+    if(value&&current){const now=performance.now();current={...current,tables:current.tables.map(table=>{const anchor=anchors.current.get(table.id+':'+table.cursor);return anchor&&table.phase==='question'?{...table,clock:{...anchor.clock,remainingMs:Math.max(0,anchor.clock.remainingMs-(now-anchor.at))}}:table;})};anchors.current.clear();setClocks({});drillAudio.stop();}
+    if(!value)void drillAudio.prime(current?.soundEnabled??true);
+    publish(current,value);
+  };
+  const setSoundEnabled=(value:boolean)=>{interacted.current=true;if(value)void drillAudio.prime(true);else drillAudio.setEnabled(false);if(live.current)publish({...live.current,soundEnabled:value});};
+  const finish=()=>{if(live.current){interacted.current=true;drillAudio.stop();publish({...live.current,done:true},false);}};
+  const reset=()=>{interacted.current=true;anchors.current.clear();setClocks({});drillAudio.stop();publish(null,false);};
+  return {session,start,answer,paused,setPaused,notice,finish,reset,clocks,setSoundEnabled};
 }

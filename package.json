@@ -12,7 +12,8 @@
     "test:math": "node tests/math-drill.test.cjs",
     "test:value": "node tests/value-drill.test.cjs",
     "test:scenarios": "node tests/scenario-drill.test.cjs",
-    "test:workspace": "node tests/workspace-memory.test.cjs"
+    "test:workspace": "node tests/workspace-memory.test.cjs",
+    "test:timer": "node tests/drill-timer.test.cjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

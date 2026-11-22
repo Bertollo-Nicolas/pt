@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict'),fs=require('fs'),ts=require('typescript');
+require.extensions['.ts']=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,f);
+const {createDecisionClock,advanceDecisionClock,validDecisionSeconds}=require('../lib/drill-clock.ts');
+assert.equal(createDecisionClock(0),undefined);for(const v of [-1,NaN,1.5,3601])assert.equal(validDecisionSeconds(v),false);
+let c=createDecisionClock(15),n=advanceDecisionClock(c,5000);assert.equal(n.alert,'ten');c=n.clock;
+assert.equal(advanceDecisionClock(c,0).alert,null);n=advanceDecisionClock(c,5000);assert.equal(n.alert,'five');
+const saved=JSON.parse(JSON.stringify(n.clock));assert.equal(advanceDecisionClock(saved,0).alert,null);
+n=advanceDecisionClock(saved,5000);assert.equal(n.expired,true);assert.equal(n.alert,null);assert.equal(n.clock.remainingMs,0);
+assert.equal(advanceDecisionClock(createDecisionClock(15),11000).alert,'five');assert.equal(advanceDecisionClock(createDecisionClock(15),20000).alert,null);
+assert.equal(advanceDecisionClock(createDecisionClock(5),0).alert,'five');
+const {defaultMoves,migrateScenario,recordStepTimeout,emptyScenarioData}=require('../lib/scenario-drill.ts');
+const ranges={ranges:{lf:{name:'Limp / Fold',color:'#abc'}},categories:{a:{name:'SB',tabList:['one'],tabs:{one:{name:'25 bb',rangeList:[{id:'lf',hands:['AKs']}]}}}}};
+const scenario=migrateScenario({id:'s',name:'test',catId:'a',tabId:'one',sourceAction:'Limp / Fold',players:2,hero:'SB',stack:25,moves:defaultMoves(2,'SB'),correct:'fold'});
+let stats=recordStepTimeout(emptyScenarioData(),scenario,'AKs',0,ranges,'t:0');assert.equal(stats.total,1);assert.equal(stats.correct,0);assert.equal(stats.attempts[0].timedOut,true);assert.equal(recordStepTimeout(stats,scenario,'AKs',0,ranges,'t:0'),stats);assert.throws(()=>recordStepTimeout(stats,scenario,'AA',0,ranges,'t:1'));
+const {DrillAudio}=require('../lib/drill-audio.ts');
+(async()=>{let starts=[],stops=0;const ctx={currentTime:0,state:'running',destination:{},resume:async()=>{},decodeAudioData:async()=>({duration:.2}),createGain:()=>({gain:{},connect(){},disconnect(){}}),createBufferSource:()=>({connect(){},disconnect(){},start(t){starts.push(t)},stop(){stops++}})};
+const audio=new DrillAudio(()=>ctx,async()=>({ok:true,arrayBuffer:async()=>new ArrayBuffer(1)}));await audio.prime();await Promise.all([audio.play('ten'),audio.play('ten')]);assert.equal(starts.length,2);assert.equal(starts[1],.28);ctx.currentTime=5;await audio.play('five');assert.equal(starts.length,3);assert.equal(stops,2);await Promise.all([audio.play('chips'),audio.play('chips')]);assert.equal(starts.length,4);audio.setEnabled(false);ctx.currentTime=10;await audio.play('ten');assert.equal(starts.length,4);assert.ok(stops>=4);console.log('Timer, timeout scoring and audio tests passed');})().catch(e=>{console.error(e);process.exit(1)});
