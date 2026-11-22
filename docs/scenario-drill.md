@@ -52,3 +52,9 @@ Validation : npm run test:timer, test:scenarios et test:workspace.
 L’action All-in est disponible dans les réponses de Hero et les actions automatiques adverses. Le montant correspond au tapis initial, blindes incluses ; la table affiche les jetons engagés, le pot et le statut All-in. Face à un tapis adverse de même taille, les choix sont Fold ou Call. Les tapis restent identiques pour tous les joueurs du scénario.
 
 Dans la bibliothèque, Ranges du drill permet de cocher plusieurs ranges, puis de choisir leurs scénarios. Chaque nouvelle main tire un scénario du pool, puis une main de son action source. Le scénario précédent est évité quand plusieurs sont disponibles. La sélection est conservée dans la configuration synchronisée.
+
+## Variantes adverses OR
+
+Sur une action adverse Raise, le bouton or placé après le montant ajoute une nouvelle ligne dans le même bloc. Chaque ligne peut contenir une autre action ou un autre sizing, jusqu’à six variantes. La liste de questions Hero garde les mêmes étapes. Le sélecteur Réponse face à permet de configurer les boutons et la bonne réponse pour chaque contexte adverse. Les boutons hérités impossibles dans une variante sont retirés (par exemple Raise face à un tapis identique). Les modifications des boutons dans un contexte ne changent pas les autres.
+
+La main est tirée dans la même action source avant le tirage de la variante. Chaque combinaison adverse est équiprobable et figée dans le checkpoint de la main ; une mauvaise réponse ne change pas de branche. L’éditeur vérifie toutes les combinaisons (maximum 128), dont l’ordre de parole, les sizings, les boutons et les réponses. La suite commune doit rester légale pour chacune ; les variantes ne sont pas des arbres de suites de longueurs différentes.

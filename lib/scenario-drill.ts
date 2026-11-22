@@ -6,7 +6,8 @@ export type ScenarioAction = 'fold' | 'check' | 'limp' | 'call' | 'raise' | 'all
 export type Decision = 'fold' | 'check' | 'call' | 'raise' | 'allin';
 export interface ScenarioMove { actor: Position; action: ScenarioAction; amount: number }
 export interface ScenarioOption { id: string; label: string; action: ScenarioAction; amount: number }
-export interface ScenarioStep extends ScenarioMove { options?: ScenarioOption[]; correctId?: string; explanation?: string }
+export interface ScenarioAlternative { id:string; action:ScenarioAction; amount:number }
+export interface ScenarioStep extends ScenarioMove { options?: ScenarioOption[]; correctId?: string; explanation?: string; alternatives?:ScenarioAlternative[]; correctByBranch?:Record<string,string>;optionsByBranch?:Record<string,ScenarioOption[]>;branchId?:string }
 export interface TrainingScenario {
   id: string; name: string; catId: string; tabId: string; sourceAction: string;
   players: number; hero: Position; stack: number; moves: ScenarioMove[]; correct?: Decision; explanation?: string; version?: 2; steps?: ScenarioStep[];
@@ -119,6 +120,27 @@ export const moveOf = (step: ScenarioStep): ScenarioMove => {
   const option=step.options?.find(item=>item.id===step.correctId);
   return option?{actor:step.actor,action:option.action,amount:option.amount}:step;
 };
+/** Expand opponent alternatives only. Hero answers never select the next branch. */
+export function scenarioPaths(scenario:TrainingScenario,until=sequenceSteps(scenario).length){
+  let paths:{key:string;label:string;steps:ScenarioStep[]}[]=[{key:'',label:'Séquence principale',steps:[]}];
+  for(const [index,step] of sequenceSteps(scenario).slice(0,until).entries()){
+    if(step.actor!==scenario.hero&&step.alternatives?.length){
+      const choices=[{id:'base',action:step.action,amount:step.amount},...step.alternatives];
+      if(choices.length>6||new Set(choices.map(choice=>choice.id)).size!==choices.length)throw new Error(`Étape ${index+1} : prévois jusqu’à 6 variantes distinctes.`);
+      if(new Set(choices.map(choice=>`${choice.action}:${choice.action==='raise'?choice.amount:0}`)).size!==choices.length)throw new Error(`Étape ${index+1} : deux variantes jouent la même action.`);
+      if(paths.length*choices.length>128)throw new Error('Limite la séquence à 128 combinaisons de variantes.');
+      paths=paths.flatMap(path=>choices.map(choice=>({key:[path.key,`${step.branchId??index}:${choice.id}`].filter(Boolean).join('|'),label:[path.key?path.label:'',`${step.actor} ${ACTION_LABELS[choice.action]}${choice.action==='raise'?' '+choice.amount+' bb':choice.action==='allin'?' '+scenario.stack+' bb':''}`].filter(Boolean).join(' → '),steps:[...path.steps,{...step,action:choice.action,amount:choice.amount,alternatives:undefined,correctByBranch:undefined}]})));
+    }else paths=paths.map(path=>{
+      const options=step.actor===scenario.hero&&path.key?(step.optionsByBranch?.[path.key]??step.options?.filter(option=>!replayScenario(scenario,[...path.steps.map(moveOf),{actor:step.actor,...option}]).error)):step.options;
+      return {...path,steps:[...path.steps,{...step,options,alternatives:undefined,correctByBranch:undefined,optionsByBranch:undefined,correctId:step.actor===scenario.hero?(step.correctByBranch?.[path.key]??step.correctId):step.correctId}]};
+    });
+  }
+  return paths;
+}
+export function drawScenarioPath(scenario:TrainingScenario,random=Math.random):TrainingScenario{
+  const paths=scenarioPaths(scenario),path=paths[Math.min(paths.length-1,Math.floor(random()*paths.length))];
+  return {...scenario,steps:path.steps};
+}
 export function possibleOptions(scenario: TrainingScenario, prefix: ScenarioMove[] = []): ScenarioOption[] {
   const state=replayScenario(scenario,prefix);
   const actor=state.nextActor??scenario.hero;
@@ -161,7 +183,11 @@ export function defaultSequence(scenario: TrainingScenario): ScenarioStep[] {
 export function stateBeforeStep(scenario: TrainingScenario, index: number) {
   return replayScenario(scenario,sequenceSteps(scenario).slice(0,index).map(moveOf));
 }
-function validateSequence(scenario: TrainingScenario, data: RmData|null) {
+function validateSequence(scenario: TrainingScenario, data: RmData|null):string {
+  if(scenario.steps?.some(step=>step.alternatives?.length)){
+    if(scenario.steps.some(step=>step.actor===scenario.hero&&step.alternatives?.length))return 'Les variantes « or » sont réservées aux actions adverses.';
+    try{for(const path of scenarioPaths(scenario)){const error=validateSequence({...scenario,steps:path.steps},data);if(error)return `${path.label} : ${error}`;}return '';}catch(error){return (error as Error).message;}
+  }
   if(!sourceHands(data,scenario).length) return 'Range ou action source introuvable.';
   const steps=scenario.steps!;
   if(!steps.length||steps.length>20) return 'Prévois entre 1 et 20 étapes.';

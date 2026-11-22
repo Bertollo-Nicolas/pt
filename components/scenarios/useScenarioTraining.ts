@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAppStore } from '@/store/appStore';
 import type { RmData } from '@/lib/types';
-import { drawScenarioHand, handCards, emptyScenarioData, migrateScenario, moveOf, recordStepAttempt, recordStepTimeout, sequenceSteps, validateScenario, type TrainingScenario, type ScenarioDrillData } from '@/lib/scenario-drill';
+import { drawScenarioHand, drawScenarioPath, handCards, emptyScenarioData, migrateScenario, moveOf, recordStepAttempt, recordStepTimeout, sequenceSteps, validateScenario, type TrainingScenario, type ScenarioDrillData } from '@/lib/scenario-drill';
 import { validCheckpoint, type LiveSession, type LiveTable } from '@/lib/scenario-workspace';
 import { advanceDecisionClock,createDecisionClock,validDecisionSeconds,type DecisionClock,type ClockAlert } from '@/lib/drill-clock';
 import { drillAudio } from '@/lib/drill-audio';
@@ -11,7 +11,8 @@ interface ClockAnchor {clock:DecisionClock;at:number;persistedAt:number;flash?:{
 export interface ClockView {key:string;remainingMs:number;flash:ClockAlert|null}
 function deal(scenarios:TrainingScenario[],data:RmData|null,previous?:LiveTable,decisionSeconds=0):LiveTable{
   const candidates=scenarios.length>1?scenarios.filter(item=>item.id!==previous?.scenario.id):scenarios;
-  const scenario=candidates[Math.floor(Math.random()*candidates.length)],hand=drawScenarioHand(data,scenario,previous?.hand);
+  const source=candidates[Math.floor(Math.random()*candidates.length)],hand=drawScenarioHand(data,source,previous?.hand);
+  const scenario=drawScenarioPath(source);
   if(!hand)throw new Error('Source unavailable');
   const phase=sequenceSteps(scenario)[0].actor===scenario.hero?'question':'acting';
   return {id:crypto.randomUUID(),scenario,hand,cards:handCards(hand),cursor:0,phase,clock:phase==='question'?createDecisionClock(decisionSeconds):undefined,chosen:null,correct:null};

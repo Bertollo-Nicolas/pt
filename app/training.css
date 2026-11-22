@@ -24,7 +24,8 @@
 .drill-studio.is-live .live-answer-buttons button { min-height:42px; border:0; border-radius:4px; padding:7px; background:#454951; color:#f4f5f8; gap:2px; }
 .drill-studio.is-live .live-answer-buttons button[data-action=limp],.drill-studio.is-live .live-answer-buttons button[data-action=call],.drill-studio.is-live .live-answer-buttons button[data-action=check] { background:#4b9954; }
 .drill-studio.is-live .live-answer-buttons button[data-action=raise] { background:#a334b3; }
-.drill-studio.is-live .live-answer-buttons button[data-action=allin] { background:#c1454c; }
+.drill-studio.is-live .live-answer-buttons button[data-action=allin] { background:#ec982c; color:#20160a; border-color:#ffbd63; }
+.drill-studio.is-live .live-answer-buttons button[data-action=allin]:hover:not(:disabled) { background:#ffb64d; }
 .drill-studio.is-live .live-answer-buttons button:hover { filter:brightness(1.18); color:white; }
 .drill-studio.is-live .live-answer-buttons button:disabled { opacity:.4; filter:none; }
 .drill-studio.is-live .live-answer-buttons strong { font-size:12px; font-weight:600; }.drill-studio.is-live .live-answer-buttons small { font-size:9px; color:#fff; opacity:.75; }
@@ -73,3 +74,13 @@
 .drill-range-picker summary { cursor:pointer; padding:12px; border:1px solid #424957; border-radius:6px; }
 .drill-range-picker > div { position:absolute; z-index:30; background:#20232b; border:1px solid #424957; border-radius:6px; padding:10px; width:min(440px,75vw); max-height:300px; overflow:auto; box-shadow:0 10px 30px #0008; }
 .drill-range-picker label { display:flex; align-items:center; gap:8px; padding:8px 4px; }
+.opponent-action:has(.opponent-or-row) { display:flex; flex-direction:column; gap:8px; }
+.opponent-action > span { font-size:11px; color:#99a5bb; }
+.opponent-or-row { display:flex; align-items:center; gap:6px; }
+.opponent-or-row select { flex:1; min-width:0; }
+.opponent-or-row input { width:76px; min-width:0; }
+.or-row-tools { display:flex; gap:4px; }
+.or-row-tools button { padding:7px 10px; border:1px solid #4b5970; border-radius:5px; color:#c6d5ed; }
+.or-row-tools button:hover { background:#35435a; }
+.or-separator { display:block; margin:2px 0 6px; color:#8898b1; font-size:10px; }
+.branch-response-select { margin-bottom:12px; }

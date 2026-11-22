@@ -116,3 +116,23 @@ const jamScenario={...migrated,steps:[{actor:'SB',action:'limp',amount:0,options
 assert.equal(validateScenario(jamScenario,ranges),'');
 const jamAttempt=recordStepAttempt(emptyScenarioData(),jamScenario,'AKs',2,'c',ranges,'jam:2');assert.equal(jamAttempt.correct,1);
 console.log('All-in: open shove, short raise, call/fold, equal stacks, three-way pot, ended round and scoring passed.');
+
+const {scenarioPaths,drawScenarioPath}=require('../lib/scenario-drill.ts');
+const branching=structuredClone(migrated);
+branching.steps[1]={...branching.steps[1],amount:2.5,branchId:'villain',alternatives:[{id:'large',action:'raise',amount:3},{id:'jam',action:'allin',amount:0}]};
+const response=branching.steps[2];response.correctId=response.options.find(o=>o.action==='call').id;
+response.correctByBranch={'villain:large':response.options.find(o=>o.action==='fold').id,'villain:jam':response.options.find(o=>o.action==='fold').id};
+assert.equal(validateScenario(branching,ranges),'');
+const branches=scenarioPaths(branching);assert.equal(branches.length,3);
+assert.equal(branches[0].steps[1].amount,2.5);assert.equal(branches[0].steps[2].correctId,'passive');
+assert.equal(branches[1].steps[2].correctId,'fold');assert.deepEqual(branches[2].steps[2].options.map(o=>o.action),['fold','call']);
+for(const [random,amount,answer] of [[0,2.5,'passive'],[.4,3,'fold'],[.99,0,'fold']]){
+ const path=drawScenarioPath(branching,()=>random);assert.equal(path.steps[1].amount,amount);assert.equal(path.steps[2].correctId,answer);assert.equal(path.id,branching.id);assert.equal(path.sourceAction,branching.sourceAction);assert.equal(path.steps[1].alternatives,undefined);
+ const result=recordStepAttempt(emptyScenarioData(),path,'AKs',2,answer,ranges,'branch:'+random);assert.equal(result.correct,1);
+ assert.deepEqual(JSON.parse(JSON.stringify(path)),JSON.parse(JSON.stringify(structuredClone(path))),'Dealt branch survives checkpoint serialization');
+}
+assert.equal(scenarioPaths(branching,1).length,1,'No branch visible before villain action');
+assert.equal(scenarioPaths(branching,2).length,3,'Editor offers each preceding opponent variant');
+const duplicateBranch=structuredClone(branching);duplicateBranch.steps[1].alternatives[0].amount=2.5;assert.match(validateScenario(duplicateBranch,ranges),/m.me action/);
+const brokenBranch=structuredClone(branching);brokenBranch.steps[1].alternatives[0].amount=1.5;assert.ok(validateScenario(brokenBranch,ranges),'Every branch is checked, not only base');
+console.log('Opponent OR branches: shared hand pool, random selection, per-branch answers, legal jam responses, scoring and checkpoint stability passed.');
