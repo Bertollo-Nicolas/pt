@@ -39,7 +39,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
   const handleReset = () => {
     // Reset preferences without deleting saved drill decisions.
-    useAppStore.setState(state => ({ config: { cbetDrill: state.config.cbetDrill, mathDrill: state.config.mathDrill, valueDrill: state.config.valueDrill } }));
+    useAppStore.setState(state => ({ config: { scenarioDrill: state.config.scenarioDrill, cbetDrill: state.config.cbetDrill, mathDrill: state.config.mathDrill, valueDrill: state.config.valueDrill } }));
     onClose();
   };
 

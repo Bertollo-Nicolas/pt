@@ -14,6 +14,7 @@ import { SrsView } from './srs/SrsView';
 import { SrsToast } from './ui/SrsToast';
 import { SettingsModal } from './modals/SettingsModal';
 import { getRangeGroups } from '@/lib/range-options';
+import { ScenarioDrillView } from './scenarios/ScenarioDrillView';
 
 export default function RangeTrainer() {
   const { rehydrateRmData, selectedTab, currentMode, lastSpot, selectTab } = useAppStore();
@@ -30,11 +31,12 @@ export default function RangeTrainer() {
     if (!selectedTab && lastSpot) selectTab(lastSpot.catId, lastSpot.tabId);
   }, [lastSpot, selectedTab, selectTab]);
   useEffect(() => {
-    if (currentMode === 'roadmap' || currentMode === 'drill' || currentMode === 'tracker' || currentMode === 'review') useAppStore.getState().setMode('home');
+    if (currentMode === 'roadmap' || currentMode === 'tracker' || currentMode === 'review') useAppStore.getState().setMode('home');
   }, [currentMode]);
   const renderMain = () => {
     if (currentMode === 'home') return <Dashboard onLibrary={openLibrary}/>;
     if (currentMode === 'srs') return <SrsView />;
+    if (currentMode === 'drill') return <ScenarioDrillView onLibrary={openLibrary}/>;
     if (!selectedTab) return <ChooseRange onLibrary={openLibrary}/>;
     if (currentMode === 'flash') return <FlashView />;
     if (currentMode === 'grille') return <GrilleView />;

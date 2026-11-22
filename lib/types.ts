@@ -155,6 +155,7 @@ export interface SrsEntry {
 
 // ── Settings ──────────────────────────────────────────────
 export interface AppConfig {
+  scenarioDrill?: import('./scenario-drill').ScenarioDrillData;
   cbetDrill?: import('./cbet-drill/types').DrillProgress;
   mathDrill?: import('./math-drill').MathProgress;
   valueDrill?: import('./value-drill/types').ValueProgress;
