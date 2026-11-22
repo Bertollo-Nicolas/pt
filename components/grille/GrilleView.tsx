@@ -9,7 +9,7 @@ import { hexRgba, todayStr } from '@/lib/utils';
 import { scoreGrille, type GrilleCheckResult, type GrilleCheckState } from '@/lib/grille-score';
 import type { HandItem, SelectedTab } from '@/lib/types';
 
-const FOLD_COLOR = '#65766a';
+const FOLD_COLOR = '#626b7c';
 
 type CellFreqs = Record<string, number>;
 type Selection = Record<string, CellFreqs>;

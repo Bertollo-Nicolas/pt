@@ -46,3 +46,55 @@ for(let i=0;i<210;i++)progress=recordScenarioAttempt(progress,scenario,'88','fol
 assert.equal(progress.attempts.length,200);assert.equal(progress.total,212);assert.equal(progress.correct,211);
 assert.deepEqual(JSON.parse(JSON.stringify(progress)),progress);
 console.log('Scenario drill: exact range/action filtering, mixed hands, HU and 3–6 seats, turn order, betting/pot/stack accounting, legal decisions, cards and persistent results passed.');
+
+const {migrateScenario,sequenceSteps,stateBeforeStep,moveOf,replayScenario,recordStepAttempt,defaultSequence,possibleOptions}=require('../lib/scenario-drill.ts');
+const migrated=migrateScenario(scenario);
+const fresh={...scenario,moves:[],correct:undefined,version:2,steps:defaultSequence(scenario)};
+assert.equal(validateScenario(fresh,ranges),'','New authored default sequence');
+assert.equal(migrated.version,2);
+assert.equal(migrated.correct,undefined,'No global correct answer in v2');
+assert.deepEqual(migrated.moves,[]);
+assert.deepEqual(sequenceSteps(migrated).map(step=>step.actor),['SB','BB','SB']);
+assert.deepEqual(sequenceSteps(migrated).map(moveOf).map(move=>move.action),['limp','raise','fold']);
+assert.equal(validateScenario(migrated,ranges),'');
+assert.equal(stateBeforeStep(migrated,0).pot,1.5,'Begin before Hero limps');
+assert.equal(stateBeforeStep(migrated,1).pot,2,'First Hero action changes contributions');
+assert.equal(stateBeforeStep(migrated,2).pot,4,'Then villain raises');
+assert.equal(stateBeforeStep(migrated,2).toCall,2);
+for(let count=2;count<=6;count++)for(const hero of positionsFor(count)){
+  const item=migrateScenario({...scenario,players:count,hero,moves:defaultMoves(count,hero)});
+  assert.equal(validateScenario(item,ranges),'',`Sequential ${count} / ${hero}`);
+  assert.equal(item.steps.at(-1).actor,hero);
+  assert.ok(item.steps.filter(step=>step.actor===hero).every(step=>step.options.length>=2&&step.correctId));
+}
+const configurable=structuredClone(migrated);
+configurable.steps[0].options.find(option=>option.id===configurable.steps[0].correctId).label='Compléter';
+assert.equal(validateScenario(configurable,ranges),'');
+let sequential=recordStepAttempt(emptyScenarioData(),configurable,'AKs',0,configurable.steps[0].correctId,ranges,'hand1:0');
+assert.equal(sequential.attempts[0].answer,'Compléter');assert.equal(sequential.correct,1);
+const wrong=configurable.steps[2].options.find(option=>option.id!==configurable.steps[2].correctId);
+sequential=recordStepAttempt(sequential,configurable,'AKs',2,wrong.id,ranges,'hand1:2');
+assert.equal(sequential.total,2);assert.equal(sequential.correct,1);assert.equal(sequential.attempts[1].expected,'Fold');
+assert.equal(recordStepAttempt(sequential,configurable,'AKs',2,wrong.id,ranges,'hand1:2'),sequential);
+assert.throws(()=>recordStepAttempt(sequential,configurable,'AKs',1,'fold',ranges,'villain'),'Opponent action is automatic');
+assert.throws(()=>recordStepAttempt(sequential,configurable,'AQs',0,configurable.steps[0].correctId,ranges,'outside-v2'));
+const duplicate=structuredClone(configurable);duplicate.steps[0].options[2]={...duplicate.steps[0].options[0],id:'other',label:'Other fold'};
+assert.match(validateScenario(duplicate,ranges),/même action/);
+const noAnswer=structuredClone(configurable);delete noAnswer.steps[0].correctId;assert.ok(validateScenario(noAnswer,ranges));
+const earlyEnd=structuredClone(configurable);earlyEnd.steps.pop();assert.ok(validateScenario(earlyEnd,ranges));
+const illegalOption=structuredClone(configurable);illegalOption.steps[0].options[0].action='check';assert.ok(validateScenario(illegalOption,ranges));
+// Three Hero decisions with two re-raises, replayed by canonical correct actions.
+const extended=structuredClone(migrated);extended.steps=[];extended.stack=50;
+const authored=[{actor:'SB',action:'limp',amount:0},{actor:'BB',action:'raise',amount:3},{actor:'SB',action:'raise',amount:9},{actor:'BB',action:'raise',amount:18},{actor:'SB',action:'fold',amount:0}];
+for(const move of authored){
+  if(move.actor==='SB'){
+    const options=possibleOptions(extended,extended.steps.map(moveOf));
+    const correct=options.find(option=>option.action===move.action);assert.ok(correct);correct.amount=move.amount;
+    extended.steps.push({...move,options,correctId:correct.id});
+  }else extended.steps.push(move);
+}
+assert.equal(validateScenario(extended,ranges),'');assert.equal(stateBeforeStep(extended,4).pot,27);assert.equal(stateBeforeStep(extended,4).toCall,9);
+assert.equal(replayScenario(extended,extended.steps.map(moveOf)).nextActor,undefined,'Fold ends the hand');
+assert.deepEqual(migrateScenario(migrated),migrated,'Idempotent migration');
+assert.deepEqual(JSON.parse(JSON.stringify(configurable)),configurable);
+console.log('Sequential scenarios: first action, per-step configurable buttons/correct answers, automatic opponents, canonical continuation, three Hero decisions, migration and per-decision persistence passed.');

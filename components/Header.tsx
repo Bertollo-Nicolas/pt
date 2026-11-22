@@ -3,29 +3,18 @@ import { useAppStore } from '@/store/appStore';
 import type { Mode } from '@/lib/types';
 import { Icon, type IconName } from './ui/Icon';
 import { TrainingRangeSelect } from './TrainingRangeSelect';
-
-export const MODES: { id: Mode; label: string; icon: IconName }[] = [
-  { id: 'home', label: 'Vue d’ensemble', icon: 'grid' },
-  { id: 'flash', label: 'Flashcards', icon: 'flash' },
-  { id: 'grille', label: 'Range builder', icon: 'target' },
-  { id: 'srs', label: 'Révisions', icon: 'calendar' },
-  { id: 'drill', label: 'Drills', icon: 'target' },
+export const MODES:{id:Mode;label:string;icon:IconName}[]=[
+  {id:'home',label:'Accueil',icon:'grid'},
+  {id:'flash',label:'Flashcards',icon:'flash'},
+  {id:'grille',label:'Range builder',icon:'target'},
+  {id:'srs',label:'Révisions',icon:'calendar'},
+  {id:'drill',label:'Drills',icon:'roadmap'},
 ];
-
-export function Header({ onOpenSidebar, onOpenLibrary, syncState }: { onOpenSidebar: () => void; onOpenLibrary: () => void; syncState: 'loading' | 'saving' | 'synced' | 'offline' }) {
-  const { currentMode, selectedTab } = useAppStore();
-  const training = currentMode === 'flash' || currentMode === 'grille';
-  return <header className="workspace-header">
-    <button onClick={onOpenSidebar} className="icon-control md:hidden" aria-label="Ouvrir la navigation"><Icon name="menu" /></button>
-    <div className={`${training ? 'hidden sm:flex' : 'flex'} items-center gap-3 min-w-0 text-sm`}>
-      <span className="text-muted hidden sm:inline">Espace personnel</span><span className="text-muted2 hidden sm:inline">/</span>
-      <span className="truncate">{MODES.find(mode => mode.id === currentMode)?.label}</span>
-      {training && selectedTab && <><span className="text-muted2">/</span><span className="truncate text-muted hidden lg:inline">{selectedTab.name}</span></>}
-    </div>
-    {training && <div className="flex-1 min-w-0 max-w-[340px] mx-2"><TrainingRangeSelect/></div>}
-    <div className="ml-auto flex items-center gap-5 flex-shrink-0">
-      <span className="hidden lg:flex items-center gap-2 text-xs text-muted" role="status"><span className={`h-1.5 w-1.5 rounded-full ${syncState === 'synced' ? 'bg-green' : syncState === 'offline' ? 'bg-orange' : 'bg-muted animate-pulse'}`} />{syncState === 'synced' ? 'À jour' : syncState === 'offline' ? 'Hors ligne' : 'Synchronisation…'}</span>
-      <button className="library-trigger" onClick={onOpenLibrary}><Icon name="folder" size={16}/><span>Mes ranges</span><Icon name="chevron" size={13}/></button>
-    </div>
-  </header>;
+export function Header({onOpenSidebar,onOpenLibrary,onSettings,onLogout,syncState}:{onOpenSidebar:()=>void;onOpenLibrary:()=>void;onSettings?:()=>void;onLogout?:()=>void;syncState:'loading'|'saving'|'synced'|'offline'}){
+  const {currentMode,setMode}=useAppStore();
+  const training=currentMode==='flash'||currentMode==='grille';
+  return <><header className="app-topbar"><button className="mobile-menu icon-control" onClick={onOpenSidebar} aria-label="Ouvrir la navigation"><Icon name="menu"/></button><button className="app-wordmark" onClick={()=>setMode('home')} aria-label="Range, accueil"><span>r<span>↗</span></span>range<small>TRAINING</small></button>
+    <nav aria-label="Navigation principale" className="app-topnav">{MODES.map(mode=><button key={mode.id} data-mode={mode.id} aria-current={currentMode===mode.id?'page':undefined} onClick={()=>setMode(mode.id)}><Icon name={mode.icon} size={15}/>{mode.label}</button>)}</nav>
+    <div className="app-topbar-tools"><span className={`connection-dot is-${syncState}`} role="status" aria-label={syncState==='synced'?'Synchronisé':syncState==='offline'?'Hors ligne':'Synchronisation en cours'} title={syncState==='synced'?'Synchronisé':syncState==='offline'?'Hors ligne':'Synchronisation en cours'}/><button className="topbar-library" aria-label="Bibliothèque" onClick={onOpenLibrary}><Icon name="folder" size={16}/><span>Bibliothèque</span></button>{onSettings&&<button className="topbar-icon" onClick={onSettings} aria-label="Paramètres"><Icon name="settings" size={17}/></button>}{onLogout&&<button className="topbar-icon" onClick={onLogout} aria-label="Déconnexion"><Icon name="logout" size={17}/></button>}</div>
+  </header>{training&&<div className="active-range-bar"><span>RANGE ACTIVE</span><TrainingRangeSelect/><button onClick={onOpenLibrary}>Gérer les ranges <Icon name="chevron" size={13}/></button></div>}</>;
 }

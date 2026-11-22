@@ -5,10 +5,10 @@ L’entrée **Drills** ouvre le nouveau système de scénarios. Les anciens modu
 ## Parcours
 
 1. Choisir une range dans la bibliothèque, tous dossiers confondus.
-2. Créer un scénario : nom, action source détectée, table HU ou 3–6 joueurs, position Hero, tapis de départ, séquence avant Hero, bonne réponse et explication facultative.
+2. Créer un scénario : nom, action source détectée, table HU ou 3–6 joueurs, position Hero et tapis de départ. Dans la séquence, chaque étape de Hero possède ses boutons personnalisables, une réponse juste et une explication facultative. Les actions adverses sont automatiques.
 3. Enregistrer, modifier, dupliquer ou supprimer le scénario.
-4. Choisir une range et cocher les scénarios à travailler, définir le nombre total de décisions et 1–3 tables simultanées.
-5. Répondre, consulter la correction, puis continuer. Un bilan reprend les erreurs.
+4. Choisir une range et cocher les scénarios à travailler, définir le nombre total de **mains** et 1–3 tables simultanées.
+5. Recevoir la main avant la première décision de Hero, répondre, puis jouer la suite du coup. Feedback juste/faux pendant une seconde ; les adversaires jouent automatiquement, puis Hero répond à nouveau. Après la dernière décision, la main suivante arrive automatiquement. Un bilan reprend les erreurs par étape.
 
 ## Règles
 
@@ -16,17 +16,22 @@ L’entrée **Drills** ouvre le nouveau système de scénarios. Les anciens modu
 - Fold utilise la même interprétation que les flashcards : les folds implicites sont inclus.
 - Blindes 0,5 / 1 bb, sans ante, préflop uniquement. Tous les joueurs ont le même tapis initial (2–1 000 bb). Montants de raise exprimés en total engagé sur la street.
 - Le simulateur contrôle l’ordre de parole, les folds, les calls et les relances minimales. Les situations à tapis et les side pots ne sont pas pris en charge dans cette version.
-- Pot, contributions et tapis restants sont calculés depuis les blindes et la séquence. Hero reste en bas, même si sa position change.
-- Les décisions proposées dépendent du montant à payer : fold/call/raise ou check/raise. La bonne réponse vient de la configuration du scénario, pas d’un solver.
-- Le nombre de situations désigne le total de décisions sur toutes les tables. Les mains remplacent les précédentes jusqu’à atteindre ce total.
+- Pot, contributions et tapis restants sont calculés depuis les blindes et les étapes déjà jouées. Hero reste en bas, même si sa position change. La table conserve une géométrie de pilule horizontale au ratio 2,2:1, indépendamment de la hauteur de l’écran.
+- Chaque étape Hero possède 2–6 boutons : libellé, action et montant total pour une relance. Le bouton juste est coché dans cette étape ; aucune réponse globale n’est demandée dans le contexte du scénario. Les libellés et actions ne peuvent pas être dupliqués, sauf sizings distincts d’une relance.
+- La bonne réponse vient de la configuration du scénario, pas d’un solver. Après une erreur intermédiaire, la séquence continue avec l’action de référence, annoncée dans le feedback.
+- Le nombre de mains désigne le total sur toutes les tables. Les statistiques comptent chaque décision de Hero séparément.
+- Pause et fermeture de l’onglet arrêtent les temporisations ; le bouton de fin de session ouvre un bilan sans perdre les décisions validées.
 - Une range ou une action supprimée rend son scénario indisponible ; il reste possible de le réassocier ou de le supprimer.
 
 ## Sauvegarde
 
 `AppConfig.scenarioDrill` contient les scénarios, les compteurs cumulés et les 200 dernières décisions. Sauvegarde locale via le store existant et synchronisation du compte via `/api/sync` (config JSON existante, aucune migration SQL). La remise à zéro des préférences conserve ces données. La session en cours est temporaire ; chaque réponse validée est enregistrée immédiatement.
 
+Les scénarios v2 utilisent `steps`, avec `options` et `correctId` sur chaque étape Hero. Les anciens scénarios `moves` + `correct` sont convertis à la lecture : les actions Hero déjà scriptées deviennent des questions, les actions adverses restent automatiques, et la décision finale est ajoutée à la séquence. La conversion est enregistrée lors de l’édition ; les ranges et anciennes statistiques sont conservées.
+
 ## Vérification
 
-- `npm run test:scenarios` : filtrage exact, fréquences nulles et mixtes, toutes positions HU/3–6 joueurs, ordre de parole, pot et tapis, actions légales, cartes, déduplication et statistiques persistantes.
-- Vérification navigateur sur une route temporaire isolée, sans synchronisation ni données utilisateur : création HU/6-max, sauvegarde après rechargement, modification invalide, duplication, suppression, réponses justes/fausses, bilan et renouvellement des tables.
-- Formulaire desktop vérifié sans scroll à 1024×768, 1280×640 et 1366×768. Entraînement trois tables vérifié sans scroll à 1024×768, 1280×640, 1366×768 et 1920×1080 ; mobile 390×844 sans débordement horizontal.
+- `npm run test:scenarios` : filtrage exact, fréquences nulles et mixtes, toutes positions HU/3–6 joueurs, ordre de parole, pot et tapis, actions légales, cartes, déduplication, migration idempotente, réponses personnalisées par étape, séquence à trois décisions Hero et statistiques persistantes.
+- Vérification navigateur sur une route temporaire isolée, sans synchronisation ni données utilisateur : première décision avant le limp, erreur initiale puis suite corrigée, réponse finale et main suivante automatiques, pause, trois tables simultanées, bilan, sauvegarde et modification du bon bouton dans la séquence.
+- Nouvelle navigation et pages Accueil/Builder/Flashcards/Révisions vérifiées sur desktop et mobile, avec bibliothèque, paramètres et navigation mobile accessibles.
+- Éditeur desktop vérifié sans scroll de page à 1024×768, 1280×640 et 1440×900 (la liste des étapes défile si nécessaire). Entraînement trois tables vérifié sans scroll à 1024×768, 1280×640, 1366×768, 1440×900 et 1920×1080 ; mobile 390×844 sans débordement horizontal. Ratio des tables mesuré à 2,2:1 sur tous ces formats.

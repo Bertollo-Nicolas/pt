@@ -43,8 +43,7 @@ export default function RangeTrainer() {
     return <Dashboard onLibrary={openLibrary}/>;
   };
   return <div className="app-shell">
-    <div className="hidden md:block w-[236px] xl:w-[252px] flex-shrink-0 h-full"><Navigation onSettings={openSettings} onLibrary={openLibrary} onLogout={logout}/></div>
-    <div className="workspace-main"><Header onOpenSidebar={() => setNavigationOpen(true)} onOpenLibrary={openLibrary} syncState={syncState}/><main id="main-content" className="flex-1 overflow-hidden flex flex-col min-h-0">{renderMain()}</main></div>
+    <div className="workspace-main"><Header onOpenSidebar={() => setNavigationOpen(true)} onOpenLibrary={openLibrary} onSettings={openSettings} onLogout={logout} syncState={syncState}/><main id="main-content" className="flex-1 overflow-hidden flex flex-col min-h-0">{renderMain()}</main></div>
     <Modal open={navigationOpen} onClose={closeNavigation} className="navigation-dialog"><Navigation onSettings={openSettings} onLibrary={openLibrary} onClose={closeNavigation} onLogout={logout}/></Modal>
     <Modal open={libraryOpen} onClose={closeLibrary} className="library-dialog"><Sidebar onOpenSettings={openSettings} onClose={closeLibrary}/></Modal>
     <SrsToast/><SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)}/>
