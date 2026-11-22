@@ -11,7 +11,7 @@ const state=simulateScenario(scenario);
 assert.equal(state.error,'');assert.equal(state.pot,4);assert.equal(state.toCall,2);
 assert.equal(state.seats.find(seat=>seat.position==='SB').committed,1);
 assert.equal(state.seats.find(seat=>seat.position==='BB').committed,3);
-assert.deepEqual(state.choices,['fold','call','raise']);assert.equal(validateScenario(scenario,ranges),'');
+assert.deepEqual(state.choices,['fold','call','raise','allin']);assert.equal(validateScenario(scenario,ranges),'');
 assert.ok(validateScenario({...scenario,correct:'check'},ranges));
 for(let count=2;count<=6;count++) for(const hero of positionsFor(count)) {
   const item={...scenario,players:count,hero,moves:defaultMoves(count,hero)};
@@ -27,7 +27,7 @@ assert.ok(simulateScenario({...scenario,moves:[{actor:'SB',action:'limp',amount:
 assert.ok(simulateScenario({...scenario,moves:[{actor:'SB',action:'limp',amount:0},{actor:'BB',action:'raise',amount:25}]}).error,'All in unsupported');
 assert.ok(simulateScenario({...scenario,moves:[{actor:'SB',action:'limp',amount:0},{actor:'BB',action:'check',amount:0}]}).error,'Round is complete');
 assert.equal(simulateScenario({...scenario,hero:'BB',moves:[{actor:'SB',action:'limp',amount:0}],correct:'check'}).toCall,0);
-assert.deepEqual(simulateScenario({...scenario,hero:'BB',moves:[{actor:'SB',action:'limp',amount:0}],correct:'check'}).choices,['check','raise']);
+assert.deepEqual(simulateScenario({...scenario,hero:'BB',moves:[{actor:'SB',action:'limp',amount:0}],correct:'check'}).choices,['check','raise','allin']);
 for(let i=0;i<100;i++)assert.ok(['88','AKs'].includes(drawScenarioHand(ranges,scenario)));
 assert.equal(drawScenarioHand(ranges,scenario,'AKs',()=>0),'88');
 assert.equal(drawScenarioHand(null,scenario),null);
@@ -98,3 +98,21 @@ assert.equal(replayScenario(extended,extended.steps.map(moveOf)).nextActor,undef
 assert.deepEqual(migrateScenario(migrated),migrated,'Idempotent migration');
 assert.deepEqual(JSON.parse(JSON.stringify(configurable)),configurable);
 console.log('Sequential scenarios: first action, per-step configurable buttons/correct answers, automatic opponents, canonical continuation, three Hero decisions, migration and per-decision persistence passed.');
+
+// Explicit all-in uses the full initial stack including posted blinds.
+const shove={...scenario,stack:15};
+let jam=replayScenario(shove,[{actor:'SB',action:'allin',amount:0}]);
+assert.equal(jam.error,'');assert.equal(jam.pot,16);assert.equal(jam.nextActor,'BB');assert.equal(jam.seats[0].committed,15);
+jam=replayScenario(shove,[{actor:'SB',action:'allin',amount:0},{actor:'BB',action:'call',amount:0}]);
+assert.equal(jam.error,'');assert.equal(jam.pot,30);assert.equal(jam.nextActor,undefined);
+assert.ok(replayScenario(shove,[{actor:'SB',action:'allin',amount:0},{actor:'BB',action:'call',amount:0},{actor:'SB',action:'check',amount:0}]).error);
+assert.ok(replayScenario(shove,[{actor:'SB',action:'allin',amount:0},{actor:'BB',action:'allin',amount:0}]).error,'Use call against an equal-stack shove');
+const facing={...shove,hero:'BB'};
+assert.deepEqual(possibleOptions(facing,[{actor:'SB',action:'allin',amount:0}]).map(o=>o.action),['fold','call']);
+assert.equal(replayScenario({...shove,stack:5},[{actor:'SB',action:'raise',amount:3},{actor:'BB',action:'allin',amount:0},{actor:'SB',action:'call',amount:0}]).pot,10,'Short all-in below min raise');
+const multiJam=replayScenario({...shove,players:3},[{actor:'BTN',action:'allin',amount:0},{actor:'SB',action:'call',amount:0},{actor:'BB',action:'call',amount:0}]);
+assert.equal(multiJam.error,'');assert.equal(multiJam.pot,45);assert.equal(multiJam.nextActor,undefined);
+const jamScenario={...migrated,steps:[{actor:'SB',action:'limp',amount:0,options:possibleOptions(shove),correctId:'passive'},{actor:'BB',action:'allin',amount:0},{actor:'SB',action:'call',amount:0,options:[{id:'f',label:'Fold',action:'fold',amount:0},{id:'c',label:'Call',action:'call',amount:0}],correctId:'c'}],stack:15};
+assert.equal(validateScenario(jamScenario,ranges),'');
+const jamAttempt=recordStepAttempt(emptyScenarioData(),jamScenario,'AKs',2,'c',ranges,'jam:2');assert.equal(jamAttempt.correct,1);
+console.log('All-in: open shove, short raise, call/fold, equal stacks, three-way pot, ended round and scoring passed.');

@@ -55,7 +55,7 @@ export function useScenarioTraining(data:RmData|null){
       const correct=!timedOut&&optionId===step.correctId,expected=step.options!.find(item=>item.id===step.correctId)!.label;
       interacted.current=true;
       anchors.current.delete(key);
-      if(['limp','call','raise'].includes(moveOf(step).action))void drillAudio.play('chips');
+      if(['limp','call','raise','allin'].includes(moveOf(step).action))void drillAudio.play('chips');
       publish({...current,tables:current.tables.map(item=>item.id===actual.id?{...item,phase:'feedback',clock:undefined,chosen:timedOut?'__timeout__':optionId,correct}:item),attempts:[...current.attempts,{name:actual.scenario.name,hand:actual.hand,step:actual.cursor,given:timedOut?'Temps écoulé':option!.label,expected,correct,...(timedOut?{timedOut:true}:{})}]},false,stats);
     }catch{setNotice('La range source a change. Verifie tes scenarios.');publish(current,true);}
   };
@@ -94,7 +94,7 @@ export function useScenarioTraining(data:RmData|null){
         timers.current.delete(key);const previous=live.current,current=previous?.tables.find(item=>item.id===table.id);
         if(!previous||previous.done||!current||current.cursor!==table.cursor||current.phase!==table.phase||pause.current)return;
         interacted.current=true;const steps=sequenceSteps(current.scenario),index=current.cursor+1;
-        if(current.phase==='acting'&&['limp','call','raise'].includes(moveOf(steps[current.cursor]).action))void drillAudio.play('chips');
+        if(current.phase==='acting'&&['limp','call','raise','allin'].includes(moveOf(steps[current.cursor]).action))void drillAudio.play('chips');
         if(index<steps.length){const phase=steps[index].actor===current.scenario.hero?'question':'acting';publish({...previous,tables:previous.tables.map(item=>item.id===table.id?{...item,cursor:index,phase,clock:phase==='question'?createDecisionClock(previous.decisionSeconds??0):undefined,chosen:null,correct:null}:item)});return;}
         const remaining=previous.tables.filter(item=>item.id!==table.id);
         if(previous.allocated<previous.length){const eligible=previous.scenarios.filter(item=>!validateScenario(item,dataRef.current));if(eligible.length){const replacement=deal(eligible,dataRef.current,current,previous.decisionSeconds??0);publish({...previous,completed:previous.completed+1,allocated:previous.allocated+1,tables:previous.tables.map(item=>item.id===table.id?replacement:item)});return;}}

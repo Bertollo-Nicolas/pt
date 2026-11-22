@@ -46,3 +46,9 @@ Le timer est optionnel (0 = sans limite, jusqu’à 3600 secondes) et recommence
 À zéro, la décision est enregistrée comme manquée (sans inventer de fold), puis le drill poursuit la ligne de référence. Une réponse au même instant ne peut pas compter deux fois. Les anciens checkpoints restent compatibles, sans timer.
 
 Validation : npm run test:timer, test:scenarios et test:workspace.
+
+## All-in et sessions multi-ranges
+
+L’action All-in est disponible dans les réponses de Hero et les actions automatiques adverses. Le montant correspond au tapis initial, blindes incluses ; la table affiche les jetons engagés, le pot et le statut All-in. Face à un tapis adverse de même taille, les choix sont Fold ou Call. Les tapis restent identiques pour tous les joueurs du scénario.
+
+Dans la bibliothèque, Ranges du drill permet de cocher plusieurs ranges, puis de choisir leurs scénarios. Chaque nouvelle main tire un scénario du pool, puis une main de son action source. Le scénario précédent est évité quand plusieurs sont disponibles. La sélection est conservée dans la configuration synchronisée.

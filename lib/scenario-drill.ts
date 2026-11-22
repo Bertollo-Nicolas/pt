@@ -2,8 +2,8 @@ import { allHands, buildRangeMap, getDecisionActions } from './poker';
 import type { RmData } from './types';
 
 export type Position = 'UTG' | 'HJ' | 'CO' | 'BTN' | 'SB' | 'BB';
-export type ScenarioAction = 'fold' | 'check' | 'limp' | 'call' | 'raise';
-export type Decision = 'fold' | 'check' | 'call' | 'raise';
+export type ScenarioAction = 'fold' | 'check' | 'limp' | 'call' | 'raise' | 'allin';
+export type Decision = 'fold' | 'check' | 'call' | 'raise' | 'allin';
 export interface ScenarioMove { actor: Position; action: ScenarioAction; amount: number }
 export interface ScenarioOption { id: string; label: string; action: ScenarioAction; amount: number }
 export interface ScenarioStep extends ScenarioMove { options?: ScenarioOption[]; correctId?: string; explanation?: string }
@@ -14,7 +14,7 @@ export interface TrainingScenario {
 export interface ScenarioAttempt { id: string; scenarioId: string; hand: string; answer: string; correct: boolean; date: string; step?: number; expected?: string;timedOut?:boolean }
 export interface ScenarioDrillData { scenarios: TrainingScenario[]; attempts: ScenarioAttempt[]; total: number; correct: number; updatedAt?:number }
 export const emptyScenarioData = (): ScenarioDrillData => ({ scenarios: [], attempts: [], total: 0, correct: 0 });
-export const ACTION_LABELS: Record<ScenarioAction, string> = { fold:'Fold', check:'Check', limp:'Limp', call:'Call', raise:'Raise' };
+export const ACTION_LABELS: Record<ScenarioAction, string> = { fold:'Fold', check:'Check', limp:'Limp', call:'Call', raise:'Raise', allin:'All-in' };
 export const positionsFor = (count: number): Position[] => count === 2 ? ['SB','BB'] : (['UTG','HJ','CO','BTN','SB','BB'] as Position[]).slice(6-count);
 const round = (n: number) => Math.round(n*100)/100;
 
@@ -39,7 +39,7 @@ export function replayScenario(scenario: TrainingScenario, moves: ScenarioMove[]
     if (error) break;
     const seat=seats.find(item=>item.position===move.actor);
     const fail=(message:string)=>{error=`Action ${index+1} : ${message}`;};
-    if (!seat||seat.folded) {fail('ce joueur ne peut plus agir.');break;}
+    if (!seat||seat.folded||seat.committed>=scenario.stack) {fail('ce joueur ne peut plus agir.');break;}
     if(pending[0]!==move.actor) {fail(`c’est à ${pending[0]??'personne'} de jouer.`);break;}
     pending.shift();
     const toCall=round(currentBet-seat.committed);
@@ -50,22 +50,23 @@ export function replayScenario(scenario: TrainingScenario, moves: ScenarioMove[]
       seat.committed=1;
     } else if(move.action==='call') {
       if(toCall<=0) {fail('aucune mise à payer.');break;}
-      if(currentBet>=scenario.stack) {fail('les situations à tapis ne sont pas encore prises en charge.');break;}
       seat.committed=currentBet;
-    } else if(move.action==='raise') {
-      if(!Number.isFinite(move.amount)||move.amount<currentBet+lastRaise||move.amount>=scenario.stack) {fail(`raise total : au moins ${round(currentBet+lastRaise)} bb et inférieur au tapis.`);break;}
-      lastRaise=round(move.amount-currentBet);currentBet=move.amount;seat.committed=currentBet;
+    } else if(move.action==='raise'||move.action==='allin') {
+      const amount=move.action==='allin'?scenario.stack:move.amount;
+      if(move.action==='allin'&&amount<=currentBet){fail('utilise Call pour payer un tapis adverse.');break;}
+      if(!Number.isFinite(amount)||(move.action==='raise'&&(amount<currentBet+lastRaise||amount>=scenario.stack))) {fail(`raise total : au moins ${round(currentBet+lastRaise)} bb et inférieur au tapis.`);break;}
+      lastRaise=Math.max(lastRaise,round(amount-currentBet));currentBet=amount;seat.committed=currentBet;
       const seatIndex=positions.indexOf(move.actor);
-      pending=[...positions.slice(seatIndex+1),...positions.slice(0,seatIndex)].filter(position=>!seats.find(item=>item.position===position)!.folded);
+      pending=[...positions.slice(seatIndex+1),...positions.slice(0,seatIndex)].filter(position=>!seats.find(item=>item.position===position)!.folded&&seats.find(item=>item.position===position)!.committed<scenario.stack);
     } else {fail('action inconnue.');break;}
-    seat.lastAction=ACTION_LABELS[move.action]+(move.action==='raise'?` ${round(move.amount)} bb`:'');
+    seat.lastAction=ACTION_LABELS[move.action]+(move.action==='raise'||move.action==='allin'?` ${round(seat.committed)} bb`:'');
     if(seats.filter(item=>!item.folded).length<=1) pending=[];
   }
   const hero=seats.find(seat=>seat.position===scenario.hero);
   const toCall=round(Math.max(0,currentBet-(hero?.committed??0)));
   const choices: Decision[]=toCall>0?['fold','call','raise']:['check','raise'];
-  // No side pots / all-ins in this first preflop trainer.
   if(currentBet+lastRaise>=scenario.stack) choices.splice(choices.indexOf('raise'),1);
+  if(currentBet<scenario.stack&&hero&&!hero.folded&&hero.committed<scenario.stack) choices.push('allin');
   return { seats, pot:round(seats.reduce((sum,seat)=>sum+seat.committed,0)), toCall, currentBet, choices, error, nextActor:pending[0], lastRaise, minRaise:round(currentBet+lastRaise) };
 }
 
@@ -125,6 +126,7 @@ export function possibleOptions(scenario: TrainingScenario, prefix: ScenarioMove
     {id:'fold',label:'Fold',action:'fold',amount:0},
     {id:'passive',label:state.toCall===0?'Check':state.currentBet===1&&actor!=='BB'?'Limp':'Call',action:state.toCall===0?'check':state.currentBet===1&&actor!=='BB'?'limp':'call',amount:0},
     {id:'raise',label:state.currentBet>1?'Reraise':'Raise',action:'raise',amount:round(Math.max(state.minRaise,state.currentBet*3))},
+    {id:'allin',label:'All-in',action:'allin',amount:0},
   ];
   return candidate.filter(option=>!replayScenario(scenario,[...prefix,{actor,...option}]).error);
 }
