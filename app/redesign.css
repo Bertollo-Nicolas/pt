@@ -44,5 +44,46 @@ body { background:var(--canvas); color:var(--ink); font-family:Inter,-apple-syst
 }
 .live-table { height:100%; max-height:600px; }
 .live-tables { align-items:start; }
+.live-tables.is-dense { grid-template-columns:repeat(3,minmax(0,1fr)); grid-template-rows:repeat(2,minmax(0,1fr)); gap:12px; }
+.live-tables.is-dense[data-count="4"] { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.live-tables.is-dense .live-table { max-height:none; }
+.live-tables.is-dense .live-table-heading small { display:none; }
+.live-tables.is-dense .live-history { margin-top:5px; min-height:20px; max-height:20px; overflow:hidden; flex-wrap:nowrap; white-space:nowrap; }
+.live-tables.is-dense .live-history > span { padding:2px 4px; font-size:8px; }
+.live-tables.is-dense .live-decision { min-height:60px; gap:5px; }
+.live-tables.is-dense .live-answer-buttons button { min-height:33px; padding:4px; }
+.live-tables.is-dense .live-answer-buttons strong { font-size:10px; }
+.live-tables.is-dense .live-feedback { padding:5px; gap:2px 7px; }
+.live-tables.is-dense .live-feedback > span,.live-tables.is-dense .live-feedback > strong { font-size:11px; }
+.poker-stage.is-mini .poker-seat { width:62px; }
+.poker-stage.is-mini .poker-cards { height:20px; gap:2px; }
+.poker-stage.is-mini .poker-card { width:17px; height:20px; padding:2px; flex-direction:row; }
+.poker-stage.is-mini .poker-card b { font-size:12px; letter-spacing:-.5px; }
+.poker-stage.is-mini .poker-card span { font-size:9px; }
+.poker-stage.is-mini .poker-card.card-back { width:15px; height:17px; }
+.poker-stage.is-mini .poker-player { padding:2px 3px; gap:0; border-radius:4px; }
+.poker-stage.is-mini .poker-player > span { font-size:6px; letter-spacing:.2px; line-height:9px; gap:4px; }
+.poker-stage.is-mini .poker-player > span b { font-size:6px; padding:0 2px; }
+.poker-stage.is-mini .poker-player > strong { font-size:10px; line-height:12px; }
+.poker-stage.is-mini .poker-player > strong small { font-size:7px; }
+.poker-stage.is-mini .poker-pot { gap:0; }
+.poker-stage.is-mini .poker-pot > span { font-size:6px; letter-spacing:1px; }
+.poker-stage.is-mini .poker-pot > strong { font-size:15px; }
+.poker-stage.is-mini .poker-pot > strong small { font-size:8px; }
+.poker-stage.is-mini .poker-center-chips { padding:2px; }
+.poker-stage.is-mini .poker-center-chips i,.poker-stage.is-mini .poker-wager i { width:9px; height:5px; border-width:1px; }
+.poker-stage.is-mini .poker-wager { gap:2px; font-size:7px; }
+@media(min-width:768px) and (max-height:760px) {
+  .live-tables.is-dense { gap:8px; }
+  .live-tables.is-dense .live-table { padding:7px; }
+  .live-tables.is-dense .live-table-heading { font-size:7px; }
+  .live-tables.is-dense .live-table-heading > b { font-size:7px; }
+  .live-tables.is-dense .live-history { min-height:17px; max-height:17px; margin-top:3px; }
+  .live-tables.is-dense .live-decision { min-height:47px; gap:3px; }
+  .live-tables.is-dense .live-answer-buttons button { min-height:28px; }
+  .live-tables.is-dense .live-answer-buttons strong { font-size:9px; }
+  .live-tables.is-dense .decision-caption { font-size:6px; }
+  .live-tables.is-dense .decision-caption b { font-size:8px; }
+}
 @media(max-width:767px) { .live-table { height:auto; max-height:none; } }
 @media(prefers-reduced-motion:reduce) { .acting-dot { animation:none; } .home-tool { transition:none; } }

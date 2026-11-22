@@ -7,7 +7,7 @@ L’entrée **Drills** ouvre le nouveau système de scénarios. Les anciens modu
 1. Choisir une range dans la bibliothèque, tous dossiers confondus.
 2. Créer un scénario : nom, action source détectée, table HU ou 3–6 joueurs, position Hero et tapis de départ. Dans la séquence, chaque étape de Hero possède ses boutons personnalisables, une réponse juste et une explication facultative. Les actions adverses sont automatiques.
 3. Enregistrer, modifier, dupliquer ou supprimer le scénario.
-4. Choisir une range et cocher les scénarios à travailler, définir le nombre total de **mains** et 1–3 tables simultanées.
+4. Choisir une range et cocher les scénarios à travailler, définir le nombre total de **mains** et 1–6 tables simultanées.
 5. Recevoir la main avant la première décision de Hero, répondre, puis jouer la suite du coup. Feedback juste/faux pendant une seconde ; les adversaires jouent automatiquement, puis Hero répond à nouveau. Après la dernière décision, la main suivante arrive automatiquement. Un bilan reprend les erreurs par étape.
 
 ## Règles
@@ -17,6 +17,7 @@ L’entrée **Drills** ouvre le nouveau système de scénarios. Les anciens modu
 - Blindes 0,5 / 1 bb, sans ante, préflop uniquement. Tous les joueurs ont le même tapis initial (2–1 000 bb). Montants de raise exprimés en total engagé sur la street.
 - Le simulateur contrôle l’ordre de parole, les folds, les calls et les relances minimales. Les situations à tapis et les side pots ne sont pas pris en charge dans cette version.
 - Pot, contributions et tapis restants sont calculés depuis les blindes et les étapes déjà jouées. Hero reste en bas, même si sa position change. La table conserve une géométrie de pilule horizontale au ratio 2,2:1, indépendamment de la hauteur de l’écran.
+- Les badges joueurs affichent position et tapis ; les actions sont regroupées dans le récapitulatif au-dessus de la table. Pour 4 tables, disposition 2 × 2 ; pour 5–6 tables, disposition 3 × 2. Sur un écran peu haut, ces tables utilisent un affichage miniature ; sur mobile elles restent empilées.
 - Chaque étape Hero possède 2–6 boutons : libellé, action et montant total pour une relance. Le bouton juste est coché dans cette étape ; aucune réponse globale n’est demandée dans le contexte du scénario. Les libellés et actions ne peuvent pas être dupliqués, sauf sizings distincts d’une relance.
 - La bonne réponse vient de la configuration du scénario, pas d’un solver. Après une erreur intermédiaire, la séquence continue avec l’action de référence, annoncée dans le feedback.
 - Le nombre de mains désigne le total sur toutes les tables. Les statistiques comptent chaque décision de Hero séparément.
