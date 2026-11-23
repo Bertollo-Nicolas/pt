@@ -1,9 +1,10 @@
 import type { TrainingScenario } from './scenario-drill';
+import type {ScenarioSchedulerState} from './scenario-scheduler';
 import type { DecisionClock } from './drill-clock';
 import { validDecisionSeconds } from './drill-clock';
 export interface LiveTable { id:string; scenario:TrainingScenario; hand:string; cards?:{rank:string;suit:string}[];clock?:DecisionClock;held?:boolean;infoOpen?:boolean;cursor:number; phase:'acting'|'question'|'feedback'; chosen:string|null; correct:boolean|null }
 export interface PlayedDecision { name:string;hand:string;step:number;given:string;expected:string;correct:boolean;timedOut?:boolean }
-export interface LiveSession { id:string;scenarios:TrainingScenario[];length:number;allocated:number;completed:number;tables:LiveTable[];attempts:PlayedDecision[];done:boolean;decisionSeconds?:number;soundEnabled?:boolean;pauseAfterMistake?:boolean }
+export interface LiveSession { scheduler?:ScenarioSchedulerState;id:string;scenarios:TrainingScenario[];length:number;allocated:number;completed:number;tables:LiveTable[];attempts:PlayedDecision[];done:boolean;decisionSeconds?:number;soundEnabled?:boolean;pauseAfterMistake?:boolean }
 export interface DrillSetup {ranges?:string[];range:string;selected:string[];length:string;tables:number;decisionSeconds?:number;soundEnabled?:boolean;pauseAfterMistake?:boolean}
 export interface DrillWorkspace {
   updatedAt:number;

@@ -13,7 +13,8 @@
     "test:value": "node tests/value-drill.test.cjs",
     "test:scenarios": "node tests/scenario-drill.test.cjs",
     "test:workspace": "node tests/workspace-memory.test.cjs",
-    "test:timer": "node tests/drill-timer.test.cjs"
+    "test:timer": "node tests/drill-timer.test.cjs",
+    "test:scheduler": "node tests/scenario-scheduler.test.cjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

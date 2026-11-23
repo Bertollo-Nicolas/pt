@@ -51,13 +51,13 @@ Validation : npm run test:timer, test:scenarios et test:workspace.
 
 L’action All-in est disponible dans les réponses de Hero et les actions automatiques adverses. Le montant correspond au tapis initial, blindes incluses ; la table affiche les jetons engagés, le pot et le statut All-in. Face à un tapis adverse de même taille, les choix sont Fold ou Call. Les tapis restent identiques pour tous les joueurs du scénario.
 
-Dans la bibliothèque, Ranges du drill permet de cocher plusieurs ranges, puis de choisir leurs scénarios. Chaque nouvelle main tire un scénario du pool, puis une main de son action source. Le scénario précédent est évité quand plusieurs sont disponibles. La sélection est conservée dans la configuration synchronisée.
+Dans la bibliothèque, Ranges du drill permet de cocher plusieurs ranges, puis de choisir leurs scénarios. Le tirage adaptatif couvre les mains des actions sources sélectionnées et équilibre les scénarios à priorité égale. La sélection est conservée dans la configuration synchronisée.
 
 ## Variantes adverses OR
 
 Sur une action adverse Raise, le bouton or placé après le montant ajoute une nouvelle ligne dans le même bloc. Chaque ligne peut contenir une autre action ou un autre sizing, jusqu’à six variantes. La liste de questions Hero garde les mêmes étapes. Le sélecteur Réponse face à permet de configurer les boutons et la bonne réponse pour chaque contexte adverse. Les boutons hérités impossibles dans une variante sont retirés (par exemple Raise face à un tapis identique). Les modifications des boutons dans un contexte ne changent pas les autres.
 
-La main est tirée dans la même action source avant le tirage de la variante. Chaque combinaison adverse est équiprobable et figée dans le checkpoint de la main ; une mauvaise réponse ne change pas de branche. L’éditeur vérifie toutes les combinaisons (maximum 128), dont l’ordre de parole, les sizings, les boutons et les réponses. La suite commune doit rester légale pour chacune ; les variantes ne sont pas des arbres de suites de longueurs différentes.
+La main est tirée dans la même action source avant le tirage de la variante. Les variantes non maîtrisées et les moins vues sont prioritaires ; la variante tirée est figée dans le checkpoint de la main ; une mauvaise réponse ne change pas de branche. L’éditeur vérifie toutes les combinaisons (maximum 128), dont l’ordre de parole, les sizings, les boutons et les réponses. La suite commune doit rester légale pour chacune ; les variantes ne sont pas des arbres de suites de longueurs différentes.
 
 Les réponses de toutes les variantes sont visibles simultanément dans Bonne réponse pour chaque variante. Chaque ligne a son propre choix (ex. Call vs 2,5x / Fold vs 3x). Le menu Modifier les boutons pour sert uniquement à choisir les boutons à éditer. Le résumé de l’étape indique toutes les associations variante / réponse.
 
@@ -68,3 +68,11 @@ Le bouton Info à droite de chaque table affiche la range complète du dossier s
 La roue dentée de la barre de gauche propose Pause après une erreur (Off par défaut) et Time bank Off / 7 s / 15 s / 25 s. Le time bank est le chrono par décision de Hero ; changer sa durée réinitialise les chronos courants et annule les anciennes alertes. Une erreur ou un timeout avec la pause activée maintient la correction sur cette seule table jusqu’à Continuer cette table. Désactiver l’option libère les tables en attente.
 
 Les réglages sont sauvegardés dans la préparation et le checkpoint. Les arrêts par table et l’ouverture de la range font partie du checkpoint ; la reprise après refresh reste globalement en pause comme auparavant.
+
+## Tirage adaptatif des mains
+
+Le scheduler partage la couverture entre les scénarios utilisant une même range et une même action source. Il propose les mains les moins vues, évite les mains déjà actives et les six dernières mains quand le pool le permet, puis donne la priorité aux erreurs à couverture égale. Les mains restent strictement filtrées par action source ; aucun fold voisin extérieur n’est ajouté au drill.
+
+La maîtrise exige deux bonnes réponses consécutives pour chaque décision de Hero et chaque contexte adverse. Une ouverture commune aux branches partage sa progression ; Call vs 2,5x et Fold vs 3x ont des progressions distinctes. Une erreur ou un timeout remet la série de cette décision à zéro. Une main maîtrisée est mise de côté, puis un cycle d’entretien reprend lorsque le pool est maîtrisé. Un pool plus petit que le nombre de tables peut imposer des doublons.
+
+La progression adaptative est propre à la session et sauvegardée en JSON dans son checkpoint. Un refresh ne relance pas le tirage à zéro. Une nouvelle session recommence un nouveau cycle. Validation : npm run test:scheduler et session navigateur de 20 mains / 40 décisions sur six tables, incluant refresh et reprise.
