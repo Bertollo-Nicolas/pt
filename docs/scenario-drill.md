@@ -60,3 +60,11 @@ Sur une action adverse Raise, le bouton or placé après le montant ajoute une n
 La main est tirée dans la même action source avant le tirage de la variante. Chaque combinaison adverse est équiprobable et figée dans le checkpoint de la main ; une mauvaise réponse ne change pas de branche. L’éditeur vérifie toutes les combinaisons (maximum 128), dont l’ordre de parole, les sizings, les boutons et les réponses. La suite commune doit rester légale pour chacune ; les variantes ne sont pas des arbres de suites de longueurs différentes.
 
 Les réponses de toutes les variantes sont visibles simultanément dans Bonne réponse pour chaque variante. Chaque ligne a son propre choix (ex. Call vs 2,5x / Fold vs 3x). Le menu Modifier les boutons pour sert uniquement à choisir les boutons à éditer. Le résumé de l’étape indique toutes les associations variante / réponse.
+
+## Assistance et options en cours de session
+
+Le bouton Info à droite de chaque table affiche la range complète du dossier source, sa légende et la main actuelle encadrée en jaune. Il suspend cette table et son chrono jusqu’à fermeture ; les autres tables continuent.
+
+La roue dentée de la barre de gauche propose Pause après une erreur (Off par défaut) et Time bank Off / 7 s / 15 s / 25 s. Le time bank est le chrono par décision de Hero ; changer sa durée réinitialise les chronos courants et annule les anciennes alertes. Une erreur ou un timeout avec la pause activée maintient la correction sur cette seule table jusqu’à Continuer cette table. Désactiver l’option libère les tables en attente.
+
+Les réglages sont sauvegardés dans la préparation et le checkpoint. Les arrêts par table et l’ouverture de la range font partie du checkpoint ; la reprise après refresh reste globalement en pause comme auparavant.
