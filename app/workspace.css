@@ -139,10 +139,13 @@ button.bg-accent { color:#102014; }
 .exercise-toolbar { background:#1b1b1e; border-color:#36363c; }.exercise-workspace { background:#111113; }
 .hand-cell { border-radius:2px; }.builder-correction { background:#1c1c1f; border-color:#38383e; border-radius:9px; }
 @media(min-width:1051px) {
-  .builder-workspace:not(.is-review):not(:has(.builder-results)) { display:grid; grid-template-columns:minmax(0,1fr) 340px; grid-template-rows:auto minmax(0,1fr); padding:0 18px 18px; gap:16px; }
-  .builder-workspace:not(.is-review):not(:has(.builder-results)) > .exercise-heading { grid-column:1/-1; padding-left:0; padding-right:0; }
-  .builder-workspace:not(.is-review):not(:has(.builder-results)) > .builder-controls { grid-column:2; grid-row:2; min-height:0; overflow:auto; padding:16px; border-radius:10px; background:#1c1c1f; }
-  .builder-workspace:not(.is-review):not(:has(.builder-results)) > .builder-matrix { grid-column:1; grid-row:2; background:#151517; border-radius:8px; }
+  .builder-workspace:not(:has(.builder-results)) { display:grid; grid-template-columns:minmax(0,1fr) 340px; grid-template-rows:auto minmax(0,1fr); padding:0 18px 18px; gap:16px; }
+  .builder-workspace:not(:has(.builder-results)) > .exercise-heading { grid-column:1/-1; padding-left:0; padding-right:0; }
+  .builder-workspace:not(:has(.builder-results)) > .builder-controls { grid-column:2; grid-row:2; min-height:0; overflow:auto; padding:16px; border-radius:10px; background:#1c1c1f; }
+  .builder-workspace:not(:has(.builder-results)) > .builder-matrix { grid-column:1; grid-row:2; background:#151517; border-radius:8px; }
+  .builder-workspace.is-review:not(:has(.builder-results)) { grid-template-rows:auto auto minmax(0,1fr); }
+  .builder-workspace > .builder-review-banner { grid-column:1/-1; grid-row:2; margin-bottom:0; }
+  .builder-workspace.is-review:not(:has(.builder-results)) > .builder-controls,.builder-workspace.is-review:not(:has(.builder-results)) > .builder-matrix { grid-row:3; }
   .builder-controls .builder-action-palette { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; overflow:visible; margin:16px 0; }
   .builder-controls .builder-action-palette > div { min-width:0; }
 }

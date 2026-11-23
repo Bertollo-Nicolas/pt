@@ -266,6 +266,7 @@ export function GrilleView() {
   useEffect(() => {
     const obs = new ResizeObserver(updateSizes);
     if (containerRef.current) obs.observe(containerRef.current);
+    if (midRef.current) obs.observe(midRef.current);
     if (resultsRef.current) obs.observe(resultsRef.current);
     updateSizes();
     return () => obs.disconnect();
@@ -403,7 +404,7 @@ export function GrilleView() {
 
       {/* SRS banner */}
       {isSrsReview && (
-        <div className="flex-shrink-0 mb-1.5 px-3 py-2 bg-accent/10 border border-accent/30 rounded-lg flex items-center justify-between gap-2">
+        <div className="builder-review-banner flex-shrink-0 mb-1.5 px-3 py-2 bg-accent/10 border border-accent/30 rounded-lg flex items-center justify-between gap-2">
           <div>
             <span className="text-xs font-bold text-accent">Révision SRS</span>
             <span className="text-[11px] text-muted ml-2">Reconstituez la range de mémoire, puis vérifiez</span>
@@ -411,7 +412,7 @@ export function GrilleView() {
           <button onClick={() => store.setMode('srs')} className="min-h-8 px-2 text-[11px] text-muted hover:text-text transition-colors flex-shrink-0">Annuler</button>
         </div>
       )}
-      {roadmapGrilleSession && <div className="flex-shrink-0 mb-1.5 px-3 py-2 bg-accent/10 border border-accent/30 rounded-lg flex items-center justify-between gap-2"><div><span className="text-xs font-bold text-accent">Validation Roadmap</span><span className="text-[11px] text-muted ml-2">Reconstitue la range puis valide-la. Le SRS sera activé automatiquement.</span></div><button onClick={() => store.setMode('roadmap')} className="text-[10px] text-muted hover:text-text">Quitter</button></div>}
+      {roadmapGrilleSession && <div className="builder-review-banner flex-shrink-0 mb-1.5 px-3 py-2 bg-accent/10 border border-accent/30 rounded-lg flex items-center justify-between gap-2"><div><span className="text-xs font-bold text-accent">Validation Roadmap</span><span className="text-[11px] text-muted ml-2">Reconstitue la range puis valide-la. Le SRS sera activé automatiquement.</span></div><button onClick={() => store.setMode('roadmap')} className="text-[10px] text-muted hover:text-text">Quitter</button></div>}
 
       {/* ── Editing UI ──────────────────────────────────────────── */}
       {!checkResult && (
